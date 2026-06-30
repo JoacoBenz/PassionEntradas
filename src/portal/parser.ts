@@ -20,7 +20,7 @@ export const PORTAL_SELECTORS = {
   userInput:
     'input[name="username"], input[name="user"], input[name="login"], input[name="email"], input[type="text"]',
   passInput: 'input[name="password"], input[name="pass"], input[type="password"]',
-  submit: 'input[type="submit"], button[type="submit"], #login',
+  submit: '#button, input[type="submit"], button[type="submit"]',
   /** Algo que SOLO existe estando logueado (el menú de agente / logout). */
   loggedInMarker: 'a[href*="logout"], a[href*="event_list.php"]',
   /** Marcadores de captcha / MFA. Si aparece -> NO evadir. */
@@ -162,9 +162,27 @@ function readEventInfo(root: HTMLElement): { fecha: string | null; ciudad: strin
 }
 
 /**
+ * Clasifica una página de detalle según lo que devuelve el portal (que NO
+ * siempre coincide con el link de la lista: hay "book" que en realidad son
+ * On Request, y links que llevan a Servicios Extra):
+ *   - "book"       -> tiene tabla de sectores (inputs seat_cat_id[...]).
+ *   - "on_request" -> es un evento real (Event Information) pero SIN sectores
+ *                     bookeables: solo se puede pedir por consulta.
+ *   - "other"      -> ni evento ni sectores (p. ej. Servicios Extra / merch).
+ */
+export function classifyDetail(html: string): "book" | "on_request" | "other" {
+  if (/name=["']?seat_cat_id/i.test(html)) return "book";
+  if (/Event Information/i.test(html)) return "on_request";
+  return "other";
+}
+
+/**
  * Parsea event_detail.php -> un RawTicketInput por sector/categoría.
  * Usa los inputs hidden (seat_cat_id[]/unit_price[]/available_seats[]) que son
  * más estables que el texto.
+ *
+ * Regla de negocio: un sector con stock 0 NO se vende; pasa a "on_request"
+ * (consultar) con precio oculto, igual que los eventos sin precio.
  */
 export function parseEventDetail(html: string, ev: PortalEvent): RawTicketInput[] {
   const root = parse(html);
@@ -193,6 +211,7 @@ export function parseEventDetail(html: string, ev: PortalEvent): RawTicketInput[
       ? parseInt0(seatsInput.getAttribute("value"))
       : parseInt0(tds[3]?.text);
 
+    const sinStock = (stock ?? 0) <= 0;
     out.push({
       id: `${ev.eventId}::${catId}`,
       evento: ev.titulo,
@@ -200,12 +219,13 @@ export function parseEventDetail(html: string, ev: PortalEvent): RawTicketInput[
       fecha,
       ciudad,
       categoria: clean(tds[0]?.text) || null,
-      precio_origen: precio,
+      // Sin stock -> consultar: se oculta el precio (no es comprable).
+      precio_origen: sinStock ? null : precio,
       moneda_origen: "EUR",
       stock,
-      disponible: (stock ?? 0) > 0,
+      disponible: !sinStock,
       url_origen: ev.detailUrl,
-      estado: "book",
+      estado: sinStock ? "on_request" : "book",
     });
   }
   return out;

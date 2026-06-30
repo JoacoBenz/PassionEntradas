@@ -1,7 +1,7 @@
 import type { Config } from "../config/index.js";
 import type { Logger } from "../logger.js";
 import { fetchPortalHtml } from "./client.js";
-import { buildOnRequestRow, parseEventDetail, parseEventList } from "./parser.js";
+import { buildOnRequestRow, classifyDetail, parseEventDetail, parseEventList } from "./parser.js";
 import type { PortalSession } from "./session.js";
 import type { PortalEvent, RawTicketInput } from "./types.js";
 import { sleep } from "../util/time.js";
@@ -73,11 +73,24 @@ export async function scrapeRawTickets(deps: {
     try {
       const html = await fetchPortalHtml({ url: e.detailUrl, cookieHeader, cfg, log, signal });
       const sectors = parseEventDetail(html, e);
-      if (sectors.length === 0) {
-        log.warn({ eventId: e.eventId }, "detalle sin sectores parseables");
-        complete = false; // no sabemos si fue cambio de layout; conservador
+      if (sectors.length > 0) {
+        rows.push(...sectors);
+      } else {
+        // El portal devolvió una página sin sectores: puede ser un evento que
+        // en realidad es On Request, un Servicio Extra (merch) o un cambio de
+        // layout. Clasificamos para no marcar "incompleto" en los dos primeros.
+        const kind = classifyDetail(html);
+        if (kind === "on_request") {
+          rows.push(buildOnRequestRow(e));
+          log.info({ eventId: e.eventId }, "evento sin sectores: tratado como On Request");
+        } else if (kind === "other") {
+          log.info({ eventId: e.eventId }, "detalle no es un evento (Servicio Extra), omitido");
+        } else {
+          // Era una página "book" pero no pudimos parsear sectores: conservador.
+          log.warn({ eventId: e.eventId }, "detalle book sin sectores parseables");
+          complete = false;
+        }
       }
-      rows.push(...sectors);
     } catch (err) {
       // Un detalle que falla no tumba el ciclo, pero lo marca incompleto.
       log.warn({ err, eventId: e.eventId }, "fallo al traer/parsear detalle, continúo");

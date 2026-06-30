@@ -139,6 +139,16 @@ export class PortalSession {
     ]);
     await page.waitForLoadState("networkidle", { timeout: 30_000 }).catch(() => undefined);
 
+    // La página resultante del POST de login renderiza por JS y puede venir
+    // "vacía" (sin el marcador de sesión). Re-navegamos a una página real para
+    // confirmar la sesión de forma fiable.
+    await page
+      .goto(new URL(this.cfg.PE_EVENT_LIST_PATH, this.cfg.PE_BASE_URL).toString(), {
+        waitUntil: "networkidle",
+        timeout: 30_000,
+      })
+      .catch(() => undefined);
+
     await this.assertNotBlocked(page);
     if (!(await this.isLoggedIn(page))) {
       throw new LoginFailedError("Login no confirmado (credenciales o marcador de sesión)");
