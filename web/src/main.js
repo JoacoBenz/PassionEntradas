@@ -89,8 +89,12 @@ function buildEvents(rows) {
     const book = ev.ubicaciones.filter((u) => (u.stock ?? 0) > 0 && u.estado === "book");
     ev.bookable = book.length;
     ev.bookStock = book.reduce((a, u) => a + (u.stock ?? 0), 0); // entradas comprables
-    const precios = ev.ubicaciones.map((u) => (u.precio_final == null ? null : Number(u.precio_final))).filter((n) => n != null);
-    ev.minPrice = precios.length ? Math.min(...precios) : null;
+    // "desde": menor precio REAL (>0). Prioriza lo reservable; ignora 0/null
+    // (sectores sin precio o agotados, como GA/VIP de F1 que vienen en 0).
+    const precioPos = (arr) => arr.map((u) => Number(u.precio_final)).filter((n) => Number.isFinite(n) && n > 0);
+    const reservables = precioPos(book);
+    const todos = precioPos(ev.ubicaciones);
+    ev.minPrice = reservables.length ? Math.min(...reservables) : todos.length ? Math.min(...todos) : null;
     // TODO: enganchar acá el flujo de compra/contacto propio (checkout, WhatsApp,
     // mail, etc.). Por ahora los botones son placeholders y NO linkean al portal.
     ev.ubicaciones.sort((a, b) => {
@@ -108,9 +112,10 @@ function wordmark() {
 }
 
 function ladderRow(u) {
-  const precio = fmtMoney(u.precio_final, u.moneda_final);
+  const hasPrice = u.precio_final != null && Number(u.precio_final) > 0;
+  const precio = hasPrice ? fmtMoney(u.precio_final, u.moneda_final) : null;
   const stk = u.stock ?? 0;
-  const bookable = stk > 0 && u.estado === "book";
+  const bookable = stk > 0 && u.estado === "book" && hasPrice;
   const low = stk > 0 && stk <= 2;
   const sector = u.categoria || "Entrada general";
   const stat =
