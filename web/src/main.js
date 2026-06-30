@@ -60,7 +60,8 @@ const mesLabel = (iso) =>
 
 // ---- data ------------------------------------------------------------------
 async function fetchTickets() {
-  const url = `${SUPA_URL}/rest/v1/tickets?select=*&order=fecha.asc.nullslast`;
+  const cols = "id,evento,competicion,fecha,ciudad,categoria,precio_final,moneda_final,stock,estado";
+  const url = `${SUPA_URL}/rest/v1/tickets?select=${cols}&order=fecha.asc.nullslast`;
   const res = await fetch(url, { headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` } });
   if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
   return res.json();
@@ -87,10 +88,8 @@ function buildEvents(rows) {
     ev.bookStock = book.reduce((a, u) => a + (u.stock ?? 0), 0); // entradas comprables
     const precios = ev.ubicaciones.map((u) => (u.precio_final == null ? null : Number(u.precio_final))).filter((n) => n != null);
     ev.minPrice = precios.length ? Math.min(...precios) : null;
-    ev.cheapestUrl =
-      book.slice().sort((a, b) => Number(a.precio_final) - Number(b.precio_final))[0]?.url_origen ||
-      ev.ubicaciones[0]?.url_origen ||
-      "#";
+    // TODO: enganchar acá el flujo de compra/contacto propio (checkout, WhatsApp,
+    // mail, etc.). Por ahora los botones son placeholders y NO linkean al portal.
     ev.ubicaciones.sort((a, b) => {
       const pa = a.precio_final == null ? Infinity : Number(a.precio_final);
       const pb = b.precio_final == null ? Infinity : Number(b.precio_final);
@@ -120,7 +119,7 @@ function ladderRow(u) {
       <span class="seat-name">${esc(sector)}</span>
       <span class="seat-price">${precio ? esc(precio) : "—"}</span>
       <span class="seat-stat">${stat}</span>
-      <a class="seat-act ${bookable ? "go" : "ask"}" href="${esc(u.url_origen || "#")}" target="_blank" rel="noopener">
+      <a class="seat-act ${bookable ? "go" : "ask"}" href="#" data-placeholder>
         ${bookable ? "Reservar" : "Consultar"}
       </a>
     </li>`;
@@ -201,7 +200,7 @@ function rankItem(ev, idx) {
         <span class="rank-stock">${ev.bookStock} <small>entradas</small></span>
         <span class="rank-price">${ev.minPrice != null ? "desde " + esc(fmtMoney(ev.minPrice, "EUR")) : "a consultar"}</span>
       </div>
-      <a class="rank-act" href="${esc(ev.cheapestUrl)}" target="_blank" rel="noopener" data-stop>Reservar</a>
+      <a class="rank-act" href="#" data-stop data-placeholder>Reservar</a>
     </li>`;
 }
 
@@ -392,6 +391,12 @@ function renderCatalog() {
 
 // ---- boot ------------------------------------------------------------------
 window.addEventListener("hashchange", route);
+
+// Botones placeholder (Reservar/Consultar): todavía no tienen destino propio.
+app.addEventListener("click", (e) => {
+  const a = e.target.closest("[data-placeholder]");
+  if (a) e.preventDefault();
+});
 
 async function boot() {
   app.innerHTML = `<div class="splash">Armando la cartelera…</div>`;
