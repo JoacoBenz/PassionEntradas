@@ -28,8 +28,25 @@ export const PORTAL_SELECTORS = {
     '.g-recaptcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], #captcha, [data-mfa], input[name="otp"]',
 } as const;
 
-const clean = (s: string | undefined | null): string =>
+/**
+ * Repara mojibake: el portal (sitio viejo) sirve algunos textos UTF-8 pero
+ * etiquetados como latin1, así que "Autódromo" llega como "AutÃ³dromo".
+ * Si detectamos ese patrón, re-decodificamos latin1 -> utf8.
+ */
+function fixMojibake(s: string): string {
+  if (!/[ÂÃ][-¿]/.test(s)) return s;
+  try {
+    const r = Buffer.from(s, "latin1").toString("utf8");
+    return r.includes("�") ? s : r;
+  } catch {
+    return s;
+  }
+}
+
+const cleanRaw = (s: string | undefined | null): string =>
   (s ?? "").replace(/ /g, " ").replace(/\s+/g, " ").trim();
+
+const clean = (s: string | undefined | null): string => fixMojibake(cleanRaw(s));
 
 /**
  * Normaliza fechas del portal a ISO. Maneja:

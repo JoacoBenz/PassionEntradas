@@ -15,6 +15,9 @@ const fmtMoney = (n, cur) =>
         maximumFractionDigits: 0,
       }).format(Number(n));
 
+// Compacto para el talón: "€ 12.000" (sin el código "EUR" largo).
+const fmtEuro = (n) => (n == null ? null : "€ " + new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(Number(n)));
+
 const fmtDate = (iso) => {
   if (!iso) return { d: "—", m: "", y: "", full: "Fecha a confirmar" };
   const dt = new Date(iso);
@@ -117,7 +120,7 @@ function ladderRow(u) {
   return `
     <li class="seat ${bookable ? "" : "seat--req"}">
       <span class="seat-name">${esc(sector)}</span>
-      <span class="seat-price">${precio ? esc(precio) : "—"}</span>
+      <span class="seat-price">${precio ? esc(precio) : '<span class="consult">Consultar</span>'}</span>
       <span class="seat-stat">${stat}</span>
       <a class="seat-act ${bookable ? "go" : "ask"}" href="#" data-placeholder>
         ${bookable ? "Reservar" : "Consultar"}
@@ -155,7 +158,7 @@ function stub(ev, i) {
       </div>
       <aside class="ticket-stub">
         <span class="stub-label">${ev.minPrice != null ? "desde" : "precio"}</span>
-        <span class="stub-price">${ev.minPrice != null ? esc(fmtMoney(ev.minPrice, "EUR")) : "consulta"}</span>
+        <span class="stub-price ${ev.minPrice == null ? "is-consult" : ""}">${ev.minPrice != null ? esc(fmtEuro(ev.minPrice)) : "Consultar"}</span>
         <span class="stub-meta">${ev.ubicaciones.length} ubicaciones${ev.bookable ? ` · ${ev.bookable} con stock` : ""}</span>
         <span class="barcode" aria-hidden="true"></span>
         <span class="stub-code">N.º ${esc(code)}</span>

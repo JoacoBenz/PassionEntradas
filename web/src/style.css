@@ -244,10 +244,26 @@ a { color: inherit; }
 }
 .ladder {
   list-style: none; margin: 0; padding: 0;
-  transform-origin: top center; transform: rotateX(-92deg); opacity: .15;
-  transition: transform .55s cubic-bezier(.2, .7, .2, 1), opacity .4s ease .05s;
+  transform-origin: top center; transform: rotateX(-14deg); opacity: 0;
+  transition: transform .5s cubic-bezier(.22, .61, .36, 1), opacity .35s ease;
 }
-.ticket.open .ladder { transform: rotateX(0); opacity: 1; }
+.ticket.open .ladder { transform: none; opacity: 1; }
+
+/* cada ubicación cae en cascada al desenrollar (de arriba hacia abajo) */
+.seat { opacity: 0; transform: translateY(-8px);
+  transition: opacity .3s ease, transform .42s cubic-bezier(.2, .7, .2, 1); }
+.ticket.open .seat { opacity: 1; transform: none; }
+.ticket.open .seat:nth-child(1)  { transition-delay: .08s; }
+.ticket.open .seat:nth-child(2)  { transition-delay: .12s; }
+.ticket.open .seat:nth-child(3)  { transition-delay: .16s; }
+.ticket.open .seat:nth-child(4)  { transition-delay: .20s; }
+.ticket.open .seat:nth-child(5)  { transition-delay: .24s; }
+.ticket.open .seat:nth-child(6)  { transition-delay: .28s; }
+.ticket.open .seat:nth-child(7)  { transition-delay: .32s; }
+.ticket.open .seat:nth-child(8)  { transition-delay: .36s; }
+.ticket.open .seat:nth-child(9)  { transition-delay: .40s; }
+.ticket.open .seat:nth-child(10) { transition-delay: .44s; }
+.ticket.open .seat:nth-child(n+11) { transition-delay: .48s; }
 .seat {
   display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 14px;
   padding: 11px 2px; border-bottom: 1px solid var(--hair);
@@ -258,7 +274,9 @@ a { color: inherit; }
   font-family: "Space Mono", monospace; font-weight: 700; font-size: 14px;
   font-variant-numeric: tabular-nums; text-align: right; min-width: 78px;
 }
-.seat--req .seat-price { color: var(--hair); }
+.seat-price .consult {
+  color: var(--gold); text-transform: uppercase; font-weight: 700; font-size: 11px; letter-spacing: .05em;
+}
 .seat-stat {
   font-family: "Space Mono", monospace; font-size: 11px; color: var(--mute);
   display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 92px;
@@ -295,9 +313,10 @@ a { color: inherit; }
   letter-spacing: .18em; color: var(--mute);
 }
 .stub-price {
-  font-family: "Archivo", sans-serif; font-weight: 900; font-size: 30px; line-height: 1;
-  letter-spacing: -.02em;
+  font-family: "Archivo", sans-serif; font-weight: 900; font-size: 25px; line-height: 1.05;
+  letter-spacing: -.03em; white-space: nowrap;
 }
+.stub-price.is-consult { font-size: 19px; text-transform: uppercase; color: var(--gold); letter-spacing: 0; }
 .stub-meta { font-size: 11.5px; color: var(--mute); margin-top: 2px; line-height: 1.4; }
 .barcode {
   margin-top: auto; height: 38px; align-self: stretch;
@@ -379,4 +398,5 @@ a { color: inherit; }
   .ticket:hover { transform: none; }
   .ladder { transition: opacity .2s ease; transform: none; opacity: 1; }
   .roll-wrap { transition: max-height .2s ease; }
+  .seat { transition: none; opacity: 1; transform: none; }
 }
