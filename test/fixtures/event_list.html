@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Passion Events Booking System</title></head>
+  <body>
+    <ul><li><a href="https://passioneventsonline.eu/admin/event_list.php" class="active">Agent</a></li></ul>
+
+    <table><tr><td>Search Events</td></tr></table>
+    <table><tr><td>Latest News</td></tr></table>
+
+    <!-- Tabla de eventos (la real usa <td class="list-head-normal"> en la cabecera) -->
+    <table>
+      <tr>
+        <td class="list-head-normal"><a href="https://passioneventsonline.eu/admin/event_list.php?sort=event_title&amp;order=down">Title</a>&nbsp;</td>
+        <td class="list-head-normal"><a href="https://passioneventsonline.eu/admin/event_list.php?sort=sub_name&amp;order=down">Sub Category</a>&nbsp;</td>
+        <td align="center" class="list-head-selected"><a href="https://passioneventsonline.eu/admin/event_list.php?sort=event_start_date&amp;order=down">Start</a></td>
+        <td class="list-head-normal"><a href="https://passioneventsonline.eu/admin/event_list.php?sort=event_location&amp;order=down">Location</a>&nbsp;</td>
+        <td class="list-head-normal" align="center">Available Seats</td>
+        <td class="list-head-normal" align="center">Action</td>
+      </tr>
+
+      <!-- On Request: el Title NO es link; el link (event_detail_request.php) está en Action -->
+      <tr onmouseover="this.className='highlight'" onmouseout="this.className='normal'" class="normal">
+        <td class="list-column-left">Match 80, World Cup - Round of 32 - England vs Congo DR</td>
+        <td class="list-column-left">World Cup 2026 Canada / Mexico / USA</td>
+        <td class="list-column-center">Wed, 01-07-2026</td>
+        <td class="list-column-left">Atlanta Stadium, Atlanta (USA)</td>
+        <td class="list-column-center">0</td>
+        <td class="list-column-center"><a href="https://passioneventsonline.eu/admin/event_detail_request.php?event_id=9022">On Request</a></td>
+      </tr>
+      <tr class="normal">
+        <td class="list-column-left">Match 82, World Cup - Round of 32 - Belgium vs Senegal</td>
+        <td class="list-column-left">World Cup 2026 Canada / Mexico / USA</td>
+        <td class="list-column-center">Wed, 01-07-2026</td>
+        <td class="list-column-left">Seattle Stadium, Seattle (USA)</td>
+        <td class="list-column-center">0</td>
+        <td class="list-column-center"><a href="https://passioneventsonline.eu/admin/event_detail_request.php?event_id=9019">On Request</a></td>
+      </tr>
+
+      <!-- Book: el Title ES link a event_detail.php y el Action dice "Book" -->
+      <tr class="normal">
+        <td class="list-column-left"><a href="https://passioneventsonline.eu/admin/event_detail.php?event_id=9044">Match 104 - World Cup Final</a></td>
+        <td class="list-column-left">World Cup 2026 Canada / Mexico / USA</td>
+        <td class="list-column-center">Sun, 19-07-2026</td>
+        <td class="list-column-left">New York New Jersey Stadium, East Rutherford (USA)</td>
+        <td class="list-column-center">34</td>
+        <td class="list-column-center"><a href="https://passioneventsonline.eu/admin/event_detail.php?event_id=9044">Book</a></td>
+      </tr>
+      <tr class="normal">
+        <td class="list-column-left"><a href="https://passioneventsonline.eu/admin/event_detail.php?event_id=9167">F1 Madrid, Spanish Grand Prix 2026</a></td>
+        <td class="list-column-left">Formula 1 2026</td>
+        <td class="list-column-center">Sun, 13-09-2026</td>
+        <td class="list-column-left">Madrid (Spain)</td>
+        <td class="list-column-center">19</td>
+        <td class="list-column-center"><a href="https://passioneventsonline.eu/admin/event_detail.php?event_id=9167">Book</a></td>
+      </tr>
+    </table>
+  </body>
+</html>

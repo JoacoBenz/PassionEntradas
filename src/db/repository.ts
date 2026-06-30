@@ -9,7 +9,8 @@ const RUNS_TABLE = "sync_runs";
  * Acceso a datos. Implementa la REGLA ANTI-BORRADO:
  *  - upsert por lotes (nunca delete masivo).
  *  - los ids ausentes se marcan disponible=false/stock=0, NO se borran.
- *  - el marcado de ausentes lo decide el ciclo (tras pasar el guard parcial).
+ *  - el marcado de ausentes lo decide el ciclo (tras pasar el guard y solo si
+ *    el scrape fue completo).
  */
 export class TicketRepository {
   constructor(
@@ -17,14 +18,19 @@ export class TicketRepository {
     private readonly log: Logger,
   ) {}
 
-  /** Cantidad de tickets disponibles actualmente (baseline para el guard). */
-  async getAvailableCount(): Promise<number> {
-    const { count, error } = await this.db
-      .from(TABLE)
-      .select("id", { count: "exact", head: true })
-      .eq("disponible", true);
-    if (error) throw new Error(`getAvailableCount: ${error.message}`);
-    return count ?? 0;
+  /**
+   * Baseline para el guard anti-borrado: cantidad de ítems válidos del ÚLTIMO
+   * sync exitoso (no el total de la tabla, que crece con los marcados ausentes).
+   */
+  async getLastSuccessfulScrapedCount(): Promise<number> {
+    const { data, error } = await this.db
+      .from(RUNS_TABLE)
+      .select("scraped_valid")
+      .eq("status", "ok")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error) throw new Error(`getLastSuccessfulScrapedCount: ${error.message}`);
+    return data?.[0]?.scraped_valid ?? 0;
   }
 
   /** Upsert por lotes (onConflict id). Devuelve cuántas filas se enviaron. */
@@ -33,7 +39,7 @@ export class TicketRepository {
     for (let i = 0; i < rows.length; i += batchSize) {
       const chunk = rows.slice(i, i + batchSize).map(toDbRow);
       const { error } = await this.db.from(TABLE).upsert(chunk, { onConflict: "id" });
-      if (error) throw new Error(`upsert lote ${i / batchSize}: ${error.message}`);
+      if (error) throw new Error(`upsert lote ${Math.floor(i / batchSize)}: ${error.message}`);
       sent += chunk.length;
       this.log.debug({ sent, total: rows.length }, "lote upserted");
     }
@@ -41,9 +47,9 @@ export class TicketRepository {
   }
 
   /**
-   * Marca como no disponibles los ids NO vistos en este ciclo: aquellos cuyo
-   * scraped_at quedó anterior a runStartedAtIso y siguen disponible=true.
-   * (Todas las filas del ciclo se upsertean con scraped_at = runStartedAtIso.)
+   * Marca no disponibles los ids NO vistos en este ciclo: scraped_at anterior a
+   * runStartedAtIso y todavía disponible=true. (Todas las filas del ciclo se
+   * upsertean con scraped_at = runStartedAtIso.)
    */
   async markAbsentBefore(runStartedAtIso: string): Promise<number> {
     const { data, error } = await this.db
@@ -64,9 +70,10 @@ export class TicketRepository {
       scraped_raw: summary.scrapedRaw,
       scraped_valid: summary.scrapedValid,
       discarded: summary.discarded,
-      baseline_available: summary.baselineAvailable,
+      baseline_count: summary.baselineCount,
       upserted: summary.upserted,
       marked_unavailable: summary.markedUnavailable,
+      complete: summary.complete,
       duration_ms: summary.durationMs,
     });
     if (error) this.log.warn({ err: error.message }, "no se pudo registrar sync_run");
@@ -89,6 +96,7 @@ function toDbRow(t: TicketRow): Record<string, unknown> {
     stock: t.stock,
     disponible: t.disponible,
     url_origen: t.url_origen,
+    estado: t.estado,
     scraped_at: t.scraped_at,
   };
 }

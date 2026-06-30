@@ -1,56 +1,95 @@
 import type { Config } from "../config/index.js";
 import type { Logger } from "../logger.js";
-import { fetchPortalJson } from "./client.js";
-import { LISTING_PATHS, parseApiResponse, parseListingHtml } from "./parser.js";
+import { fetchPortalHtml } from "./client.js";
+import { buildOnRequestRow, parseEventDetail, parseEventList } from "./parser.js";
 import type { PortalSession } from "./session.js";
-import type { RawTicketInput } from "./types.js";
+import type { PortalEvent, RawTicketInput } from "./types.js";
+import { sleep } from "../util/time.js";
+
+export interface ScrapeResult {
+  rows: RawTicketInput[];
+  /**
+   * true solo si recorrimos TODO lo previsto (sin tope de detalles y sin fallos
+   * de detalle). El ciclo solo marca ausentes si el scrape fue completo, para
+   * no marcar como agotados eventos que simplemente no alcanzamos a procesar.
+   */
+  complete: boolean;
+}
+
+function matchesCategories(ev: PortalEvent, cats: string[]): boolean {
+  if (cats.length === 0) return true;
+  const hay = `${ev.subCategoria ?? ""} ${ev.titulo}`.toLowerCase();
+  return cats.some((c) => hay.includes(c.toLowerCase()));
+}
 
 /**
- * Orquesta la extracción según PE_SCRAPE_MODE:
- *  - api: replica el endpoint JSON interno reusando la cookie (preferido).
- *  - playwright: recorre LISTING_PATHS y parsea el HTML renderizado.
- *
- * Devuelve crudos (sin validar/priceear). Dedup por id estable (último gana).
+ * Flujo Passion Events:
+ *   1. GET event_list.php -> eventos (book / on_request).
+ *   2. on_request -> una fila sin precio (disponible=false).
+ *   3. book -> GET event_detail.php (throttle) -> una fila por sector con precio.
+ * La cookie de sesión sale de PortalSession (login con Playwright).
  */
 export async function scrapeRawTickets(deps: {
   cfg: Config;
   log: Logger;
   session: PortalSession;
   signal?: AbortSignal;
-}): Promise<RawTicketInput[]> {
+}): Promise<ScrapeResult> {
   const { cfg, log, session, signal } = deps;
-  const collected: RawTicketInput[] = [];
+  const cookieHeader = await session.getCookieHeader();
 
-  if (cfg.PE_SCRAPE_MODE === "api") {
-    if (!cfg.PE_API_ENDPOINT) {
-      throw new Error("PE_SCRAPE_MODE=api requiere PE_API_ENDPOINT");
-    }
-    const cookieHeader = await session.getCookieHeader();
-    const json = await fetchPortalJson({
-      url: cfg.PE_API_ENDPOINT,
-      cookieHeader,
-      cfg,
-      log,
-      signal,
-    });
-    collected.push(...parseApiResponse(json));
-  } else {
-    for (const p of LISTING_PATHS) {
-      try {
-        const html = await session.fetchHtml(p);
-        const items = parseListingHtml(html, cfg.PE_BASE_URL);
-        log.debug({ path: p, items: items.length }, "listado parseado");
-        collected.push(...items);
-      } catch (err) {
-        // Un path que falla no debe tumbar el ciclo entero; lo registramos y
-        // seguimos. La detección de sync parcial protege contra publicar de menos.
-        log.warn({ err, path: p }, "fallo parseando un listado, continúo");
+  const listUrl = new URL(cfg.PE_EVENT_LIST_PATH, cfg.PE_BASE_URL).toString();
+  const listHtml = await fetchPortalHtml({ url: listUrl, cookieHeader, cfg, log, signal });
+
+  let events = parseEventList(listHtml, cfg.PE_BASE_URL);
+  const totalEvents = events.length;
+  events = events.filter((e) => matchesCategories(e, cfg.PE_SYNC_CATEGORIES));
+  log.info(
+    { totalEvents, tras_filtro: events.length, categorias: cfg.PE_SYNC_CATEGORIES },
+    "eventos listados",
+  );
+
+  const rows: RawTicketInput[] = [];
+  let complete = true;
+
+  // On Request (sin precio).
+  if (cfg.PE_INCLUDE_ON_REQUEST) {
+    for (const e of events.filter((e) => e.estado === "on_request")) rows.push(buildOnRequestRow(e));
+  }
+
+  // Book (con precio): un GET de detalle por evento.
+  let books = events.filter((e) => e.estado === "book");
+  if (cfg.PE_MAX_DETAILS_PER_CYCLE > 0 && books.length > cfg.PE_MAX_DETAILS_PER_CYCLE) {
+    log.warn(
+      { tope: cfg.PE_MAX_DETAILS_PER_CYCLE, totalBook: books.length },
+      "tope de detalles alcanzado: ciclo INCOMPLETO (no se marcarán ausentes)",
+    );
+    books = books.slice(0, cfg.PE_MAX_DETAILS_PER_CYCLE);
+    complete = false;
+  }
+
+  for (let i = 0; i < books.length; i++) {
+    const e = books[i]!;
+    try {
+      const html = await fetchPortalHtml({ url: e.detailUrl, cookieHeader, cfg, log, signal });
+      const sectors = parseEventDetail(html, e);
+      if (sectors.length === 0) {
+        log.warn({ eventId: e.eventId }, "detalle sin sectores parseables");
+        complete = false; // no sabemos si fue cambio de layout; conservador
       }
+      rows.push(...sectors);
+    } catch (err) {
+      // Un detalle que falla no tumba el ciclo, pero lo marca incompleto.
+      log.warn({ err, eventId: e.eventId }, "fallo al traer/parsear detalle, continúo");
+      complete = false;
+    }
+    if (i < books.length - 1 && cfg.PE_DETAIL_THROTTLE_MS > 0) {
+      await sleep(cfg.PE_DETAIL_THROTTLE_MS, signal);
     }
   }
 
-  // Dedup por id estable.
+  // Dedup por id estable (último gana).
   const byId = new Map<string, RawTicketInput>();
-  for (const item of collected) byId.set(item.id, item);
-  return [...byId.values()];
+  for (const r of rows) byId.set(r.id, r);
+  return { rows: [...byId.values()], complete };
 }

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { computeFinalPrice, round2, roundToMultiple, type PricingOptions } from "./index.js";
+import {
+  computeFinalPrice,
+  priceTicket,
+  round2,
+  roundToMultiple,
+  type PricingOptions,
+} from "./index.js";
 
 const EUR: PricingOptions = {
   markup: 0.2,
@@ -71,5 +77,14 @@ describe("computeFinalPrice (input no confiable)", () => {
     expect(() => computeFinalPrice(-1, EUR)).toThrow();
     expect(() => computeFinalPrice(Number.NaN, EUR)).toThrow();
     expect(() => computeFinalPrice(Number.POSITIVE_INFINITY, EUR)).toThrow();
+  });
+});
+
+describe("priceTicket (tolerante a null para on_request)", () => {
+  it("null -> precio_final null, moneda null", () => {
+    expect(priceTicket(null, EUR)).toEqual({ precioFinal: null, monedaFinal: null });
+  });
+  it("con precio aplica el markup", () => {
+    expect(priceTicket(10000, EUR)).toEqual({ precioFinal: 12000, monedaFinal: "EUR" });
   });
 });

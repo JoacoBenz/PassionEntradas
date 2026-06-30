@@ -6,7 +6,7 @@ import { z } from "zod";
  * Forzamos numéricos y rechazamos negativos/no-numéricos antes de tocar la DB.
  */
 
-/** Coacciona "1.234,56 €", "1234.56", "1,234.56" -> number. null si no se puede. */
+/** Coacciona "10000", "1.234,56 €", "1,234.56" -> number. null si no se puede. */
 export function parseMoney(input: unknown): number | null {
   if (typeof input === "number") return Number.isFinite(input) ? input : null;
   if (typeof input !== "string") return null;
@@ -16,24 +16,21 @@ export function parseMoney(input: unknown): number | null {
   const hasDot = s.includes(".");
   if (hasComma && hasDot) {
     // El último separador es el decimal.
-    if (s.lastIndexOf(",") > s.lastIndexOf(".")) {
-      s = s.replace(/\./g, "").replace(",", "."); // formato europeo 1.234,56
-    } else {
-      s = s.replace(/,/g, ""); // formato 1,234.56
-    }
+    if (s.lastIndexOf(",") > s.lastIndexOf(".")) s = s.replace(/\./g, "").replace(",", ".");
+    else s = s.replace(/,/g, "");
   } else if (hasComma) {
-    s = s.replace(",", "."); // 1234,56
+    s = s.replace(",", ".");
   }
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
 }
 
-/** Intenta normalizar una fecha a ISO 8601; null si no parsea. */
-export function parseDateIso(input: unknown): string | null {
-  if (input == null) return null;
-  if (typeof input !== "string" && typeof input !== "number") return null;
-  const d = new Date(input);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+/** Entero desde texto ("4", "12 disponibles", "34"). null si no se puede. */
+export function parseInt0(input: unknown): number | null {
+  if (typeof input === "number") return Number.isFinite(input) ? Math.trunc(input) : null;
+  if (typeof input !== "string") return null;
+  const n = parseInt(input.replace(/[^\d-]/g, ""), 10);
+  return Number.isFinite(n) ? n : null;
 }
 
 const emptyToNull = (v: unknown) =>
@@ -50,7 +47,8 @@ export const RawTicketSchema = z.object({
   fecha: z.preprocess(emptyToNull, z.string().datetime().nullable()).default(null),
   ciudad: z.preprocess(emptyToNull, z.string().nullable()).default(null),
   categoria: z.preprocess(emptyToNull, z.string().nullable()).default(null),
-  precio_origen: z.number().finite().nonnegative(),
+  // null para on_request; si hay precio, debe ser finito y >= 0.
+  precio_origen: z.number().finite().nonnegative().nullable(),
   moneda_origen: z.string().min(1).default("EUR"),
   stock: z.preprocess(
     (v) => (v === "" || v == null ? null : v),
@@ -58,6 +56,7 @@ export const RawTicketSchema = z.object({
   ).default(null),
   disponible: z.boolean().default(true),
   url_origen: z.preprocess(emptyToNull, z.string().url().nullable()).default(null),
+  estado: z.enum(["book", "on_request"]).default("book"),
 });
 
 export type RawTicketParsed = z.infer<typeof RawTicketSchema>;
@@ -75,4 +74,17 @@ export interface RawTicketInput {
   stock?: number | null;
   disponible?: boolean;
   url_origen?: string | null;
+  estado: "book" | "on_request";
+}
+
+/** Evento tal como aparece en la lista (event_list.php), antes del detalle. */
+export interface PortalEvent {
+  eventId: string;
+  titulo: string;
+  subCategoria: string | null;
+  fechaLista: string | null;
+  ubicacion: string | null;
+  asientos: number | null;
+  estado: "book" | "on_request";
+  detailUrl: string;
 }

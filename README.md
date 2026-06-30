@@ -15,16 +15,19 @@ disponibilidad y precios actualizados.
 ## Arquitectura
 
 ```
-[Portal agentes passioneventsonline.eu]
-        | login (1 vez) -> sesión persistida (storageState)
+[Passion Events Booking System  ·  /admin/ (PHP server-side)]
+        | login (1 vez, Playwright) -> sesión persistida (storageState)
         | sync cada SYNC_INTERVAL_MS:
-        |   1. ensureSession()  -> re-login si expiró
-        |   2. recorrer eventos -> extraer stock + precio (parser aislado)
-        |   3. validar (zod)    -> descartar inválidos
-        |   4. guard anti-borrado (detección de sync parcial)
-        |   5. markup 20% (+ conversión opcional EUR->ARS)
-        |   6. upsert por lotes en Supabase
-        |   7. marcar ausentes como no disponibles (solo si pasó el guard)
+        |   1. ensureSession()         -> re-login si expiró
+        |   2. GET event_list.php      -> eventos (book / on_request)
+        |   3. book: GET event_detail.php (1 x evento, con throttle)
+        |            -> 1 fila por sector (precio + stock de inputs hidden)
+        |      on_request: 1 fila sin precio (disponible=false)
+        |   4. validar (zod)           -> descartar inválidos
+        |   5. guard anti-borrado      -> abortar si caída sospechosa
+        |   6. markup 20% (+ conversión opcional EUR->ARS)
+        |   7. upsert por lotes en Supabase
+        |   8. marcar ausentes (solo si el scrape fue completo)
         v
    [Supabase Postgres] <--(SELECT, anon key + RLS)-- [Next.js front]
 ```
@@ -35,12 +38,12 @@ disponibilidad y precios actualizados.
 src/
   config/      Config validada con zod (.env)
   portal/
-    parser.ts  ⭐ ÚNICO punto de acoplamiento con el portal (selectores/endpoint)
+    parser.ts  ⭐ ÚNICO punto de acoplamiento: parseEventList + parseEventDetail
     session.ts Login + storageState (Playwright); detecta expiración y captcha
-    client.ts  Cliente HTTP (undici) para el endpoint JSON interno (camino A)
-    scrape.ts  Orquesta extracción según PE_SCRAPE_MODE
+    client.ts  GET de páginas HTML del portal (undici) reusando la cookie
+    scrape.ts  Orquesta lista + detalle (book/on_request, throttle, completeness)
     types.ts   Validación zod del input no confiable del portal
-  pricing/     Markup + conversión (función pura, testeada)
+  pricing/     Markup + conversión (función pura, testeada; null para on_request)
   db/          Cliente Supabase + repositorio (upsert / anti-borrado)
   sync/
     partial-guard.ts  Regla anti-borrado (pura, testeada)
@@ -50,34 +53,41 @@ src/
 db/
   migrations/0001_init.sql   Esquema + RLS
   apply.ts                   Aplica migraciones (pg + SUPABASE_DB_URL)
-test/fixtures/               Fixtures de HTML/JSON para los tests del parser
+test/fixtures/               event_list.html + event_detail.html (HTML real del portal)
 ```
 
 ---
 
-## ⭐ Adaptar el parser al portal real (paso obligatorio)
+## Cómo lee el portal (ya adaptado al portal real)
 
-Este repo trae el sistema completo y robusto, pero la **forma exacta de los datos del
-portal** hay que capturarla vos (no se puede inferir sin la sesión logueada):
+El portal es el **Passion Events Booking System** (PHP server-side bajo `/admin/`).
+No hay API JSON: los datos vienen en el HTML. El parser ya está adaptado a esa
+estructura real (capturada de `event_list.php` y `event_detail.php`):
 
-1. Logueate en `https://passioneventsonline.eu/` en tu navegador.
-2. Abrí **DevTools → pestaña Network** y navegá a un listado de eventos.
-3. ¿Ves un request **XHR/fetch** que devuelve **JSON** con eventos/precios/stock?
-   - **Sí** → camino A (recomendado, el más estable). Poné `PE_SCRAPE_MODE=api` y
-     `PE_API_ENDPOINT=<esa URL>`. Ajustá `parseApiResponse()` en
-     [`src/portal/parser.ts`](src/portal/parser.ts) a la forma real del JSON
-     y actualizá el fixture [`test/fixtures/portal-api.json`](test/fixtures/portal-api.json).
-   - **No** (todo viene en el HTML server-side / render JS) → camino B. Dejá
-     `PE_SCRAPE_MODE=playwright`, ajustá los **selectores** y `parseListingHtml()` en
-     `src/portal/parser.ts`, `LISTING_PATHS`, y el fixture
-     [`test/fixtures/portal-list.html`](test/fixtures/portal-list.html).
-4. Confirmá también los **selectores de login** (`PORTAL_SELECTORS`) y el marcador de
-   sesión iniciada.
-5. `npm test` valida la **mecánica** del parser contra los fixtures. Al cambiar
-   selectores/forma, actualizá el fixture correspondiente.
+- **`event_list.php`** → tabla `Title | Sub Category | Start | Location | Available
+  Seats | Action`. El **tipo** se infiere de la URL del link:
+  - `event_detail.php?event_id=N`  → **"book"** (tiene precio, comprable).
+  - `event_detail_request.php?event_id=N` → **"on_request"** (sin precio, contacto).
+- **`event_detail.php`** (book) → tabla de sectores. Precio y stock se leen de los
+  **inputs hidden** `unit_price[]` y `available_seats[]` (más estable que el texto);
+  el id de sector sale de `seat_cat_id[]`. Cada sector = una fila en `tickets`
+  (`id = <event_id>::<seat_cat_id>`).
 
-Todo lo específico del portal vive **solo** en `src/portal/parser.ts`: si cambia el
-layout, se arregla en un único archivo.
+### Modelo de datos resultante
+
+| estado | precio | disponible | uso en el front |
+|---|---|---|---|
+| `book` | sí (×1.20) | `seats > 0` | mostrar precio y permitir compra |
+| `on_request` | `null` | `false` | mostrar "Consultar" (WhatsApp/mail) |
+
+Todo lo específico del portal vive **solo** en
+[`src/portal/parser.ts`](src/portal/parser.ts): si cambia el layout, se arregla en un
+único archivo (y se actualizan los fixtures de `test/`).
+
+> **Lo único pendiente de confirmar:** los **selectores del formulario de login**
+> (`PORTAL_SELECTORS` en `parser.ts`) son best-effort, porque la captura se hizo ya
+> logueado. Si el login automático falla, ajustá `userInput`/`passInput`/`submit` con
+> lo que veas en la página de login (`PE_LOGIN_URL`).
 
 ---
 
@@ -136,14 +146,18 @@ Ver [`.env.example`](.env.example) para la lista completa y comentada.
 | Variable | Default | Descripción |
 |---|---|---|
 | `PE_USER` / `PE_PASS` | — | Credenciales de **tu** cuenta de agente (secreto). |
-| `PE_BASE_URL` | `https://passioneventsonline.eu/` | Portal de origen. |
-| `PE_SCRAPE_MODE` | `playwright` | `api` (endpoint JSON) o `playwright` (HTML). |
-| `PE_API_ENDPOINT` | — | URL del endpoint JSON interno (si `mode=api`). |
+| `PE_BASE_URL` | `https://passioneventsonline.eu/admin/` | Base del portal (admin). |
+| `PE_LOGIN_URL` | (= base) | Página de login si difiere del index. |
+| `PE_EVENT_LIST_PATH` | `event_list.php` | Listado de eventos. |
+| `PE_SYNC_CATEGORIES` | (todas) | Filtro por Sub Category/Título (lista CSV). |
+| `PE_INCLUDE_ON_REQUEST` | `true` | Incluir eventos sin precio como `disponible=false`. |
+| `PE_DETAIL_THROTTLE_MS` | `1000` | Pausa entre fetches de detalle (cortesía). |
+| `PE_MAX_DETAILS_PER_CYCLE` | `0` | Tope de detalles por ciclo (0 = sin límite). |
 | `PRICE_MARKUP` | `0.20` | Markup fijo (+20 %). |
 | `CONVERT_TO_ARS` | `false` | Si `true`, convierte EUR→ARS. |
 | `EUR_ARS_RATE` | — | Tasa EUR→ARS (obligatoria si conversión `true`). |
 | `ARS_ROUND_TO` | `100` | Redondeo ARS (100 = al cien; 1 = entero). |
-| `SYNC_INTERVAL_MS` | `45000` | Espera **entre** ciclos (tras terminar cada uno). |
+| `SYNC_INTERVAL_MS` | `300000` | Espera **entre** ciclos (5 min; N+1 por detalle). |
 | `SYNC_DROP_ABORT_RATIO` | `0.7` | Aborta si la cantidad cae más que esto vs. último sync. |
 | `SUPABASE_URL` | — | URL del proyecto Supabase. |
 | `SUPABASE_SERVICE_ROLE_KEY` | — | **service_role** (secreto, solo en el worker). |
@@ -162,6 +176,8 @@ precio_final = round( precio_origen * (1 + PRICE_MARKUP) * tasaConversion )
 - Sin conversión: `tasaConversion = 1`, `moneda_final = 'EUR'`, redondeo a **2 decimales**.
 - Con `CONVERT_TO_ARS=true`: `tasaConversion = EUR_ARS_RATE`, `moneda_final = 'ARS'`,
   redondeo al **múltiplo `ARS_ROUND_TO`** (default 100).
+- Eventos **`on_request`**: no tienen precio de origen → `precio_final = null`
+  (no hay nada que markupear).
 
 Se guardan **siempre** `precio_origen` y `precio_final` por separado (trazabilidad).
 

@@ -33,7 +33,8 @@ export class PortalSession {
   }
 
   private get loginUrl(): string {
-    return this.cfg.PE_LOGIN_URL ?? new URL("/login", this.cfg.PE_BASE_URL).toString();
+    // En Passion Events el login está en el index del /admin/. Configurable.
+    return this.cfg.PE_LOGIN_URL ?? this.cfg.PE_BASE_URL;
   }
 
   private async stateExists(): Promise<boolean> {

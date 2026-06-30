@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Passion Events Booking System</title></head>
+  <body>
+    <ul><li><a href="https://passioneventsonline.eu/admin/event_list.php" class="active">Agent</a></li></ul>
+
+    <!-- Tabla #0: Event Information -->
+    <table>
+      <tr><th colspan="2" class="form-ttl">Event Information</th></tr>
+      <tr><td align="right" valign="top" height="7">&nbsp;</td><td>&nbsp;</td></tr>
+      <tr><td align="right" width="30%">Event Name:</td><td>Match 104 - World Cup Final</td></tr>
+      <tr><td align="right" width="30%">Event Start Date/Time:</td><td>Sun, 19/07/2026 15:00<span></span></td></tr>
+      <tr><td align="right" width="30%">Closing Date (Booking):</td><td>Sun, 12/07/2026 18:00</td></tr>
+      <tr><td align="right" width="30%">Event Venue:</td><td>New York New Jersey Stadium, East Rutherford (USA)</td></tr>
+      <tr><td align="right">Available:</td><td>34</td></tr>
+    </table>
+
+    <!-- Tabla #1: sectores con inputs hidden seat_cat_id[]/unit_price[]/available_seats[] -->
+    <table>
+      <tr style="height:25px">
+        <th width="100">Category</th>
+        <th width="65" align="center">Zone</th>
+        <th width="100">Ticket Price</th>
+        <th width="105">Available Seats</th>
+        <th width="65">Quantity</th>
+        <th width="100" align="center">Total</th>
+      </tr>
+      <tr class="" style="height:40px;">
+        <td align="center"><input type="hidden" name="seat_cat_id[]" id="chk_ticket_494" class="chk_ticket_class" value="494"> WC Cat 3/4</td>
+        <td align="center"><div>&nbsp;</div></td>
+        <td align="center">10000 <input type="hidden" value="10000" name="unit_price[]" class="unit_price">&nbsp;€</td>
+        <td align="center">4 <input type="hidden" value="4" name="available_seats[]" class="available_qty"></td>
+        <td align="center"><div class="qty_order">[ Order now ]</div></td>
+        <td align="center"><span class="total_price"></span></td>
+      </tr>
+      <tr class="allow-border-row" style="height:40px;">
+        <td align="center"><input type="hidden" name="seat_cat_id[]" id="chk_ticket_502" class="chk_ticket_class" value="502"> WC Cat 3/4 <br> (4-pack guarantee)</td>
+        <td align="center"><div>&nbsp;</div></td>
+        <td align="center">11500 <input type="hidden" value="11500" name="unit_price[]" class="unit_price">&nbsp;€</td>
+        <td align="center">4 <input type="hidden" value="4" name="available_seats[]" class="available_qty"></td>
+        <td align="center"><div class="qty_order">[ Order now ]</div></td>
+        <td align="center"><span class="total_price"></span></td>
+      </tr>
+      <tr class="" style="height:40px;">
+        <td align="center"><input type="hidden" name="seat_cat_id[]" id="chk_ticket_495" class="chk_ticket_class" value="495"> WC Cat 2</td>
+        <td align="center"><div>&nbsp;</div></td>
+        <td align="center">12000 <input type="hidden" value="12000" name="unit_price[]" class="unit_price">&nbsp;€</td>
+        <td align="center">4 <input type="hidden" value="4" name="available_seats[]" class="available_qty"></td>
+        <td align="center"><div class="qty_order">[ Order now ]</div></td>
+        <td align="center"><span class="total_price"></span></td>
+      </tr>
+    </table>
+  </body>
+</html>

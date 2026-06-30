@@ -1,237 +1,230 @@
-import { parse } from "node-html-parser";
-import { z } from "zod";
-import { parseDateIso, parseMoney, type RawTicketInput } from "./types.js";
+import { parse, type HTMLElement } from "node-html-parser";
+import { parseInt0, parseMoney, type PortalEvent, type RawTicketInput } from "./types.js";
 
 /**
  * ┌──────────────────────────────────────────────────────────────────────────┐
- * │  ⚠️  ÚNICO PUNTO DE ACOPLAMIENTO CON EL PORTAL.                            │
- * │                                                                            │
- * │  Toda la lógica/selectores específicos de passioneventsonline.eu viven    │
- * │  ACÁ. Cuando el layout o el endpoint cambien, se arregla SOLO este        │
- * │  archivo (y su fixture en test/fixtures).                                 │
- * │                                                                            │
- * │  Los selectores y la forma del JSON de abajo son REPRESENTATIVOS, basados │
- * │  en patrones típicos de portales de ticketing. Reemplazalos con lo que    │
- * │  capturás vos en DevTools > Network (modo `api`) o inspeccionando el DOM  │
- * │  (modo `playwright`). Los fixtures están hechos a juego para que los      │
- * │  tests validen la MECÁNICA del parser; al cambiar selectores, actualizá   │
- * │  el fixture.                                                               │
+ * │  ÚNICO PUNTO DE ACOPLAMIENTO CON EL PORTAL (Passion Events Booking System).│
+ * │  Adaptado a la estructura REAL capturada del admin:                        │
+ * │   - event_list.php      -> tabla de eventos (Title|SubCat|Start|Location|  │
+ * │                            Available Seats|Action).                        │
+ * │   - event_detail.php    -> "Book" (con precio): tabla de sectores con      │
+ * │                            inputs hidden seat_cat_id[]/unit_price[]/        │
+ * │                            available_seats[].                              │
+ * │   - event_detail_request.php -> "On Request" (sin precio, contacto).       │
+ * │  Si cambia el layout, se arregla acá (y en los fixtures de test).          │
  * └──────────────────────────────────────────────────────────────────────────┘
  */
 
-/** Selectores del flujo de login/sesión (modo playwright). TODO: confirmar en el portal. */
+/** Selectores del flujo de login/sesión. TODO: confirmar contra la página real de login. */
 export const PORTAL_SELECTORS = {
-  loginForm: 'form[action*="login"], #login-form, form#loginForm',
-  userInput: 'input[name="email"], input[name="username"], input[type="email"], #username',
-  passInput: 'input[name="password"], input[type="password"], #password',
-  submit: 'button[type="submit"], input[type="submit"], button#login',
-  /** Algo que SOLO existe estando logueado. */
-  loggedInMarker: 'a[href*="logout"], .user-menu, [data-logged-in="true"]',
-  /** Marcadores de captcha / MFA / verificación. Si aparece -> NO evadir. */
+  userInput:
+    'input[name="username"], input[name="user"], input[name="login"], input[name="email"], input[type="text"]',
+  passInput: 'input[name="password"], input[name="pass"], input[type="password"]',
+  submit: 'input[type="submit"], button[type="submit"], #login',
+  /** Algo que SOLO existe estando logueado (el menú de agente / logout). */
+  loggedInMarker: 'a[href*="logout"], a[href*="event_list.php"]',
+  /** Marcadores de captcha / MFA. Si aparece -> NO evadir. */
   challengeMarker:
     '.g-recaptcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], #captcha, [data-mfa], input[name="otp"]',
-  /** Contenedor de la grilla de eventos (modo playwright). */
-  eventCard: ".event-card, article.event",
 } as const;
 
-/**
- * Paths a recorrer en modo playwright (relativos a PE_BASE_URL).
- * TODO: ajustar a las categorías/deportes que realmente querés sincronizar.
- */
-export const LISTING_PATHS: string[] = ["/events", "/events?sport=football", "/events?sport=f1"];
+const clean = (s: string | undefined | null): string =>
+  (s ?? "").replace(/ /g, " ").replace(/\s+/g, " ").trim();
 
-/** Construye un id estable a partir de evento + categoría/sector. */
-export function buildId(eventId: string, categoryId: string): string {
-  return `${eventId}::${categoryId}`;
+/**
+ * Normaliza fechas del portal a ISO. Maneja:
+ *   "Wed, 01-07-2026"            -> 2026-07-01T00:00:00.000Z
+ *   "Sun, 19/07/2026 15:00"      -> 2026-07-19T15:00:00.000Z
+ * El portal no expone zona horaria; se interpreta como UTC (determinístico).
+ */
+export function parsePortalDate(input: unknown): string | null {
+  if (input == null) return null;
+  const s = String(input)
+    .replace(/ /g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^[A-Za-z]{2,4},?\s*/, ""); // saca el día de semana ("Sun, ")
+  const m = s.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (!m) return null;
+  const dd = m[1]!,
+    mm = m[2]!,
+    yyyy = m[3]!,
+    hh = m[4] ?? "0",
+    min = m[5] ?? "0";
+  const d = new Date(Date.UTC(+yyyy, +mm - 1, +dd, +hh, +min));
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 /** ¿El HTML corresponde a una sesión logueada? */
 export function isLoggedInHtml(html: string): boolean {
-  const root = parse(html);
-  return root.querySelector(PORTAL_SELECTORS.loggedInMarker) !== null;
+  return parse(html).querySelector(PORTAL_SELECTORS.loggedInMarker) !== null;
 }
 
-/** ¿Hay captcha/MFA/verificación en la página? (señal de bloqueo) */
+/** ¿Hay captcha/MFA/verificación? (señal de bloqueo: no se evade) */
 export function isChallengeHtml(html: string): boolean {
-  const root = parse(html);
-  if (root.querySelector(PORTAL_SELECTORS.challengeMarker)) return true;
+  if (parse(html).querySelector(PORTAL_SELECTORS.challengeMarker)) return true;
   const lower = html.toLowerCase();
-  return (
-    lower.includes("recaptcha") ||
-    lower.includes("hcaptcha") ||
-    lower.includes("verifica que no eres un robot") ||
-    lower.includes("verify you are human")
-  );
+  return lower.includes("recaptcha") || lower.includes("hcaptcha");
 }
 
-const txt = (s: string | undefined | null): string => (s ?? "").replace(/\s+/g, " ").trim();
-
-// ──────────────────────────────────────────────────────────────────────────
-// CAMINO A (preferido): endpoint JSON interno (XHR/fetch).
-// ──────────────────────────────────────────────────────────────────────────
-
-/** Forma laxa del envelope JSON del portal. Ajustar a la real. */
-const ApiCategory = z.object({
-  id: z.union([z.string(), z.number()]).transform(String),
-  name: z.string().optional(),
-  price: z.unknown().optional(),
-  currency: z.string().optional(),
-  available: z.unknown().optional(),
-  stock: z.unknown().optional(),
-  soldOut: z.boolean().optional(),
-  url: z.string().optional(),
-});
-
-const ApiEvent = z.object({
-  id: z.union([z.string(), z.number()]).transform(String),
-  name: z.string().optional(),
-  title: z.string().optional(),
-  competition: z.string().optional(),
-  startDate: z.union([z.string(), z.number()]).optional(),
-  date: z.union([z.string(), z.number()]).optional(),
-  city: z.string().optional(),
-  venueCity: z.string().optional(),
-  url: z.string().optional(),
-  categories: z.array(ApiCategory).default([]),
-  tickets: z.array(ApiCategory).default([]),
-});
-
-const ApiEnvelope = z.union([
-  z.object({ events: z.array(ApiEvent) }),
-  z.object({ data: z.array(ApiEvent) }),
-  z.array(ApiEvent),
-]);
-
-function toStockAndAvail(c: z.infer<typeof ApiCategory>): {
-  stock: number | null;
-  disponible: boolean;
-} {
-  const rawStock = c.stock ?? c.available;
-  let stock: number | null = null;
-  if (typeof rawStock === "number" && Number.isFinite(rawStock)) stock = Math.trunc(rawStock);
-  else if (typeof rawStock === "string") {
-    const n = parseInt(rawStock.replace(/[^\d]/g, ""), 10);
-    stock = Number.isFinite(n) ? n : null;
+const absUrl = (href: string, baseUrl: string): string => {
+  try {
+    return new URL(href, baseUrl).toString();
+  } catch {
+    return href;
   }
-  const disponible = c.soldOut === true ? false : stock == null ? true : stock > 0;
-  return { stock, disponible };
+};
+
+// ──────────────────────────────────────────────────────────────────────────
+// LISTA: event_list.php
+// ──────────────────────────────────────────────────────────────────────────
+
+/** Encuentra la tabla cuya fila de cabecera contiene los textos dados. */
+function findTableByHeader(root: HTMLElement, ...needles: string[]): HTMLElement | null {
+  for (const t of root.querySelectorAll("table")) {
+    const head = clean(t.querySelector("tr")?.text).toLowerCase();
+    if (needles.every((n) => head.includes(n))) return t;
+  }
+  return null;
 }
 
 /**
- * Parsea la respuesta JSON del endpoint interno a RawTicketInput[].
- * Devuelve [] si el envelope no matchea (se loguea aguas arriba como sync vacío).
+ * Parsea event_list.php -> eventos. El tipo se infiere de la URL del link:
+ *   event_detail.php          -> "book" (tiene precio)
+ *   event_detail_request.php  -> "on_request" (sin precio)
  */
-export function parseApiResponse(raw: unknown): RawTicketInput[] {
-  const parsed = ApiEnvelope.safeParse(raw);
-  if (!parsed.success) return [];
-  const events = Array.isArray(parsed.data)
-    ? parsed.data
-    : "events" in parsed.data
-      ? parsed.data.events
-      : parsed.data.data;
-
-  const out: RawTicketInput[] = [];
-  for (const ev of events) {
-    const evento = txt(ev.name ?? ev.title);
-    if (!evento) continue;
-    const fecha = parseDateIso(ev.startDate ?? ev.date ?? null);
-    const cats = [...ev.categories, ...ev.tickets];
-    for (const c of cats) {
-      const precio = parseMoney(c.price ?? null);
-      const { stock, disponible } = toStockAndAvail(c);
-      out.push({
-        id: buildId(ev.id, c.id),
-        evento,
-        competicion: ev.competition ?? null,
-        fecha,
-        ciudad: ev.city ?? ev.venueCity ?? null,
-        categoria: txt(c.name) || null,
-        precio_origen: precio,
-        moneda_origen: c.currency ?? "EUR",
-        stock,
-        disponible,
-        url_origen: c.url ?? ev.url ?? null,
-      });
-    }
-  }
-  return out;
-}
-
-// ──────────────────────────────────────────────────────────────────────────
-// CAMINO B (fallback): HTML renderizado (modo playwright -> page.content()).
-// ──────────────────────────────────────────────────────────────────────────
-
-/**
- * Parsea el HTML de un listado a RawTicketInput[].
- * Estructura esperada (REEMPLAZAR por la real):
- *
- *   <article class="event-card" data-event-id="evt-1">
- *     <h3 class="event-title">FC Barcelona vs Real Madrid</h3>
- *     <span class="event-competition">LaLiga</span>
- *     <time class="event-date" datetime="2026-04-21T20:00:00Z">...</time>
- *     <span class="event-city">Barcelona</span>
- *     <ul class="ticket-categories">
- *       <li class="ticket-row" data-category-id="cat-A">
- *         <span class="cat-name">Categoría 1</span>
- *         <span class="cat-price">€ 350,00</span>
- *         <span class="cat-stock" data-stock="12">12 disponibles</span>
- *         <a class="cat-link" href="/events/evt-1/cat-A">Ver</a>
- *       </li>
- *     </ul>
- *   </article>
- */
-export function parseListingHtml(html: string, baseUrl?: string): RawTicketInput[] {
+export function parseEventList(html: string, baseUrl: string): PortalEvent[] {
   const root = parse(html);
-  const out: RawTicketInput[] = [];
+  const table = findTableByHeader(root, "available seats", "action");
+  if (!table) return [];
 
-  for (const card of root.querySelectorAll(".event-card")) {
-    const eventId =
-      card.getAttribute("data-event-id") ?? card.getAttribute("id") ?? "";
-    const evento = txt(card.querySelector(".event-title")?.text);
-    if (!eventId || !evento) continue;
+  const out: PortalEvent[] = [];
+  for (const tr of table.querySelectorAll("tr")) {
+    const tds = tr.querySelectorAll("td");
+    if (tds.length < 6) continue;
 
-    const competicion = txt(card.querySelector(".event-competition")?.text) || null;
-    const dateEl = card.querySelector(".event-date");
-    const fecha = parseDateIso(dateEl?.getAttribute("datetime") ?? txt(dateEl?.text) ?? null);
-    const ciudad = txt(card.querySelector(".event-city")?.text) || null;
+    const hrefs = tr
+      .querySelectorAll("a")
+      .map((a) => a.getAttribute("href") ?? "")
+      .filter((h) => /event_id=/.test(h));
+    if (hrefs.length === 0) continue; // fila de cabecera (links de sort, sin event_id)
 
-    for (const row of card.querySelectorAll(".ticket-row")) {
-      const categoryId =
-        row.getAttribute("data-category-id") ?? row.getAttribute("id") ?? "";
-      if (!categoryId) continue;
+    const bookHref = hrefs.find((h) => /event_detail\.php/i.test(h));
+    const reqHref = hrefs.find((h) => /event_detail_request\.php/i.test(h));
+    const href = bookHref ?? reqHref ?? hrefs[0]!;
+    const idMatch = href.match(/event_id=(\d+)/);
+    if (!idMatch) continue;
 
-      const categoria = txt(row.querySelector(".cat-name")?.text) || null;
-      const precio = parseMoney(row.querySelector(".cat-price")?.text ?? null);
-
-      const stockEl = row.querySelector(".cat-stock");
-      const stockAttr = stockEl?.getAttribute("data-stock");
-      let stock: number | null = null;
-      if (stockAttr != null && stockAttr !== "") {
-        const n = parseInt(stockAttr, 10);
-        stock = Number.isFinite(n) ? n : null;
-      }
-      const soldOut =
-        row.classList.contains("sold-out") ||
-        /agotado|sold\s*out/i.test(txt(stockEl?.text));
-      const disponible = soldOut ? false : stock == null ? true : stock > 0;
-
-      const href = row.querySelector(".cat-link")?.getAttribute("href") ?? null;
-      const url_origen = href && baseUrl ? new URL(href, baseUrl).toString() : href;
-
-      out.push({
-        id: buildId(eventId, categoryId),
-        evento,
-        competicion,
-        fecha: fecha || null,
-        ciudad,
-        categoria,
-        precio_origen: precio,
-        moneda_origen: "EUR",
-        stock,
-        disponible,
-        url_origen,
-      });
-    }
+    out.push({
+      eventId: idMatch[1]!,
+      titulo: clean(tds[0]!.text),
+      subCategoria: clean(tds[1]!.text) || null,
+      fechaLista: parsePortalDate(tds[2]!.text),
+      ubicacion: clean(tds[3]!.text) || null,
+      asientos: parseInt0(tds[4]!.text),
+      estado: bookHref ? "book" : "on_request",
+      detailUrl: absUrl(href, baseUrl),
+    });
   }
   return out;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// DETALLE: event_detail.php (Book) -> un RawTicketInput por sector.
+// ──────────────────────────────────────────────────────────────────────────
+
+function inputByName(row: HTMLElement, prefix: string): HTMLElement | undefined {
+  return row.querySelectorAll("input").find((i) => (i.getAttribute("name") ?? "").startsWith(prefix));
+}
+function inputByClass(row: HTMLElement, cls: string): HTMLElement | undefined {
+  return row.querySelectorAll("input").find((i) => (i.getAttribute("class") ?? "").includes(cls));
+}
+
+/** Enriquece fecha/ciudad desde la tabla "Event Information". */
+function readEventInfo(root: HTMLElement): { fecha: string | null; ciudad: string | null } {
+  let fecha: string | null = null;
+  let ciudad: string | null = null;
+  for (const t of root.querySelectorAll("table")) {
+    for (const tr of t.querySelectorAll("tr")) {
+      const tds = tr.querySelectorAll("td");
+      if (tds.length < 2) continue;
+      const label = clean(tds[0]!.text).toLowerCase();
+      const val = clean(tds[1]!.text);
+      if (label.includes("start date")) {
+        const d = parsePortalDate(val);
+        if (d) fecha = d;
+      } else if (label.includes("venue")) {
+        if (val) ciudad = val;
+      }
+    }
+  }
+  return { fecha, ciudad };
+}
+
+/**
+ * Parsea event_detail.php -> un RawTicketInput por sector/categoría.
+ * Usa los inputs hidden (seat_cat_id[]/unit_price[]/available_seats[]) que son
+ * más estables que el texto.
+ */
+export function parseEventDetail(html: string, ev: PortalEvent): RawTicketInput[] {
+  const root = parse(html);
+  const info = readEventInfo(root);
+  const fecha = info.fecha ?? ev.fechaLista;
+  const ciudad = info.ciudad ?? ev.ubicacion;
+
+  const table = findTableByHeader(root, "ticket price", "category");
+  if (!table) return [];
+
+  const out: RawTicketInput[] = [];
+  for (const tr of table.querySelectorAll("tr")) {
+    const catIdInput = inputByName(tr, "seat_cat_id");
+    if (!catIdInput) continue; // cabecera u otra fila
+    const catId = catIdInput.getAttribute("value") ?? "";
+    if (!catId) continue;
+
+    const tds = tr.querySelectorAll("td");
+    const priceInput = inputByClass(tr, "unit_price") ?? inputByName(tr, "unit_price");
+    const seatsInput = inputByClass(tr, "available_qty") ?? inputByName(tr, "available_seats");
+
+    const precio = priceInput
+      ? parseMoney(priceInput.getAttribute("value"))
+      : parseMoney(tds[2]?.text);
+    const stock = seatsInput
+      ? parseInt0(seatsInput.getAttribute("value"))
+      : parseInt0(tds[3]?.text);
+
+    out.push({
+      id: `${ev.eventId}::${catId}`,
+      evento: ev.titulo,
+      competicion: ev.subCategoria,
+      fecha,
+      ciudad,
+      categoria: clean(tds[0]?.text) || null,
+      precio_origen: precio,
+      moneda_origen: "EUR",
+      stock,
+      disponible: (stock ?? 0) > 0,
+      url_origen: ev.detailUrl,
+      estado: "book",
+    });
+  }
+  return out;
+}
+
+/** Construye la fila de un evento "On Request" (sin precio, contacto). */
+export function buildOnRequestRow(ev: PortalEvent): RawTicketInput {
+  return {
+    id: `${ev.eventId}::REQ`,
+    evento: ev.titulo,
+    competicion: ev.subCategoria,
+    fecha: ev.fechaLista,
+    ciudad: ev.ubicacion,
+    categoria: null,
+    precio_origen: null,
+    moneda_origen: "EUR",
+    stock: ev.asientos ?? 0,
+    disponible: false,
+    url_origen: ev.detailUrl,
+    estado: "on_request",
+  };
 }

@@ -1,6 +1,6 @@
 import type { Config } from "../config/index.js";
 import type { Logger } from "../logger.js";
-import { computeFinalPrice, type PricingOptions } from "../pricing/index.js";
+import { priceTicket, type PricingOptions } from "../pricing/index.js";
 import { scrapeRawTickets } from "../portal/scrape.js";
 import type { PortalSession } from "../portal/session.js";
 import { RawTicketSchema } from "../portal/types.js";
@@ -29,8 +29,9 @@ function pricingOptions(cfg: Config): PricingOptions {
 
 /**
  * Ejecuta un ciclo completo:
- *  scrape -> validar (zod) -> guard anti-borrado -> markup -> upsert ->
- *  marcar ausentes -> registrar resumen.
+ *  scrape (lista + detalle) -> validar (zod) -> guard anti-borrado ->
+ *  markup (precio_final, null para on_request) -> upsert ->
+ *  marcar ausentes (solo si el scrape fue completo) -> registrar resumen.
  */
 export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
   const { cfg, log, session, repo, signal } = deps;
@@ -39,9 +40,9 @@ export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
   const startedAtIso = new Date(startMs).toISOString();
 
   // 1. Extraer.
-  const raw = await scrapeRawTickets({ cfg, log, session, signal });
+  const { rows: raw, complete } = await scrapeRawTickets({ cfg, log, session, signal });
 
-  // 2. Validar con zod. Descartar inválidos y contar.
+  // 2. Validar con zod + aplicar markup. Descartar inválidos y contar.
   const opts = pricingOptions(cfg);
   const rows: TicketRow[] = [];
   let discarded = 0;
@@ -52,7 +53,7 @@ export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
       continue;
     }
     try {
-      const { precioFinal, monedaFinal } = computeFinalPrice(parsed.data.precio_origen, opts);
+      const { precioFinal, monedaFinal } = priceTicket(parsed.data.precio_origen, opts);
       rows.push({
         ...parsed.data,
         precio_final: precioFinal,
@@ -65,22 +66,28 @@ export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
     }
   }
 
-  // 3. Guard anti-borrado: baseline = disponibles actuales.
-  const baseline = await repo.getAvailableCount();
+  // 3. Guard anti-borrado: baseline = ítems válidos del último sync exitoso.
+  const baseline = await repo.getLastSuccessfulScrapedCount();
   const decision = decidePublish({
     scrapedValid: rows.length,
     baselineAvailable: baseline,
     dropAbortRatio: cfg.SYNC_DROP_ABORT_RATIO,
   });
 
+  const base: Omit<SyncSummary, "status" | "reason" | "upserted" | "markedUnavailable"> = {
+    scrapedRaw: raw.length,
+    scrapedValid: rows.length,
+    discarded,
+    baselineCount: baseline,
+    complete,
+    durationMs: 0,
+  };
+
   if (!decision.publish) {
     const summary: SyncSummary = {
+      ...base,
       status: "aborted",
       reason: decision.reason,
-      scrapedRaw: raw.length,
-      scrapedValid: rows.length,
-      discarded,
-      baselineAvailable: baseline,
       upserted: 0,
       markedUnavailable: 0,
       durationMs: now() - startMs,
@@ -90,17 +97,19 @@ export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
     return summary;
   }
 
-  // 4. Publicar: upsert + marcar ausentes.
+  // 4. Publicar: upsert siempre; marcar ausentes solo si el scrape fue completo.
   const upserted = await repo.upsertBatches(rows, cfg.UPSERT_BATCH_SIZE);
-  const markedUnavailable = await repo.markAbsentBefore(startedAtIso);
+  let markedUnavailable = 0;
+  if (complete) {
+    markedUnavailable = await repo.markAbsentBefore(startedAtIso);
+  } else {
+    log.warn("scrape incompleto: NO se marcan ausentes (evita falsos agotados)");
+  }
 
   const summary: SyncSummary = {
+    ...base,
     status: "ok",
-    reason: "ok",
-    scrapedRaw: raw.length,
-    scrapedValid: rows.length,
-    discarded,
-    baselineAvailable: baseline,
+    reason: complete ? "ok" : "ok_incomplete",
     upserted,
     markedUnavailable,
     durationMs: now() - startMs,

@@ -1,80 +1,105 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { parseApiResponse, parseListingHtml, buildId } from "./parser.js";
-import { RawTicketSchema } from "./types.js";
+import {
+  buildOnRequestRow,
+  parseEventDetail,
+  parseEventList,
+  parsePortalDate,
+} from "./parser.js";
+import { RawTicketSchema, type PortalEvent } from "./types.js";
 
+const BASE = "https://passioneventsonline.eu/admin/";
 const fixture = (name: string): string =>
   readFileSync(fileURLToPath(new URL(`../../test/fixtures/${name}`, import.meta.url)), "utf8");
 
-describe("parseApiResponse (camino A: JSON interno)", () => {
-  const items = parseApiResponse(JSON.parse(fixture("portal-api.json")));
-
-  it("aplana eventos x categorías a 3 tickets", () => {
-    expect(items).toHaveLength(3);
-  });
-
-  it("mapea precios, stock y disponibilidad (incluye soldOut y precio string)", () => {
-    const a = items.find((t) => t.id === buildId("evt-1", "cat-A"));
-    expect(a).toMatchObject({
-      evento: "FC Barcelona vs Real Madrid",
-      competicion: "LaLiga",
-      ciudad: "Barcelona",
-      precio_origen: 350,
-      stock: 12,
-      disponible: true,
-    });
-
-    const b = items.find((t) => t.id === buildId("evt-1", "cat-B"));
-    expect(b).toMatchObject({ precio_origen: 220, stock: 0, disponible: false });
-
-    // evt-2 usa title/date/venueCity/tickets y price string "€ 480,00", stock "5 disponibles"
-    const g = items.find((t) => t.id === buildId("evt-2", "cat-G"));
-    expect(g).toMatchObject({
-      evento: "Gran Premio de España F1",
-      precio_origen: 480,
-      stock: 5,
-      disponible: true,
-    });
-    expect(g?.fecha).toBe("2026-06-14T13:00:00.000Z");
-  });
-
-  it("todo lo extraído pasa la validación zod", () => {
-    for (const it of items) expect(RawTicketSchema.safeParse(it).success).toBe(true);
-  });
-
-  it("devuelve [] ante un envelope desconocido", () => {
-    expect(parseApiResponse({ nope: true })).toEqual([]);
-    expect(parseApiResponse(null)).toEqual([]);
+describe("parsePortalDate", () => {
+  it("parsea formato lista (DD-MM-YYYY) y detalle (DD/MM/YYYY HH:mm)", () => {
+    expect(parsePortalDate("Wed, 01-07-2026")).toBe("2026-07-01T00:00:00.000Z");
+    expect(parsePortalDate("Sun, 19/07/2026 15:00")).toBe("2026-07-19T15:00:00.000Z");
+    expect(parsePortalDate("basura")).toBeNull();
   });
 });
 
-describe("parseListingHtml (camino B: HTML renderizado)", () => {
-  const items = parseListingHtml(fixture("portal-list.html"), "https://passioneventsonline.eu/");
+describe("parseEventList (event_list.php)", () => {
+  const events = parseEventList(fixture("event_list.html"), BASE);
 
-  it("extrae 3 tickets de 2 eventos", () => {
-    expect(items).toHaveLength(3);
+  it("extrae 4 eventos (2 on_request + 2 book)", () => {
+    expect(events).toHaveLength(4);
+    expect(events.filter((e) => e.estado === "book")).toHaveLength(2);
+    expect(events.filter((e) => e.estado === "on_request")).toHaveLength(2);
   });
 
-  it("parsea precio europeo, stock y URL absoluta", () => {
-    const a = items.find((t) => t.id === buildId("evt-1", "cat-A"));
-    expect(a).toMatchObject({
-      evento: "FC Barcelona vs Real Madrid",
-      precio_origen: 350,
-      stock: 12,
-      disponible: true,
-      url_origen: "https://passioneventsonline.eu/events/evt-1/cat-A",
-    });
-    expect(a?.fecha).toBe("2026-04-21T20:00:00.000Z");
+  it("clasifica book vs on_request por la URL del link", () => {
+    const book = events.find((e) => e.eventId === "9044")!;
+    expect(book.estado).toBe("book");
+    expect(book.titulo).toBe("Match 104 - World Cup Final");
+    expect(book.asientos).toBe(34);
+    expect(book.fechaLista).toBe("2026-07-19T00:00:00.000Z");
+    expect(book.detailUrl).toContain("event_detail.php?event_id=9044");
+
+    const req = events.find((e) => e.eventId === "9022")!;
+    expect(req.estado).toBe("on_request");
+    expect(req.asientos).toBe(0);
+    expect(req.detailUrl).toContain("event_detail_request.php?event_id=9022");
+  });
+});
+
+describe("parseEventDetail (event_detail.php, Book)", () => {
+  const ev: PortalEvent = {
+    eventId: "9044",
+    titulo: "Match 104 - World Cup Final",
+    subCategoria: "World Cup 2026 Canada / Mexico / USA",
+    fechaLista: "2026-07-19T00:00:00.000Z",
+    ubicacion: "New York New Jersey Stadium, East Rutherford (USA)",
+    asientos: 34,
+    estado: "book",
+    detailUrl: `${BASE}event_detail.php?event_id=9044`,
+  };
+  const sectors = parseEventDetail(fixture("event_detail.html"), ev);
+
+  it("genera un ticket por sector (3) con id estable evento::catId", () => {
+    expect(sectors.map((s) => s.id)).toEqual(["9044::494", "9044::502", "9044::495"]);
   });
 
-  it("marca no disponible la fila sold-out", () => {
-    const b = items.find((t) => t.id === buildId("evt-1", "cat-B"));
-    expect(b?.disponible).toBe(false);
-    expect(b?.precio_origen).toBe(220);
+  it("toma precio y stock de los inputs hidden", () => {
+    expect(sectors.map((s) => s.precio_origen)).toEqual([10000, 11500, 12000]);
+    expect(sectors.every((s) => s.stock === 4 && s.disponible === true)).toBe(true);
+  });
+
+  it("nombres de sector y fecha/ciudad enriquecidas del detalle", () => {
+    expect(sectors[0]!.categoria).toBe("WC Cat 3/4");
+    expect(sectors[1]!.categoria).toBe("WC Cat 3/4 (4-pack guarantee)");
+    // fecha con hora del detalle (no la de la lista)
+    expect(sectors[0]!.fecha).toBe("2026-07-19T15:00:00.000Z");
+    expect(sectors[0]!.ciudad).toBe("New York New Jersey Stadium, East Rutherford (USA)");
   });
 
   it("todo lo extraído pasa la validación zod", () => {
-    for (const it of items) expect(RawTicketSchema.safeParse(it).success).toBe(true);
+    for (const s of sectors) expect(RawTicketSchema.safeParse(s).success).toBe(true);
+  });
+});
+
+describe("buildOnRequestRow", () => {
+  const row = buildOnRequestRow({
+    eventId: "9022",
+    titulo: "Match 80, World Cup - Round of 32 - England vs Congo DR",
+    subCategoria: "World Cup 2026 Canada / Mexico / USA",
+    fechaLista: "2026-07-01T00:00:00.000Z",
+    ubicacion: "Atlanta Stadium, Atlanta (USA)",
+    asientos: 0,
+    estado: "on_request",
+    detailUrl: `${BASE}event_detail_request.php?event_id=9022`,
+  });
+
+  it("queda sin precio, no disponible y estado on_request", () => {
+    expect(row.precio_origen).toBeNull();
+    expect(row.disponible).toBe(false);
+    expect(row.estado).toBe("on_request");
+    expect(row.id).toBe("9022::REQ");
+  });
+
+  it("pasa la validación zod (precio null permitido)", () => {
+    expect(RawTicketSchema.safeParse(row).success).toBe(true);
   });
 });

@@ -61,3 +61,16 @@ export function computeFinalPrice(precioOrigen: number, opts: PricingOptions): P
   const raw = precioOrigen * (1 + opts.markup);
   return { precioFinal: round2(raw), monedaFinal: "EUR" };
 }
+
+/**
+ * Variante tolerante a null: los eventos "on_request" no tienen precio de
+ * origen, así que precio_final también es null (no hay nada que markupear).
+ */
+export function priceTicket(
+  precioOrigen: number | null,
+  opts: PricingOptions,
+): { precioFinal: number | null; monedaFinal: "EUR" | "ARS" | null } {
+  if (precioOrigen == null) return { precioFinal: null, monedaFinal: null };
+  const r = computeFinalPrice(precioOrigen, opts);
+  return { precioFinal: r.precioFinal, monedaFinal: r.monedaFinal };
+}
