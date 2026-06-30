@@ -57,6 +57,7 @@ export class TicketRepository {
       .update({ disponible: false, stock: 0 })
       .lt("scraped_at", runStartedAtIso)
       .eq("disponible", true)
+      .eq("source", "portal") // nunca tocar las entradas cargadas a mano por admin
       .select("id");
     if (error) throw new Error(`markAbsentBefore: ${error.message}`);
     return data?.length ?? 0;
