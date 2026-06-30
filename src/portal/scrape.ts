@@ -52,24 +52,23 @@ export async function scrapeRawTickets(deps: {
   const rows: RawTicketInput[] = [];
   let complete = true;
 
-  // On Request (sin precio).
-  if (cfg.PE_INCLUDE_ON_REQUEST) {
-    for (const e of events.filter((e) => e.estado === "on_request")) rows.push(buildOnRequestRow(e));
-  }
-
-  // Book (con precio): un GET de detalle por evento.
-  let books = events.filter((e) => e.estado === "book");
-  if (cfg.PE_MAX_DETAILS_PER_CYCLE > 0 && books.length > cfg.PE_MAX_DETAILS_PER_CYCLE) {
+  // Tanto "book" como "on_request" tienen una página de detalle con la tabla de
+  // sectores (precio + stock reales); solo cambia la acción (comprar vs Request).
+  // Por eso pedimos el detalle de AMBOS y dejamos que el parser fije el estado.
+  let targets = cfg.PE_INCLUDE_ON_REQUEST
+    ? events
+    : events.filter((e) => e.estado === "book");
+  if (cfg.PE_MAX_DETAILS_PER_CYCLE > 0 && targets.length > cfg.PE_MAX_DETAILS_PER_CYCLE) {
     log.warn(
-      { tope: cfg.PE_MAX_DETAILS_PER_CYCLE, totalBook: books.length },
+      { tope: cfg.PE_MAX_DETAILS_PER_CYCLE, total: targets.length },
       "tope de detalles alcanzado: ciclo INCOMPLETO (no se marcarán ausentes)",
     );
-    books = books.slice(0, cfg.PE_MAX_DETAILS_PER_CYCLE);
+    targets = targets.slice(0, cfg.PE_MAX_DETAILS_PER_CYCLE);
     complete = false;
   }
 
-  for (let i = 0; i < books.length; i++) {
-    const e = books[i]!;
+  for (let i = 0; i < targets.length; i++) {
+    const e = targets[i]!;
     try {
       const html = await fetchPortalHtml({ url: e.detailUrl, cookieHeader, cfg, log, signal });
       const sectors = parseEventDetail(html, e);
@@ -85,6 +84,9 @@ export async function scrapeRawTickets(deps: {
           log.info({ eventId: e.eventId }, "evento sin sectores: tratado como On Request");
         } else if (kind === "other") {
           log.info({ eventId: e.eventId }, "detalle no es un evento (Servicio Extra), omitido");
+        } else if (e.estado === "on_request") {
+          // Evento On Request sin tabla de sectores: fila única "a consultar".
+          rows.push(buildOnRequestRow(e));
         } else {
           // Era una página "book" pero no pudimos parsear sectores: conservador.
           log.warn({ eventId: e.eventId }, "detalle book sin sectores parseables");
@@ -96,7 +98,7 @@ export async function scrapeRawTickets(deps: {
       log.warn({ err, eventId: e.eventId }, "fallo al traer/parsear detalle, continúo");
       complete = false;
     }
-    if (i < books.length - 1 && cfg.PE_DETAIL_THROTTLE_MS > 0) {
+    if (i < targets.length - 1 && cfg.PE_DETAIL_THROTTLE_MS > 0) {
       await sleep(cfg.PE_DETAIL_THROTTLE_MS, signal);
     }
   }

@@ -177,12 +177,17 @@ export function classifyDetail(html: string): "book" | "on_request" | "other" {
 }
 
 /**
- * Parsea event_detail.php -> un RawTicketInput por sector/categoría.
- * Usa los inputs hidden (seat_cat_id[]/unit_price[]/available_seats[]) que son
- * más estables que el texto.
+ * Parsea event_detail.php (book) o event_detail_request.php (on_request) -> un
+ * RawTicketInput por sector/categoría. Ambas páginas usan la MISMA tabla de
+ * sectores con inputs hidden (seat_cat_id[]/unit_price[]/available_seats[]);
+ * solo cambia la acción (comprar vs "Request").
  *
- * Regla de negocio: un sector con stock 0 NO se vende; pasa a "on_request"
- * (consultar) con precio oculto, igual que los eventos sin precio.
+ * Estado de cada sector:
+ *   - evento On Request (link request)  -> "on_request" SIEMPRE (precio visible,
+ *     pero la compra es por consulta).
+ *   - evento Book con stock 0           -> "on_request" (agotado: por consulta).
+ *   - evento Book con stock > 0         -> "book" (reservable directo).
+ * El precio se conserva siempre que el portal lo publique (lo hace en ambas).
  */
 export function parseEventDetail(html: string, ev: PortalEvent): RawTicketInput[] {
   const root = parse(html);
@@ -212,6 +217,7 @@ export function parseEventDetail(html: string, ev: PortalEvent): RawTicketInput[
       : parseInt0(tds[3]?.text);
 
     const sinStock = (stock ?? 0) <= 0;
+    const esConsulta = ev.estado === "on_request" || sinStock;
     out.push({
       id: `${ev.eventId}::${catId}`,
       evento: ev.titulo,
@@ -219,13 +225,12 @@ export function parseEventDetail(html: string, ev: PortalEvent): RawTicketInput[
       fecha,
       ciudad,
       categoria: clean(tds[0]?.text) || null,
-      // Sin stock -> consultar: se oculta el precio (no es comprable).
-      precio_origen: sinStock ? null : precio,
+      precio_origen: precio,
       moneda_origen: "EUR",
       stock,
-      disponible: !sinStock,
+      disponible: !esConsulta,
       url_origen: ev.detailUrl,
-      estado: sinStock ? "on_request" : "book",
+      estado: esConsulta ? "on_request" : "book",
     });
   }
   return out;
