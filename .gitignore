@@ -27,3 +27,6 @@ logs/
 
 # Test artifacts
 coverage/
+
+# Salida del dry-run (puede contener datos del portal)
+dry-run-output.json

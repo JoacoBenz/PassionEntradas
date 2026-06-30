@@ -103,8 +103,24 @@ npx playwright install chromium   # solo para correr fuera de Docker
 npm run typecheck
 npm test                  # tests de pricing, parser y anti-borrado
 npm run build
-npm start                 # corre el worker (necesita .env válido)
+npm start                 # corre el worker (necesita .env válido + Supabase)
 ```
+
+### Probar sin publicar (dry-run)
+
+Para verificar que el scraper **toma bien los datos de los ~100 eventos SIN tocar
+Supabase**: con `PE_USER`/`PE_PASS` en `.env`, corré:
+
+```bash
+npm install
+npx playwright install chromium
+npm run dry-run
+```
+
+Loguea, recorre lista + detalles, parsea y aplica el markup, e **imprime** un
+resumen (book / on_request, precios, stock, sectores) + escribe el detalle completo
+en `dry-run-output.json` para que lo revises. No escribe en la base. Si el **login
+automático** falla, ajustá `PORTAL_SELECTORS`/`PE_LOGIN_URL` (ver sección del parser).
 
 ### Aplicar la migración a Supabase
 
