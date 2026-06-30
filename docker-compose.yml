@@ -1,0 +1,35 @@
+services:
+  worker:
+    build: .
+    image: passion-entradas-worker:latest
+    container_name: passion-entradas-worker
+    restart: unless-stopped
+    # Secretos por archivo .env (fuera de git). NUNCA en el repo.
+    env_file: .env
+    environment:
+      STATE_DIR: /data
+      HEALTH_PORT: "8080"
+    volumes:
+      # storageState/cookies persistido entre reinicios. Es secreto: volumen propio.
+      - pe_state:/data
+    healthcheck:
+      test: ["CMD", "node", "dist/healthcheck.js"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    # Endurecimiento básico.
+    security_opt:
+      - no-new-privileges:true
+    # Watchtower: que actualice esta imagen automáticamente.
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pe_state:
+    driver: local

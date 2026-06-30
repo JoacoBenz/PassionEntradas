@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Secrets / runtime state — NUNCA commitear
+.env
+.env.*
+!.env.example
+*.local
+
+# Playwright session state (cookies = secreto)
+state/
+storageState.json
+*.storage.json
+
+# Logs
+*.log
+logs/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Test artifacts
+coverage/

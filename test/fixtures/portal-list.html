@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Eventos · Passion Events (fixture)</title>
+  </head>
+  <body>
+    <header><a href="/account/logout" class="logout-link">Salir</a></header>
+
+    <section class="event-list">
+      <article class="event-card" data-event-id="evt-1">
+        <h3 class="event-title">FC Barcelona vs Real Madrid</h3>
+        <span class="event-competition">LaLiga</span>
+        <time class="event-date" datetime="2026-04-21T20:00:00Z">21 Abr 2026</time>
+        <span class="event-city">Barcelona</span>
+        <ul class="ticket-categories">
+          <li class="ticket-row" data-category-id="cat-A">
+            <span class="cat-name">Categoría 1 - Lateral</span>
+            <span class="cat-price" data-currency="EUR">€ 350,00</span>
+            <span class="cat-stock" data-stock="12">12 disponibles</span>
+            <a class="cat-link" href="/events/evt-1/cat-A">Ver</a>
+          </li>
+          <li class="ticket-row sold-out" data-category-id="cat-B">
+            <span class="cat-name">Categoría 2 - Fondo</span>
+            <span class="cat-price" data-currency="EUR">€ 220,00</span>
+            <span class="cat-stock">Agotado</span>
+            <a class="cat-link" href="/events/evt-1/cat-B">Ver</a>
+          </li>
+        </ul>
+      </article>
+
+      <article class="event-card" data-event-id="evt-2">
+        <h3 class="event-title">Gran Premio de España F1</h3>
+        <span class="event-competition">F1</span>
+        <time class="event-date" datetime="2026-06-14T13:00:00Z">14 Jun 2026</time>
+        <span class="event-city">Barcelona</span>
+        <ul class="ticket-categories">
+          <li class="ticket-row" data-category-id="cat-G">
+            <span class="cat-name">Tribuna Principal</span>
+            <span class="cat-price" data-currency="EUR">€ 480,00</span>
+            <span class="cat-stock" data-stock="5">5 disponibles</span>
+            <a class="cat-link" href="/events/evt-2/cat-G">Ver</a>
+          </li>
+        </ul>
+      </article>
+    </section>
+  </body>
+</html>

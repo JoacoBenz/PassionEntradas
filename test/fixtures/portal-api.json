@@ -1,0 +1,46 @@
+{
+  "events": [
+    {
+      "id": "evt-1",
+      "name": "FC Barcelona vs Real Madrid",
+      "competition": "LaLiga",
+      "startDate": "2026-04-21T20:00:00Z",
+      "city": "Barcelona",
+      "url": "https://passioneventsonline.eu/events/evt-1",
+      "categories": [
+        {
+          "id": "cat-A",
+          "name": "Categoría 1 - Lateral",
+          "price": 350.0,
+          "currency": "EUR",
+          "available": 12,
+          "url": "https://passioneventsonline.eu/events/evt-1/cat-A"
+        },
+        {
+          "id": "cat-B",
+          "name": "Categoría 2 - Fondo",
+          "price": 220.0,
+          "currency": "EUR",
+          "available": 0,
+          "soldOut": true
+        }
+      ]
+    },
+    {
+      "id": "evt-2",
+      "title": "Gran Premio de España F1",
+      "competition": "F1",
+      "date": "2026-06-14T13:00:00Z",
+      "venueCity": "Barcelona",
+      "tickets": [
+        {
+          "id": "cat-G",
+          "name": "Tribuna Principal",
+          "price": "€ 480,00",
+          "currency": "EUR",
+          "stock": "5 disponibles"
+        }
+      ]
+    }
+  ]
+}
