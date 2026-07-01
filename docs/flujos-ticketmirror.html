@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Bexovar · Sistema de venta de entradas · Flujos</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink2:#1e293b; --body:#334155; --mute:#64748b; --faint:#94a3b8;
+    --accent:#0284c7; --accent-d:#0369a1; --line:#e2e8f0; --bg-accent:#f0f9ff; --bg-soft:#f1f5f9;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body{ font-family:"Liberation Sans", Arial, Helvetica, sans-serif; color:var(--body); font-size:10.5pt; line-height:1.5; margin:0; }
+  h1,h2,h3{ color:var(--ink); margin:0; }
+  p{ margin:0 0 8px; } strong{ color:var(--ink2); }
+
+  .brandbar{ display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid var(--ink); padding-bottom:8px; }
+  .brand{ font-weight:800; letter-spacing:.32em; color:var(--ink); font-size:12pt; }
+  .brand-r{ font-size:8pt; letter-spacing:.12em; color:var(--mute); text-transform:uppercase; }
+  .eyebrow{ margin-top:26px; color:var(--accent); font-size:8.5pt; font-weight:700; letter-spacing:.16em; text-transform:uppercase; }
+  h1.title{ font-size:29pt; font-weight:800; letter-spacing:-.01em; margin:6px 0 2px; }
+  .subtitle{ font-size:13pt; color:var(--mute); font-weight:500; }
+  .meta{ margin-top:14px; font-size:9pt; color:var(--faint); }
+  .lead{ margin-top:16px; padding-top:16px; border-top:1px solid var(--line); font-size:11pt; color:var(--ink2); }
+
+  .legend{ margin-top:16px; display:flex; gap:16px; flex-wrap:wrap; font-size:9pt; color:var(--ink2); }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .chip{ width:26px; height:15px; border-radius:4px; border:1.5px solid; display:inline-block; }
+  .c-dec{ background:#fff; border-color:var(--accent); transform:skewX(-12deg); border-radius:2px; }
+  .c-good{ background:#dcfce7; border-color:#16a34a; } .c-bad{ background:#fee2e2; border-color:#dc2626; }
+  .c-term{ background:var(--ink); border-color:var(--ink); }
+
+  .flow{ break-before:page; padding-top:6px; }
+  .flow h2{ font-size:14pt; font-weight:800; padding-bottom:7px; border-bottom:2px solid var(--line); }
+  .flow h2 .n{ color:var(--accent); margin-right:8px; }
+  .flow .desc{ margin:8px 0 4px; color:var(--mute); font-size:9.7pt; }
+  .mermaid{ text-align:center; margin-top:8px; }
+  .mermaid svg{ display:block; margin:0 auto; }
+  .example{ margin-top:12px; background:var(--bg-accent); border:1px solid #cde8f7; border-left:3px solid var(--accent); border-radius:5px; padding:9px 12px; font-size:9.3pt; color:var(--ink2); }
+  .example b{ color:var(--accent-d); }
+  .example ul{ margin:6px 0 0; padding-left:18px; }
+  .example li{ margin:2px 0; }
+  footer{ margin-top:26px; }
+</style>
+</head>
+<body>
+
+  <header class="brandbar">
+    <span class="brand">BEXOVAR</span>
+    <span class="brand-r">Desarrollo a medida</span>
+  </header>
+
+  <div class="eyebrow">Sistema de venta de entradas · Solución a medida</div>
+  <h1 class="title">Flujos del sistema</h1>
+  <div class="subtitle">Cómo decide cada ciclo de información</div>
+  <div class="meta">Preparado por Bexovar · 1 de julio de 2026</div>
+
+  <p class="lead">Estos diagramas muestran, paso a paso, <strong>cómo trabaja el sistema y qué decide en
+  cada punto</strong>. Cada rombo es una decisión con sus caminos posibles. Sirven para ver el
+  comportamiento real de la solución, sin tecnicismos.</p>
+
+  <div class="legend">
+    <span><i class="chip c-term"></i> Inicio / fin</span>
+    <span><i class="chip c-dec"></i> Decisión (rombo)</span>
+    <span><i class="chip c-good"></i> Resultado positivo</span>
+    <span><i class="chip c-bad"></i> Se frena / protege</span>
+  </div>
+
+  <section class="flow">
+    <h2><span class="n">1A.</span>Sincronización con un proveedor — obtención de datos</h2>
+    <p class="desc">Cómo entra el sistema, se asegura la sesión y clasifica cada evento (Inmediato, On Request, u omitir).</p>
+    <pre class="mermaid">
+flowchart TD
+  s(["Inicio del ciclo"]) --> q1{"¿Sesión válida?"}
+  q1 -->|"Sí"| L["Traer lista de eventos"]
+  q1 -->|"No"| lg["Iniciar login"]
+  lg --> q3{"¿Login correcto?"}
+  q3 -->|"No"| bk["Backoff y reintento"]
+  q3 -->|"Sí"| L
+  L --> D["Por cada evento: traer detalle"]
+  D --> q4{"¿Trae sectores con precio?"}
+  q4 -->|"Sí"| q5{"¿Con stock disponible?"}
+  q5 -->|"Sí"| inm["Marcar como Inmediato"]
+  q5 -->|"No"| onr["Marcar como On Request"]
+  q4 -->|"No"| q6{"¿Qué es?"}
+  q6 -->|"Es On Request"| req["Fila a consultar"]
+  q6 -->|"Servicio extra"| sk["Omitir"]
+  q6 -->|"Sin datos"| inc["Marcar ciclo incompleto"]
+  inm --> nx(["Continúa en la Parte B"])
+  onr --> nx
+  req --> nx
+  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
+  class s,nx term;
+    </pre>
+  </section>
+
+  <section class="flow">
+    <h2><span class="n">1B.</span>Sincronización — publicación segura (anti-vaciado)</h2>
+    <p class="desc">La regla crítica: nunca se vacía el catálogo por un error. Solo se marcan ausentes si el ciclo fue completo.</p>
+    <pre class="mermaid">
+flowchart TD
+  a(["Datos del ciclo"]) --> g{"Anti-vaciado: ¿0 ítems o caída mayor al umbral?"}
+  g -->|"Sí, sospechoso"| ab(["Abortar: conservar catálogo anterior"])
+  g -->|"No"| mk["Aplicar la comisión del agente: proveedor + categoría"]
+  mk --> up["Guardar y actualizar en la base"]
+  up --> q{"¿El ciclo fue completo?"}
+  q -->|"Sí"| ma["Marcar ausentes como no disponibles"]
+  q -->|"No"| nm["No marcar ausentes — evita falsos agotados"]
+  ma --> done(["Fin del ciclo"])
+  nm --> done
+  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
+  classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+  class a,done term;
+  class ab bad;
+    </pre>
+  </section>
+
+  <section class="flow">
+    <h2><span class="n">2.</span>Cálculo de precio — comisión del agente y moneda</h2>
+    <p class="desc">Cómo se arma el precio de venta: conversión a USD si hace falta, y la regla de comisión del agente más específica que aplique.</p>
+    <pre class="mermaid">
+flowchart TD
+  s(["Precio del proveedor"]) --> q1{"¿La moneda es USD?"}
+  q1 -->|"No"| cv["Convertir a USD con la cotización del día"]
+  q1 -->|"Sí"| q2{"¿Hay regla para proveedor + categoría?"}
+  cv --> q2
+  q2 -->|"Sí"| r1["Usar ese porcentaje"]
+  q2 -->|"No"| q3{"¿Hay porcentaje del proveedor?"}
+  q3 -->|"Sí"| r2["Usar el porcentaje del proveedor"]
+  q3 -->|"No"| r3["Usar el porcentaje global por defecto"]
+  r1 --> c["Precio de venta = precio + margen"]
+  r2 --> c
+  r3 --> c
+  c --> o(["Precio de venta en USD"])
+  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
+  class s,o term;
+    </pre>
+    <div class="example"><b>Ejemplos de comisión del agente (a definir con el cliente):</b>
+      Passion Events · Fútbol → +20% &nbsp;·&nbsp; Passion Events · F1 → +15% &nbsp;·&nbsp;
+      Passion Events · Conciertos → +25% &nbsp;·&nbsp; Default del proveedor → +18% &nbsp;·&nbsp; Default global → +20%.</div>
+  </section>
+
+  <section class="flow">
+    <h2><span class="n">3.</span>Solicitud On Request — estados</h2>
+    <p class="desc">El circuito de una entrada "a consultar": desde que la agencia la pide hasta el resultado.</p>
+    <pre class="mermaid">
+flowchart TD
+  s(["Agencia elige cantidad — ve precio de referencia"]) --> cr["Crear Solicitud — estado Pendiente"]
+  cr --> ml["Aviso automático por email o WhatsApp: en revisión"]
+  ml --> ck["El equipo confirma con el proveedor"]
+  ck --> q{"¿Resultado?"}
+  q -->|"Hay disponibilidad"| ap(["Aprobado — se emite invoice"])
+  q -->|"Se ofrece otra opción"| al(["Alternativa ofrecida"])
+  q -->|"Sin disponibilidad"| rj(["Rechazado"])
+  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
+  classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d;
+  classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+  class s term;
+  class ap good;
+  class rj bad;
+    </pre>
+  </section>
+
+  <section class="flow">
+    <h2><span class="n">4.</span>Alta de un proveedor — módulo aparte</h2>
+    <p class="desc">Cada proveedor nuevo entra por su propio módulo, que trae los datos y los conecta directo a la base —como Passion Events hoy.</p>
+    <pre class="mermaid">
+flowchart TD
+  s(["Nuevo proveedor"]) --> m["Módulo aparte (conector) — trae sus datos"]
+  m --> n["Los traduce al formato común"]
+  n --> rg["Aplica la comisión del agente del proveedor"]
+  rg --> db["Se conecta directo a la base de datos"]
+  db --> lv(["Proveedor activo en el catálogo"])
+  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
+  classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d;
+  class s term;
+  class lv good;
+    </pre>
+  </section>
+
+  <section class="flow">
+    <h2><span class="n">5.</span>Cliente en el catálogo — reservar o consultar</h2>
+    <p class="desc">Qué ve y qué puede hacer un cliente o agencia según el tipo de entrada.</p>
+    <pre class="mermaid">
+flowchart TD
+  s(["Cliente busca en el catálogo"]) --> ev["Ve el evento y sus sectores"]
+  ev --> q{"¿Sector Inmediato y con stock?"}
+  q -->|"Sí"| bk(["Reservar — WhatsApp o compra"])
+  q -->|"No"| cs(["Consultar — genera Solicitud On Request"])
+  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
+  classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d;
+  class s term;
+  class bk good;
+    </pre>
+  </section>
+
+  <section class="flow">
+    <h2><span class="n">6.</span>Dashboard de pedidos — qué ve y hace el equipo</h2>
+    <p class="desc">El agente/cliente pide o reserva; el pedido cae a “Sin asignar” y un vendedor se lo asigna para coordinar la entrega.</p>
+    <pre class="mermaid">
+flowchart TD
+  s(["Agente/cliente pide o reserva una entrada"]) --> q["Pedido en cola 'Sin asignar' — avisa al equipo"]
+  q --> claim["Un vendedor (Christian / Ignacio) se lo asigna"]
+  claim --> t{"¿Tipo de pedido?"}
+  t -->|"Reserva (inmediata)"| r1["Confirma, cobra y coordina la entrega"]
+  r1 --> rv(["Vendido y entregado"])
+  t -->|"Pedido On Request"| o1["Confirma disponibilidad con el proveedor"]
+  o1 --> o2{"¿Resultado?"}
+  o2 -->|"Hay disponibilidad"| ap(["Aprobado — invoice y entrega"])
+  o2 -->|"Se ofrece otra opción"| al(["Alternativa ofrecida"])
+  o2 -->|"Sin disponibilidad"| rj(["Rechazado"])
+  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
+  classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d;
+  classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+  class s term;
+  class rv,ap good;
+  class rj bad;
+    </pre>
+  </section>
+
+  <footer></footer>
+
+  <script src="vendor/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: false, theme: "base",
+      themeVariables: {
+        fontFamily: 'Arial, "Liberation Sans", Helvetica, sans-serif', fontSize: "13px",
+        primaryColor: "#f0f9ff", primaryBorderColor: "#0284c7", primaryTextColor: "#0f172a",
+        lineColor: "#64748b", tertiaryColor: "#f1f5f9",
+      },
+      flowchart: { htmlLabels: true, curve: "basis", nodeSpacing: 26, rankSpacing: 30, useMaxWidth: true },
+    });
+    mermaid.run({ querySelector: ".mermaid" }).then(() => {
+      document.querySelectorAll(".mermaid svg").forEach((svg) => {
+        svg.removeAttribute("width"); svg.removeAttribute("height");
+        svg.style.maxWidth = "100%"; svg.style.maxHeight = "232mm";
+        svg.style.width = "auto"; svg.style.height = "auto";
+      });
+      window.__mmReady = true;
+    }).catch((e) => { document.body.setAttribute("data-mmerr", String(e)); window.__mmReady = true; });
+  </script>
+</body>
+</html>

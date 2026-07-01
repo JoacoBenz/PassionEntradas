@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Bexovar · Propuesta · Sistema de venta de entradas</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink2:#1e293b; --body:#334155; --mute:#64748b; --faint:#94a3b8;
+    --accent:#0284c7; --accent-d:#0369a1; --line:#e2e8f0; --bg-accent:#f0f9ff; --bg-soft:#f1f5f9;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body{ font-family:"Liberation Sans", Arial, Helvetica, sans-serif; color:var(--body); font-size:10.5pt; line-height:1.55; margin:0; }
+  h1,h2,h3{ color:var(--ink); margin:0; } p{ margin:0 0 9px; } strong{ color:var(--ink2); }
+  ul,ol{ margin:0 0 10px; padding-left:18px; } li{ margin:3px 0; } small{ font-size:8.5pt; }
+  code{ background:var(--bg-soft); padding:1px 4px; border-radius:3px; font-size:9pt; }
+
+  .brandbar{ display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid var(--ink); padding-bottom:8px; }
+  .brand{ font-weight:800; letter-spacing:.32em; color:var(--ink); font-size:12pt; }
+  .brand-r{ font-size:8pt; letter-spacing:.12em; color:var(--mute); text-transform:uppercase; }
+  .eyebrow{ margin-top:26px; color:var(--accent); font-size:8.5pt; font-weight:700; letter-spacing:.16em; text-transform:uppercase; }
+  h1.title{ font-size:30pt; font-weight:800; letter-spacing:-.01em; margin:6px 0 2px; }
+  .subtitle{ font-size:13pt; color:var(--mute); font-weight:500; }
+  .meta{ margin-top:14px; font-size:9pt; color:var(--faint); letter-spacing:.02em; }
+  .lead{ margin-top:16px; padding-top:16px; border-top:1px solid var(--line); font-size:11pt; color:var(--ink2); }
+
+  .toc{ margin-top:20px; border:1px solid var(--line); border-radius:6px; padding:14px 18px; background:#fcfdfe; }
+  .toc h3{ font-size:9pt; text-transform:uppercase; letter-spacing:.14em; color:var(--accent); margin-bottom:8px; }
+  .toc ol{ margin:0; padding-left:22px; columns:2; column-gap:26px; font-size:10pt; }
+  .toc li{ margin:4px 0; color:var(--ink2); }
+
+  section{ margin-top:24px; }
+  h2{ font-size:14pt; font-weight:800; padding-bottom:7px; border-bottom:2px solid var(--line); margin-bottom:12px; break-after:avoid; }
+  h2 .n{ color:var(--accent); margin-right:8px; }
+  h3{ font-size:10.5pt; color:var(--ink); margin:12px 0 4px; }
+
+  table{ width:100%; border-collapse:collapse; margin:10px 0; font-size:9.7pt; break-inside:avoid; }
+  th,td{ border:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; }
+  thead th{ background:var(--bg-soft); color:var(--ink); font-weight:700; }
+  tbody tr:nth-child(even) td{ background:#fafbfc; }
+
+  .note,.example{ background:var(--bg-accent); border:1px solid #cde8f7; border-left:3px solid var(--accent); border-radius:5px; padding:10px 13px; margin:12px 0; font-size:9.6pt; color:var(--ink2); break-inside:avoid; }
+  .note b,.example b{ color:var(--accent-d); } .example ul{ margin:6px 0 0; }
+
+  .diagram{ margin:14px 0; break-inside:avoid; }
+  .drow{ display:flex; gap:10px; justify-content:center; }
+  .dbox{ flex:1; border:1px solid var(--line); border-radius:6px; padding:9px 10px; text-align:center; background:#fff; }
+  .dbox b{ color:var(--ink); font-size:9.5pt; } .dbox small{ display:block; color:var(--mute); }
+  .dcenter{ margin:8px auto; max-width:60%; text-align:center; background:var(--ink); color:#fff; border-radius:6px; padding:9px; font-weight:700; letter-spacing:.08em; font-size:9.5pt; }
+
+  .steps{ margin:8px 0; } .step{ display:flex; gap:10px; align-items:flex-start; margin:5px 0; }
+  .step .b{ flex:none; width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-size:9pt; font-weight:700; display:flex; align-items:center; justify-content:center; margin-top:1px; }
+  .kicker{ color:var(--mute); font-size:9pt; }
+  .divider{ height:2px; background:var(--ink); margin:22px 0 0; }
+  .signoff{ margin-top:10px; font-size:10pt; color:var(--ink); font-weight:700; letter-spacing:.02em; }
+  .break{ break-before:page; }
+</style>
+</head>
+<body>
+
+  <header class="brandbar"><span class="brand">BEXOVAR</span><span class="brand-r">Desarrollo a medida</span></header>
+
+  <div class="eyebrow">Propuesta · Plataforma de reventa de entradas</div>
+  <h1 class="title">Propuesta integral</h1>
+  <div class="subtitle">El sistema y las reglas del negocio</div>
+  <div class="meta">Preparado por Bexovar · 1 de julio de 2026</div>
+
+  <p class="lead">Esto es, en un solo documento, la plataforma que te proponemos para <strong>vender entradas
+  con inventario y precios siempre al día</strong>, a tus clientes y agencias. Vas a ver qué resuelve, cómo
+  funciona y las reglas del negocio. <em>Los flujos con las decisiones del sistema van en un documento aparte
+  (“Diagramas”).</em></p>
+
+  <div class="toc">
+    <h3>Contenido</h3>
+    <ol>
+      <li>La situación hoy</li>
+      <li>La solución de un vistazo</li>
+      <li>Reglas del negocio</li>
+      <li>Cómo se suman proveedores</li>
+      <li>Qué hace el sistema</li>
+      <li>Resultados esperados</li>
+      <li>Cómo lo entregamos</li>
+      <li>Próximos pasos</li>
+    </ol>
+  </div>
+
+  <section class="break">
+    <h2><span class="n">1.</span>La situación hoy</h2>
+    <p>Hoy el inventario vive en el <strong>portal de un proveedor (Passion Events)</strong>: precios y
+    disponibilidad que cambian todo el tiempo, que hay que mirar y pasar <strong>a mano</strong> para cada
+    cliente. No hay un catálogo propio, en tiempo real, con <strong>tu precio de venta ya calculado</strong>.</p>
+    <ul>
+      <li><strong>Ventas que se pierden:</strong> precios o stock desactualizados, consultas que llegan tarde.</li>
+      <li><strong>Horas de trabajo:</strong> revisar el portal, calcular el margen, responder uno por uno.</li>
+      <li><strong>Techo para crecer:</strong> sin catálogo propio es difícil sumar agencias, vendedores o más proveedores.</li>
+      <li><strong>Dependencia de un solo origen:</strong> si ese proveedor cambia o corta el acceso, el negocio se queda sin base.</li>
+    </ul>
+    <p>Seguir así no es gratis: es el costo invisible de la gestión manual, todos los meses.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">2.</span>La solución de un vistazo</h2>
+    <p>Una <strong>plataforma web propia</strong> (se entra desde el celular o la computadora, sin instalar
+    nada) que muestra en tiempo real qué hay y a qué precio —con tu comisión de agente ya aplicada— y te deja
+    <strong>atender agencias y sumar más proveedores</strong> sin rehacer nada. Tiene dos caras que trabajan juntas:</p>
+    <div class="diagram">
+      <div class="drow">
+        <div class="dbox"><b>Catálogo</b><small>agencias y clientes</small></div>
+        <div class="dbox"><b>Panel de administración</b><small>gestiona y concilia</small></div>
+      </div>
+      <div class="dcenter">SISTEMA DE VENTA DE ENTRADAS</div>
+      <div class="drow">
+        <div class="dbox"><b>Sincronización</b><small>proveedores</small></div>
+        <div class="dbox"><b>Base de datos</b><small>catálogo en USD</small></div>
+        <div class="dbox"><b>Avisos</b><small>email / WhatsApp</small></div>
+      </div>
+    </div>
+    <div class="note"><b>Seguridad:</b> no se procesan pagos en la plataforma, así que <strong>no se guardan
+    datos de tarjetas</strong>. Las claves se guardan cifradas, el catálogo es de solo lectura para el
+    público, y hay copias de seguridad automáticas.</div>
+  </section>
+
+  <section class="break">
+    <h2><span class="n">3.</span>Reglas del negocio</h2>
+    <ol>
+      <li><strong>Multiproveedor.</strong> Passion Events es el primero. Cada proveedor nuevo se suma en un <strong>módulo aparte</strong> conectado a la base, sin rehacer el sistema.</li>
+      <li><strong>Tipo de producto (lo define el proveedor).</strong> Cada entrada es <strong>Inmediata</strong> (compra directa, con stock real) u <strong>On Request</strong> (a pedido: precio de referencia, sin stock garantizado).</li>
+      <li><strong>Moneda.</strong> Toda la plataforma opera en <strong>USD</strong>.</li>
+      <li><strong>Precio de venta (comisión del agente, por reglas).</strong> Precio del proveedor + un %, donde el % depende de <strong>proveedor + categoría</strong>, con un % por defecto del proveedor y uno global. <span class="kicker">(ver Diagramas)</span></li>
+      <li><strong>Sincronización con anti-vaciado.</strong> Actualiza cada pocos minutos; si un ciclo trae muy pocos datos, conserva el catálogo anterior. <span class="kicker">(ver Diagramas)</span></li>
+      <li><strong>Accesos y permisos.</strong> Agencias/vendedores con usuario y clave ven solo lo que les corresponde; el administrador gestiona todo; la carga manual de entradas propias no la toca la sincronización.</li>
+      <li><strong>Pago.</strong> Sin checkout ni pasarela: se arregla por fuera. El sistema registra el estado, no procesa el dinero.</li>
+      <li><strong>Flujo On Request con estados.</strong> Pendiente → Aprobado / Alternativa / Rechazado. <span class="kicker">(ver Diagramas)</span></li>
+    </ol>
+    <div class="note"><b>Ejemplos de comisión del agente (a definir con vos):</b>
+      Passion Events · Fútbol → +20% &nbsp;·&nbsp; Passion Events · F1 → +15% &nbsp;·&nbsp;
+      Passion Events · Conciertos → +25% &nbsp;·&nbsp; Default del proveedor → +18% &nbsp;·&nbsp; Default global → +20%.</div>
+  </section>
+
+  <section class="break">
+    <h2><span class="n">4.</span>Cómo se suman proveedores</h2>
+    <p><strong>Primero ponemos el sistema en producción con Passion Events.</strong> Después, ya andando y
+    vendiendo, sumamos más proveedores de a uno. Cada proveedor nuevo se agrega en un <strong>módulo aparte</strong>
+    (un conector) que trae sus datos, los traduce al formato común y <strong>los conecta directo a la base de
+    datos</strong> —exactamente como funciona hoy Passion Events—. El resto del sistema no se toca.
+    <span class="kicker">(el flujo de alta está en el documento de Diagramas)</span></p>
+    <div class="example"><b>Datos que necesita cada proveedor nuevo (su módulo, como Passion Events):</b>
+      <ul>
+        <li>Nombre del proveedor y moneda de origen (ej. Passion Events, EUR).</li>
+        <li>Dirección del sitio y de la página de login.</li>
+        <li>Usuario y contraseña de la cuenta de agente en ese proveedor.</li>
+        <li>Dirección del listado de eventos (hoy: <code>event_list.php</code>).</li>
+        <li>Frecuencia de actualización y reglas de comisión del agente (proveedor + categoría).</li>
+        <li>Desarrollo del conector: cómo leer sus páginas de lista y de detalle (a medida por sitio).</li>
+      </ul></div>
+    <div class="note"><b>Importante:</b> el <strong>marco multiproveedor</strong> —el motor que permite
+    enchufar módulos— va en el plan completo; <strong>cada proveedor nuevo se cotiza aparte</strong> según el
+    sitio, porque cada módulo se desarrolla a medida.</div>
+    <h3>Definiciones a cerrar</h3>
+    <ul>
+      <li>¿Las <strong>categorías</strong> de la comisión del agente son una lista común o las de cada proveedor?</li>
+      <li>Si un proveedor cotiza en <strong>otra moneda</strong>, ¿se convierte a USD y con qué cotización?</li>
+      <li>Si dos proveedores tienen el <strong>mismo evento/sector</strong>, ¿se muestran ambos, el más barato, o se unifican?</li>
+    </ul>
+  </section>
+
+  <section class="break">
+    <h2><span class="n">5.</span>Qué hace el sistema</h2>
+    <h3>Catálogo para agencias y clientes</h3>
+    <p>Buscador por evento, lugar y fecha; precio y disponibilidad por sector, con la comisión del agente ya incluida; contacto directo por WhatsApp para cerrar la operación.</p>
+    <h3>Sincronización + comisión automáticas</h3>
+    <p>Trae eventos, precios y stock del proveedor, aplica la comisión del agente y mantiene el catálogo al día solo.</p>
+    <h3>Panel de administración</h3>
+    <p>Proveedores y reglas de comisión del agente, usuarios y roles, carga manual de entradas propias, <strong>Solicitudes On Request</strong> con sus estados, y <strong>reportes exportables</strong>.</p>
+    <h3>Dashboard de pedidos (accionable)</h3>
+    <p>Los <strong>agentes/clientes</strong> <strong>piden</strong> (On Request) o <strong>reservan</strong>
+    (inmediata) desde el catálogo. Cada pedido cae en el tablero, en la cola <strong>“Sin asignar”</strong>, y
+    se avisa al equipo.</p>
+    <p><strong>El vendedor se asigna el pedido</strong> (lo toma) para coordinar la entrega. Al tomarlo queda
+    <strong>bloqueado a él</strong> (nadie más lo agarra). Desde ahí lo resuelve —confirmar y marcar vendido;
+    o, si es On Request, emitir invoice, ofrecer alternativa o rechazar— y coordina la <strong>entrega</strong>
+    (estado <em>vendido → entregado</em>).</p>
+    <p><strong>Un solo tablero, con vistas por permiso:</strong> cada vendedor ve <strong>“Sin asignar”</strong>,
+    <strong>“Míos”</strong> y <strong>“Todos”</strong>; el admin ve todo y puede <strong>reasignar</strong>. No
+    hace falta una app por persona, y escala igual de 2 a N vendedores.</p>
+    <div class="note"><b>A definir:</b> ¿cualquiera del equipo toma de la cola, o hay <strong>clientes/agencias
+    con vendedor fijo</strong> (cartera)? ¿Los vendedores son solo <strong>Christian e Ignacio</strong> o va a
+    haber más? <em>Default propuesto: cola compartida, el vendedor se asigna el pedido, y el admin puede
+    reasignar.</em></div>
+  </section>
+
+  <section>
+    <h2><span class="n">6.</span>Resultados esperados</h2>
+    <table>
+      <thead><tr><th>Indicador</th><th>Hoy (manual)</th><th>Con el sistema</th></tr></thead>
+      <tbody>
+        <tr><td>Actualización de precios/stock</td><td>A mano, se desactualiza</td><td>Automática, cada pocos minutos</td></tr>
+        <tr><td>Cálculo del margen</td><td>Caso por caso</td><td>Automático por reglas</td></tr>
+        <tr><td>Atención a agencias</td><td>Uno por uno</td><td>Autoservicio en tiempo real</td></tr>
+        <tr><td>Sumar proveedores</td><td>Rehacer todo</td><td>Un módulo aparte, sin rediseño</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><b>El sistema se paga solo (ejemplo ilustrativo).</b> Si tener el catálogo siempre al día
+    y el acceso de agencias te permite cerrar aunque sea unas pocas ventas más por mes, con el margen habitual
+    de reventa el sistema se recupera en el primer mes o dos.</div>
+  </section>
+
+  <section class="break">
+    <h2><span class="n">7.</span>Cómo lo entregamos</h2>
+    <p>En dos fases, cada una con un resultado que aprobás.</p>
+    <table>
+      <thead><tr><th style="width:30%">Fase</th><th>Qué entregamos</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1 · Passion Events a producción</strong></td><td>El sistema andando de punta a punta con Passion Events: sincronización, catálogo web en USD, panel, carga manual y comisión del agente. Listo para vender.</td></tr>
+        <tr><td><strong>2 · Sumar proveedores</strong></td><td>Ya en producción, se suman más proveedores de a uno. Cada uno en un <strong>módulo aparte</strong> conectado directo a la base —como Passion Events hoy—, con reglas de comisión del agente por proveedor, accesos de agencias/roles y reportes.</td></tr>
+      </tbody>
+    </table>
+    <p class="kicker"><strong>Pagás contra resultados:</strong> cada fase la abonás al aprobar la entrega, con un anticipo chico para arrancar.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">8.</span>Próximos pasos</h2>
+    <div class="steps">
+      <div class="step"><span class="b">1</span><span>Cerramos las "definiciones a cerrar" del punto 4.</span></div>
+      <div class="step"><span class="b">2</span><span>Con un anticipo chico, arrancamos por la Fase 1 (Passion Events a producción).</span></div>
+    </div>
+    <p>Cuando quieras, nos escribís y arrancamos.</p>
+    <div class="divider"></div>
+    <p class="signoff">Bexovar · bexovar@gmail.com · +54 9 11 2388 5910</p>
+  </section>
+
+</body>
+</html>
