@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8" />
-<title>Bexovar · Propuesta integral · TicketMirror</title>
+<title>Bexovar · Propuesta · TicketMirror (lógica)</title>
 <style>
   :root{
     --ink:#0f172a; --ink2:#1e293b; --body:#334155; --mute:#64748b; --faint:#94a3b8;
@@ -33,8 +33,6 @@
   h2{ font-size:14pt; font-weight:800; padding-bottom:7px; border-bottom:2px solid var(--line); margin-bottom:12px; break-after:avoid; }
   h2 .n{ color:var(--accent); margin-right:8px; }
   h3{ font-size:10.5pt; color:var(--ink); margin:12px 0 4px; }
-  .sub{ font-size:12pt; font-weight:800; color:var(--ink); margin:2px 0 2px; }
-  .desc{ margin:4px 0 6px; color:var(--mute); font-size:9.7pt; }
 
   table{ width:100%; border-collapse:collapse; margin:10px 0; font-size:9.7pt; break-inside:avoid; }
   th,td{ border:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; }
@@ -42,8 +40,7 @@
   tbody tr:nth-child(even) td{ background:#fafbfc; }
 
   .note,.example{ background:var(--bg-accent); border:1px solid #cde8f7; border-left:3px solid var(--accent); border-radius:5px; padding:10px 13px; margin:12px 0; font-size:9.6pt; color:var(--ink2); break-inside:avoid; }
-  .note b,.example b{ color:var(--accent-d); }
-  .example ul{ margin:6px 0 0; }
+  .note b,.example b{ color:var(--accent-d); } .example ul{ margin:6px 0 0; }
 
   .diagram{ margin:14px 0; break-inside:avoid; }
   .drow{ display:flex; gap:10px; justify-content:center; }
@@ -53,52 +50,36 @@
 
   .steps{ margin:8px 0; } .step{ display:flex; gap:10px; align-items:flex-start; margin:5px 0; }
   .step .b{ flex:none; width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-size:9pt; font-weight:700; display:flex; align-items:center; justify-content:center; margin-top:1px; }
-
-  .price{ color:var(--accent-d); font-weight:800; white-space:nowrap; font-size:11pt; }
-  .plan-complete td{ background:var(--bg-accent) !important; }
   .kicker{ color:var(--mute); font-size:9pt; }
   .divider{ height:2px; background:var(--ink); margin:22px 0 0; }
   .signoff{ margin-top:10px; font-size:10pt; color:var(--ink); font-weight:700; letter-spacing:.02em; }
-
-  .legend{ margin:10px 0 4px; display:flex; gap:16px; flex-wrap:wrap; font-size:9pt; color:var(--ink2); }
-  .legend span{ display:inline-flex; align-items:center; gap:6px; }
-  .chip{ width:24px; height:14px; border-radius:4px; border:1.5px solid; display:inline-block; }
-  .c-dec{ background:#fff; border-color:var(--accent); } .c-good{ background:#dcfce7; border-color:#16a34a; }
-  .c-bad{ background:#fee2e2; border-color:#dc2626; } .c-term{ background:var(--ink); border-color:var(--ink); }
-
-  .flow{ break-before:page; padding-top:4px; }
-  .mermaid{ text-align:center; margin-top:8px; } .mermaid svg{ display:block; margin:0 auto; }
   .break{ break-before:page; }
 </style>
 </head>
 <body>
 
-  <header class="brandbar">
-    <span class="brand">BEXOVAR</span><span class="brand-r">Desarrollo a medida</span>
-  </header>
+  <header class="brandbar"><span class="brand">BEXOVAR</span><span class="brand-r">Desarrollo a medida</span></header>
 
   <div class="eyebrow">Propuesta · Plataforma de reventa de entradas</div>
   <h1 class="title">Propuesta integral</h1>
-  <div class="subtitle">El sistema y sus flujos, en un documento</div>
+  <div class="subtitle">El sistema y las reglas del negocio</div>
   <div class="meta">Preparado por Bexovar · 1 de julio de 2026</div>
 
-  <p class="lead">Esto es, en un solo documento, la plataforma que te proponemos para <strong>vender
-  entradas con inventario y precios siempre al día</strong>, a tus clientes y agencias. Vas a ver qué
-  resuelve, <strong>cómo funciona por dentro</strong> (con diagramas), las reglas del negocio y cuánto sale.</p>
+  <p class="lead">Esto es, en un solo documento, la plataforma que te proponemos para <strong>vender entradas
+  con inventario y precios siempre al día</strong>, a tus clientes y agencias. Vas a ver qué resuelve, cómo
+  funciona y las reglas del negocio. <em>Los flujos con las decisiones del sistema van en un documento aparte
+  (“Diagramas”).</em></p>
 
   <div class="toc">
     <h3>Contenido</h3>
     <ol>
       <li>La situación hoy</li>
       <li>La solución de un vistazo</li>
-      <li>Cómo trabaja el sistema (flujos)</li>
       <li>Reglas del negocio</li>
       <li>Cómo se suman proveedores</li>
       <li>Qué hace el sistema</li>
       <li>Resultados esperados</li>
       <li>Cómo lo entregamos</li>
-      <li>Inversión</li>
-      <li>Por qué Bexovar</li>
       <li>Próximos pasos</li>
     </ol>
   </div>
@@ -139,160 +120,30 @@
     público, y hay copias de seguridad automáticas.</div>
   </section>
 
-  <section>
-    <h2><span class="n">3.</span>Cómo trabaja el sistema (flujos)</h2>
-    <p>Acá ves, paso a paso, <strong>qué decide el sistema en cada punto</strong>. Cada rombo es una decisión con sus caminos.</p>
-    <div class="legend">
-      <span><i class="chip c-term"></i> Inicio / fin</span>
-      <span><i class="chip c-dec"></i> Decisión</span>
-      <span><i class="chip c-good"></i> Resultado positivo</span>
-      <span><i class="chip c-bad"></i> Se frena / protege</span>
-    </div>
-  </section>
-
-  <section class="flow">
-    <div class="sub">3.1 · Sincronización con un proveedor — obtención de datos</div>
-    <p class="desc">Cómo entra el sistema, asegura la sesión y clasifica cada evento (Inmediato, On Request, u omitir).</p>
-    <pre class="mermaid">
-flowchart TD
-  s(["Inicio del ciclo"]) --> q1{"¿Sesión válida?"}
-  q1 -->|"Sí"| L["Traer lista de eventos"]
-  q1 -->|"No"| lg["Iniciar login"]
-  lg --> q3{"¿Login correcto?"}
-  q3 -->|"No"| bk["Backoff y reintento"]
-  q3 -->|"Sí"| L
-  L --> D["Por cada evento: traer detalle"]
-  D --> q4{"¿Trae sectores con precio?"}
-  q4 -->|"Sí"| q5{"¿Con stock disponible?"}
-  q5 -->|"Sí"| inm["Marcar como Inmediato"]
-  q5 -->|"No"| onr["Marcar como On Request"]
-  q4 -->|"No"| q6{"¿Qué es?"}
-  q6 -->|"Es On Request"| req["Fila a consultar"]
-  q6 -->|"Servicio extra"| sk["Omitir"]
-  q6 -->|"Sin datos"| inc["Marcar ciclo incompleto"]
-  inm --> nx(["Continúa en la Parte B"])
-  onr --> nx
-  req --> nx
-  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
-  class s,nx term;
-    </pre>
-  </section>
-
-  <section class="flow">
-    <div class="sub">3.2 · Sincronización — publicación segura (anti-vaciado)</div>
-    <p class="desc">La regla crítica: nunca se vacía el catálogo por un error. Solo se marcan ausentes si el ciclo fue completo.</p>
-    <pre class="mermaid">
-flowchart TD
-  a(["Datos del ciclo"]) --> g{"Anti-vaciado: ¿0 ítems o caída mayor al umbral?"}
-  g -->|"Sí, sospechoso"| ab(["Abortar: conservar catálogo anterior"])
-  g -->|"No"| mk["Aplicar markup por reglas: proveedor + categoría"]
-  mk --> up["Guardar y actualizar en la base"]
-  up --> q{"¿El ciclo fue completo?"}
-  q -->|"Sí"| ma["Marcar ausentes como no disponibles"]
-  q -->|"No"| nm["No marcar ausentes — evita falsos agotados"]
-  ma --> done(["Fin del ciclo"])
-  nm --> done
-  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
-  classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
-  class a,done term;
-  class ab bad;
-    </pre>
-  </section>
-
-  <section class="flow">
-    <div class="sub">3.3 · Cálculo de precio — markup y moneda</div>
-    <p class="desc">Cómo se arma el precio de venta: conversión a USD si hace falta, y la regla de markup más específica que aplique.</p>
-    <pre class="mermaid">
-flowchart TD
-  s(["Precio del proveedor"]) --> q1{"¿La moneda es USD?"}
-  q1 -->|"No"| cv["Convertir a USD con la cotización del día"]
-  q1 -->|"Sí"| q2{"¿Hay regla para proveedor + categoría?"}
-  cv --> q2
-  q2 -->|"Sí"| r1["Usar el % de esa regla"]
-  q2 -->|"No"| q3{"¿Hay % del proveedor?"}
-  q3 -->|"Sí"| r2["Usar el % del proveedor"]
-  q3 -->|"No"| r3["Usar el % global"]
-  r1 --> c["Precio de venta = precio + margen"]
-  r2 --> c
-  r3 --> c
-  c --> o(["Precio de venta en USD"])
-  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
-  class s,o term;
-    </pre>
-    <div class="example"><b>Ejemplos de markup (a definir con el cliente):</b>
-      Passion Events · Fútbol → +20% &nbsp;·&nbsp; Passion Events · F1 → +15% &nbsp;·&nbsp;
-      Passion Events · Conciertos → +25% &nbsp;·&nbsp; Default del proveedor → +18% &nbsp;·&nbsp; Default global → +20%.</div>
-  </section>
-
-  <section class="flow">
-    <div class="sub">3.4 · Solicitud On Request — estados</div>
-    <p class="desc">El circuito de una entrada "a consultar": desde que la agencia la pide hasta el resultado.</p>
-    <pre class="mermaid">
-flowchart TD
-  s(["Agencia elige cantidad — ve precio de referencia"]) --> cr["Crear Solicitud — estado Pendiente"]
-  cr --> ml["Aviso automático por email o WhatsApp: en revisión"]
-  ml --> ck["El equipo confirma con el proveedor"]
-  ck --> q{"¿Resultado?"}
-  q -->|"Hay disponibilidad"| ap(["Aprobado — se emite invoice"])
-  q -->|"Se ofrece otra opción"| al(["Alternativa ofrecida"])
-  q -->|"Sin disponibilidad"| rj(["Rechazado"])
-  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
-  classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d;
-  classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
-  class s term;
-  class ap good;
-  class rj bad;
-    </pre>
-  </section>
-
-  <section class="flow">
-    <div class="sub">3.5 · El cliente en el catálogo — reservar o consultar</div>
-    <p class="desc">Qué ve y qué puede hacer un cliente o agencia según el tipo de entrada.</p>
-    <pre class="mermaid">
-flowchart TD
-  s(["Cliente busca en el catálogo"]) --> ev["Ve el evento y sus sectores"]
-  ev --> q{"¿Sector Inmediato y con stock?"}
-  q -->|"Sí"| bk(["Reservar — WhatsApp o compra"])
-  q -->|"No"| cs(["Consultar — genera Solicitud On Request"])
-  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
-  classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d;
-  class s term;
-  class bk good;
-    </pre>
-  </section>
-
   <section class="break">
-    <h2><span class="n">4.</span>Reglas del negocio</h2>
+    <h2><span class="n">3.</span>Reglas del negocio</h2>
     <ol>
       <li><strong>Multiproveedor.</strong> Passion Events es el primero. Cada proveedor nuevo se suma en un <strong>módulo aparte</strong> conectado a la base, sin rehacer el sistema.</li>
       <li><strong>Tipo de producto (lo define el proveedor).</strong> Cada entrada es <strong>Inmediata</strong> (compra directa, con stock real) u <strong>On Request</strong> (a pedido: precio de referencia, sin stock garantizado).</li>
       <li><strong>Moneda.</strong> Toda la plataforma opera en <strong>USD</strong>.</li>
-      <li><strong>Precio de venta (markup por reglas).</strong> Precio del proveedor + un %, donde el % depende de <strong>proveedor + categoría</strong>, con un % por defecto del proveedor y uno global. (Ver flujo 3.3.)</li>
-      <li><strong>Sincronización con anti-vaciado.</strong> Actualiza cada pocos minutos; si un ciclo trae muy pocos datos, conserva el catálogo anterior. (Ver flujo 3.2.)</li>
+      <li><strong>Precio de venta (markup por reglas).</strong> Precio del proveedor + un %, donde el % depende de <strong>proveedor + categoría</strong>, con un % por defecto del proveedor y uno global. <span class="kicker">(ver Diagramas)</span></li>
+      <li><strong>Sincronización con anti-vaciado.</strong> Actualiza cada pocos minutos; si un ciclo trae muy pocos datos, conserva el catálogo anterior. <span class="kicker">(ver Diagramas)</span></li>
       <li><strong>Accesos y permisos.</strong> Agencias/vendedores con usuario y clave ven solo lo que les corresponde; el administrador gestiona todo; la carga manual de entradas propias no la toca la sincronización.</li>
       <li><strong>Pago.</strong> Sin checkout ni pasarela: se arregla por fuera. El sistema registra el estado, no procesa el dinero.</li>
-      <li><strong>Flujo On Request con estados.</strong> Pendiente → Aprobado / Alternativa / Rechazado. (Ver flujo 3.4.)</li>
+      <li><strong>Flujo On Request con estados.</strong> Pendiente → Aprobado / Alternativa / Rechazado. <span class="kicker">(ver Diagramas)</span></li>
     </ol>
+    <div class="note"><b>Ejemplos de markup (a definir con vos):</b>
+      Passion Events · Fútbol → +20% &nbsp;·&nbsp; Passion Events · F1 → +15% &nbsp;·&nbsp;
+      Passion Events · Conciertos → +25% &nbsp;·&nbsp; Default del proveedor → +18% &nbsp;·&nbsp; Default global → +20%.</div>
   </section>
 
   <section class="break">
-    <h2><span class="n">5.</span>Cómo se suman proveedores</h2>
+    <h2><span class="n">4.</span>Cómo se suman proveedores</h2>
     <p><strong>Primero ponemos el sistema en producción con Passion Events.</strong> Después, ya andando y
     vendiendo, sumamos más proveedores de a uno. Cada proveedor nuevo se agrega en un <strong>módulo aparte</strong>
     (un conector) que trae sus datos, los traduce al formato común y <strong>los conecta directo a la base de
-    datos</strong> —exactamente como funciona hoy Passion Events—. El resto del sistema no se toca.</p>
-    <pre class="mermaid">
-flowchart TD
-  s(["Nuevo proveedor"]) --> m["Módulo aparte (conector) — trae sus datos"]
-  m --> n["Los traduce al formato común"]
-  n --> rg["Aplica las reglas de markup del proveedor"]
-  rg --> db["Se conecta directo a la base de datos"]
-  db --> lv(["Proveedor activo en el catálogo"])
-  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
-  classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d;
-  class s term;
-  class lv good;
-    </pre>
+    datos</strong> —exactamente como funciona hoy Passion Events—. El resto del sistema no se toca.
+    <span class="kicker">(el flujo de alta está en el documento de Diagramas)</span></p>
     <div class="example"><b>Datos que necesita cada proveedor nuevo (su módulo, como Passion Events):</b>
       <ul>
         <li>Nombre del proveedor y moneda de origen (ej. Passion Events, EUR).</li>
@@ -314,7 +165,7 @@ flowchart TD
   </section>
 
   <section class="break">
-    <h2><span class="n">6.</span>Qué hace el sistema</h2>
+    <h2><span class="n">5.</span>Qué hace el sistema</h2>
     <h3>Catálogo para agencias y clientes</h3>
     <p>Buscador por evento, lugar y fecha; precio y disponibilidad por sector, con el markup ya incluido; contacto directo por WhatsApp para cerrar la operación.</p>
     <h3>Sincronización + markup automáticos</h3>
@@ -324,14 +175,14 @@ flowchart TD
   </section>
 
   <section>
-    <h2><span class="n">7.</span>Resultados esperados</h2>
+    <h2><span class="n">6.</span>Resultados esperados</h2>
     <table>
       <thead><tr><th>Indicador</th><th>Hoy (manual)</th><th>Con el sistema</th></tr></thead>
       <tbody>
         <tr><td>Actualización de precios/stock</td><td>A mano, se desactualiza</td><td>Automática, cada pocos minutos</td></tr>
         <tr><td>Cálculo del margen</td><td>Caso por caso</td><td>Automático por reglas</td></tr>
         <tr><td>Atención a agencias</td><td>Uno por uno</td><td>Autoservicio en tiempo real</td></tr>
-        <tr><td>Sumar proveedores</td><td>Rehacer todo</td><td>Alta sin rediseño</td></tr>
+        <tr><td>Sumar proveedores</td><td>Rehacer todo</td><td>Un módulo aparte, sin rediseño</td></tr>
       </tbody>
     </table>
     <div class="note"><b>El sistema se paga solo (ejemplo ilustrativo).</b> Si tener el catálogo siempre al día
@@ -340,7 +191,7 @@ flowchart TD
   </section>
 
   <section class="break">
-    <h2><span class="n">8.</span>Cómo lo entregamos</h2>
+    <h2><span class="n">7.</span>Cómo lo entregamos</h2>
     <p>En dos fases, cada una con un resultado que aprobás.</p>
     <table>
       <thead><tr><th style="width:30%">Fase</th><th>Qué entregamos</th></tr></thead>
@@ -353,63 +204,15 @@ flowchart TD
   </section>
 
   <section>
-    <h2><span class="n">9.</span>Inversión</h2>
-    <p>Dos planes; elegís hasta dónde llegar ahora. <strong>Montos en USD, por única vez</strong> (los costos mensuales de terceros —hosting y envío de avisos— van aparte y son bajos).</p>
-    <table>
-      <thead><tr><th style="width:26%">Plan</th><th>Qué incluye</th><th style="width:16%">Inversión</th></tr></thead>
-      <tbody>
-        <tr>
-          <td><strong>Sistema actual</strong><br><small class="kicker">Passion Events</small></td>
-          <td>Sincronización de Passion Events (Inmediato/On Request, precio + stock), markup aplicado, catálogo web en USD, panel de carga manual, base de datos y seguridad.</td>
-          <td class="price">US$ 2.000</td>
-        </tr>
-        <tr class="plan-complete">
-          <td><strong>Sistema completo</strong></td>
-          <td>Todo lo anterior <strong>+</strong> multiproveedor, markup por reglas (proveedor + categoría), accesos de agencias/vendedores con roles, flujo On Request completo (solicitudes, avisos, estados, invoice) y reportes.</td>
-          <td class="price">US$ 3.000</td>
-        </tr>
-      </tbody>
-    </table>
-    <p class="kicker">Cómo se paga: un anticipo para arrancar y el resto contra cada entrega.</p>
-  </section>
-
-  <section>
-    <h2><span class="n">10.</span>Por qué Bexovar</h2>
-    <ul>
-      <li><strong>Desarrollo a medida:</strong> el sistema se ajusta a cómo trabajás vos, y queda tuyo.</li>
-      <li><strong>Independiente del proveedor:</strong> diseñado para no depender de un solo origen de inventario.</li>
-      <li><strong>Tecnología estándar y documentada:</strong> fácil de mantener y de escalar.</li>
-      <li><strong>Entrega por etapas:</strong> pagás contra resultados, con riesgo mínimo.</li>
-    </ul>
-  </section>
-
-  <section>
-    <h2><span class="n">11.</span>Próximos pasos</h2>
+    <h2><span class="n">8.</span>Próximos pasos</h2>
     <div class="steps">
-      <div class="step"><span class="b">1</span><span>Elegís el plan (actual o completo).</span></div>
-      <div class="step"><span class="b">2</span><span>Cerramos las "definiciones a cerrar" del punto 5.</span></div>
-      <div class="step"><span class="b">3</span><span>Con un anticipo chico, arrancamos por la Etapa 1.</span></div>
+      <div class="step"><span class="b">1</span><span>Cerramos las "definiciones a cerrar" del punto 4.</span></div>
+      <div class="step"><span class="b">2</span><span>Con un anticipo chico, arrancamos por la Fase 1 (Passion Events a producción).</span></div>
     </div>
     <p>Cuando quieras, nos escribís y arrancamos.</p>
     <div class="divider"></div>
     <p class="signoff">Bexovar · bexovar@gmail.com · +54 9 11 2388 5910</p>
   </section>
 
-  <script src="vendor/mermaid.min.js"></script>
-  <script>
-    mermaid.initialize({
-      startOnLoad:false, theme:"base",
-      themeVariables:{ fontFamily:'Arial, "Liberation Sans", Helvetica, sans-serif', fontSize:"13px",
-        primaryColor:"#f0f9ff", primaryBorderColor:"#0284c7", primaryTextColor:"#0f172a", lineColor:"#64748b", tertiaryColor:"#f1f5f9" },
-      flowchart:{ htmlLabels:true, curve:"basis", nodeSpacing:26, rankSpacing:30, useMaxWidth:true },
-    });
-    mermaid.run({ querySelector:".mermaid" }).then(() => {
-      document.querySelectorAll(".mermaid svg").forEach((svg) => {
-        svg.removeAttribute("width"); svg.removeAttribute("height");
-        svg.style.maxWidth="100%"; svg.style.maxHeight="215mm"; svg.style.width="auto"; svg.style.height="auto";
-      });
-      window.__mmReady = true;
-    }).catch((e) => { document.body.setAttribute("data-mmerr", String(e)); window.__mmReady = true; });
-  </script>
 </body>
 </html>

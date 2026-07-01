@@ -162,33 +162,20 @@ flowchart TD
   </section>
 
   <section class="flow">
-    <h2><span class="n">4.</span>Alta de un proveedor — tipo de integración</h2>
-    <p class="desc">La decisión al sumar un proveedor: cuanto más "abierto" (API/feed), más barato y estable.</p>
+    <h2><span class="n">4.</span>Alta de un proveedor — módulo aparte</h2>
+    <p class="desc">Cada proveedor nuevo entra por su propio módulo, que trae los datos y los conecta directo a la base —como Passion Events hoy.</p>
     <pre class="mermaid">
 flowchart TD
-  s(["Nuevo proveedor"]) --> q1{"¿Tiene API o feed oficial?"}
-  q1 -->|"Sí"| a1["Adaptador API o feed — barato y estable"]
-  q1 -->|"No"| q2{"¿Se pueden leer sus páginas?"}
-  q2 -->|"Sí"| a2["Adaptador de scraping — a medida y con mantenimiento"]
-  q2 -->|"No"| a3["Carga manual desde el panel"]
-  a1 --> rg["Registrar proveedor + reglas de markup"]
-  a2 --> rg
-  a3 --> rg
-  rg --> lv(["Proveedor activo en el catálogo"])
+  s(["Nuevo proveedor"]) --> m["Módulo aparte (conector) — trae sus datos"]
+  m --> n["Los traduce al formato común"]
+  n --> rg["Aplica las reglas de markup del proveedor"]
+  rg --> db["Se conecta directo a la base de datos"]
+  db --> lv(["Proveedor activo en el catálogo"])
   classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
   classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d;
   class s term;
   class lv good;
     </pre>
-    <div class="example"><b>Proveedor por scraping (como el actual, sin API) — datos que se necesitan:</b>
-      <ul>
-        <li>Nombre del proveedor y moneda de origen (ej. Passion Events, EUR).</li>
-        <li>Dirección del sitio y de la página de login.</li>
-        <li>Usuario y contraseña de la cuenta de agente en ese proveedor.</li>
-        <li>Dirección del listado de eventos (hoy: <code>event_list.php</code>).</li>
-        <li>Frecuencia de actualización y reglas de markup (proveedor + categoría).</li>
-        <li>Desarrollo del conector: cómo leer sus páginas de lista y de detalle (a medida por sitio).</li>
-      </ul></div>
   </section>
 
   <section class="flow">
