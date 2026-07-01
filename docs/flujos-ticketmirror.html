@@ -36,6 +36,10 @@
   .flow .desc{ margin:8px 0 4px; color:var(--mute); font-size:9.7pt; }
   .mermaid{ text-align:center; margin-top:8px; }
   .mermaid svg{ display:block; margin:0 auto; }
+  .example{ margin-top:12px; background:var(--bg-accent); border:1px solid #cde8f7; border-left:3px solid var(--accent); border-radius:5px; padding:9px 12px; font-size:9.3pt; color:var(--ink2); }
+  .example b{ color:var(--accent-d); }
+  .example ul{ margin:6px 0 0; padding-left:18px; }
+  .example li{ margin:2px 0; }
   footer{ margin-top:26px; }
 </style>
 </head>
@@ -70,9 +74,7 @@ flowchart TD
   s(["Inicio del ciclo"]) --> q1{"¿Sesión válida?"}
   q1 -->|"Sí"| L["Traer lista de eventos"]
   q1 -->|"No"| lg["Iniciar login"]
-  lg --> q2{"¿Captcha o MFA?"}
-  q2 -->|"Sí"| stop(["Parar y alertar — no se evade"])
-  q2 -->|"No"| q3{"¿Login correcto?"}
+  lg --> q3{"¿Login correcto?"}
   q3 -->|"No"| bk["Backoff y reintento"]
   q3 -->|"Sí"| L
   L --> D["Por cada evento: traer detalle"]
@@ -88,9 +90,7 @@ flowchart TD
   onr --> nx
   req --> nx
   classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
-  classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
   class s,nx term;
-  class stop bad;
     </pre>
   </section>
 
@@ -135,6 +135,9 @@ flowchart TD
   classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
   class s,o term;
     </pre>
+    <div class="example"><b>Ejemplos de markup (a definir con el cliente):</b>
+      Passion Events · Fútbol → +20% &nbsp;·&nbsp; Passion Events · F1 → +15% &nbsp;·&nbsp;
+      Passion Events · Conciertos → +25% &nbsp;·&nbsp; Default del proveedor → +18% &nbsp;·&nbsp; Default global → +20%.</div>
   </section>
 
   <section class="flow">
@@ -143,7 +146,7 @@ flowchart TD
     <pre class="mermaid">
 flowchart TD
   s(["Agencia elige cantidad — ve precio de referencia"]) --> cr["Crear Solicitud — estado Pendiente"]
-  cr --> ml["Email automático: en revisión"]
+  cr --> ml["Aviso automático por email o WhatsApp: en revisión"]
   ml --> ck["El equipo confirma con el proveedor"]
   ck --> q{"¿Resultado?"}
   q -->|"Hay disponibilidad"| ap(["Aprobado — se emite invoice"])
@@ -177,6 +180,15 @@ flowchart TD
   class s term;
   class lv good;
     </pre>
+    <div class="example"><b>Proveedor por scraping (como el actual, sin API) — datos que se necesitan:</b>
+      <ul>
+        <li>Nombre del proveedor y moneda de origen (ej. Passion Events, EUR).</li>
+        <li>Dirección del sitio y de la página de login.</li>
+        <li>Usuario y contraseña de la cuenta de agente en ese proveedor.</li>
+        <li>Dirección del listado de eventos (hoy: <code>event_list.php</code>).</li>
+        <li>Frecuencia de actualización y reglas de markup (proveedor + categoría).</li>
+        <li>Desarrollo del conector: cómo leer sus páginas de lista y de detalle (a medida por sitio).</li>
+      </ul></div>
   </section>
 
   <section class="flow">
