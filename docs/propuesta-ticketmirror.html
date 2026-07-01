@@ -101,7 +101,7 @@
   <section>
     <h2><span class="n">2.</span>La solución de un vistazo</h2>
     <p>Una <strong>plataforma web propia</strong> (se entra desde el celular o la computadora, sin instalar
-    nada) que muestra en tiempo real qué hay y a qué precio —con tu markup ya aplicado— y te deja
+    nada) que muestra en tiempo real qué hay y a qué precio —con tu comisión de agente ya aplicada— y te deja
     <strong>atender agencias y sumar más proveedores</strong> sin rehacer nada. Tiene dos caras que trabajan juntas:</p>
     <div class="diagram">
       <div class="drow">
@@ -126,13 +126,13 @@
       <li><strong>Multiproveedor.</strong> Passion Events es el primero. Cada proveedor nuevo se suma en un <strong>módulo aparte</strong> conectado a la base, sin rehacer el sistema.</li>
       <li><strong>Tipo de producto (lo define el proveedor).</strong> Cada entrada es <strong>Inmediata</strong> (compra directa, con stock real) u <strong>On Request</strong> (a pedido: precio de referencia, sin stock garantizado).</li>
       <li><strong>Moneda.</strong> Toda la plataforma opera en <strong>USD</strong>.</li>
-      <li><strong>Precio de venta (markup por reglas).</strong> Precio del proveedor + un %, donde el % depende de <strong>proveedor + categoría</strong>, con un % por defecto del proveedor y uno global. <span class="kicker">(ver Diagramas)</span></li>
+      <li><strong>Precio de venta (comisión del agente, por reglas).</strong> Precio del proveedor + un %, donde el % depende de <strong>proveedor + categoría</strong>, con un % por defecto del proveedor y uno global. <span class="kicker">(ver Diagramas)</span></li>
       <li><strong>Sincronización con anti-vaciado.</strong> Actualiza cada pocos minutos; si un ciclo trae muy pocos datos, conserva el catálogo anterior. <span class="kicker">(ver Diagramas)</span></li>
       <li><strong>Accesos y permisos.</strong> Agencias/vendedores con usuario y clave ven solo lo que les corresponde; el administrador gestiona todo; la carga manual de entradas propias no la toca la sincronización.</li>
       <li><strong>Pago.</strong> Sin checkout ni pasarela: se arregla por fuera. El sistema registra el estado, no procesa el dinero.</li>
       <li><strong>Flujo On Request con estados.</strong> Pendiente → Aprobado / Alternativa / Rechazado. <span class="kicker">(ver Diagramas)</span></li>
     </ol>
-    <div class="note"><b>Ejemplos de markup (a definir con vos):</b>
+    <div class="note"><b>Ejemplos de comisión del agente (a definir con vos):</b>
       Passion Events · Fútbol → +20% &nbsp;·&nbsp; Passion Events · F1 → +15% &nbsp;·&nbsp;
       Passion Events · Conciertos → +25% &nbsp;·&nbsp; Default del proveedor → +18% &nbsp;·&nbsp; Default global → +20%.</div>
   </section>
@@ -150,7 +150,7 @@
         <li>Dirección del sitio y de la página de login.</li>
         <li>Usuario y contraseña de la cuenta de agente en ese proveedor.</li>
         <li>Dirección del listado de eventos (hoy: <code>event_list.php</code>).</li>
-        <li>Frecuencia de actualización y reglas de markup (proveedor + categoría).</li>
+        <li>Frecuencia de actualización y reglas de comisión del agente (proveedor + categoría).</li>
         <li>Desarrollo del conector: cómo leer sus páginas de lista y de detalle (a medida por sitio).</li>
       </ul></div>
     <div class="note"><b>Importante:</b> el <strong>marco multiproveedor</strong> —el motor que permite
@@ -158,7 +158,7 @@
     sitio, porque cada módulo se desarrolla a medida.</div>
     <h3>Definiciones a cerrar</h3>
     <ul>
-      <li>¿Las <strong>categorías</strong> del markup son una lista común o las de cada proveedor?</li>
+      <li>¿Las <strong>categorías</strong> de la comisión del agente son una lista común o las de cada proveedor?</li>
       <li>Si un proveedor cotiza en <strong>otra moneda</strong>, ¿se convierte a USD y con qué cotización?</li>
       <li>Si dos proveedores tienen el <strong>mismo evento/sector</strong>, ¿se muestran ambos, el más barato, o se unifican?</li>
     </ul>
@@ -167,11 +167,11 @@
   <section class="break">
     <h2><span class="n">5.</span>Qué hace el sistema</h2>
     <h3>Catálogo para agencias y clientes</h3>
-    <p>Buscador por evento, lugar y fecha; precio y disponibilidad por sector, con el markup ya incluido; contacto directo por WhatsApp para cerrar la operación.</p>
-    <h3>Sincronización + markup automáticos</h3>
-    <p>Trae eventos, precios y stock del proveedor, aplica la regla de markup y mantiene el catálogo al día solo.</p>
+    <p>Buscador por evento, lugar y fecha; precio y disponibilidad por sector, con la comisión del agente ya incluida; contacto directo por WhatsApp para cerrar la operación.</p>
+    <h3>Sincronización + comisión automáticas</h3>
+    <p>Trae eventos, precios y stock del proveedor, aplica la comisión del agente y mantiene el catálogo al día solo.</p>
     <h3>Panel de administración</h3>
-    <p>Proveedores y reglas de markup, usuarios y roles, carga manual de entradas propias, <strong>Solicitudes On Request</strong> con sus estados, y <strong>reportes exportables</strong>.</p>
+    <p>Proveedores y reglas de comisión del agente, usuarios y roles, carga manual de entradas propias, <strong>Solicitudes On Request</strong> con sus estados, y <strong>reportes exportables</strong>.</p>
     <h3>Dashboard de pedidos (accionable)</h3>
     <p>Los <strong>agentes/clientes</strong> <strong>piden</strong> (On Request) o <strong>reservan</strong>
     (inmediata) desde el catálogo. Cada pedido cae en el tablero, en la cola <strong>“Sin asignar”</strong>, y
@@ -211,8 +211,8 @@
     <table>
       <thead><tr><th style="width:30%">Fase</th><th>Qué entregamos</th></tr></thead>
       <tbody>
-        <tr><td><strong>1 · Passion Events a producción</strong></td><td>El sistema andando de punta a punta con Passion Events: sincronización, catálogo web en USD, panel, carga manual y markup. Listo para vender.</td></tr>
-        <tr><td><strong>2 · Sumar proveedores</strong></td><td>Ya en producción, se suman más proveedores de a uno. Cada uno en un <strong>módulo aparte</strong> conectado directo a la base —como Passion Events hoy—, con reglas de markup por proveedor, accesos de agencias/roles y reportes.</td></tr>
+        <tr><td><strong>1 · Passion Events a producción</strong></td><td>El sistema andando de punta a punta con Passion Events: sincronización, catálogo web en USD, panel, carga manual y comisión del agente. Listo para vender.</td></tr>
+        <tr><td><strong>2 · Sumar proveedores</strong></td><td>Ya en producción, se suman más proveedores de a uno. Cada uno en un <strong>módulo aparte</strong> conectado directo a la base —como Passion Events hoy—, con reglas de comisión del agente por proveedor, accesos de agencias/roles y reportes.</td></tr>
       </tbody>
     </table>
     <p class="kicker"><strong>Pagás contra resultados:</strong> cada fase la abonás al aprobar la entrega, con un anticipo chico para arrancar.</p>

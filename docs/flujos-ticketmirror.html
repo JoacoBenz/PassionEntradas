@@ -101,7 +101,7 @@ flowchart TD
 flowchart TD
   a(["Datos del ciclo"]) --> g{"Anti-vaciado: ¿0 ítems o caída mayor al umbral?"}
   g -->|"Sí, sospechoso"| ab(["Abortar: conservar catálogo anterior"])
-  g -->|"No"| mk["Aplicar markup por reglas: proveedor + categoría"]
+  g -->|"No"| mk["Aplicar la comisión del agente: proveedor + categoría"]
   mk --> up["Guardar y actualizar en la base"]
   up --> q{"¿El ciclo fue completo?"}
   q -->|"Sí"| ma["Marcar ausentes como no disponibles"]
@@ -116,8 +116,8 @@ flowchart TD
   </section>
 
   <section class="flow">
-    <h2><span class="n">2.</span>Cálculo de precio — markup y moneda</h2>
-    <p class="desc">Cómo se arma el precio de venta: conversión a USD si hace falta, y la regla de markup más específica que aplique.</p>
+    <h2><span class="n">2.</span>Cálculo de precio — comisión del agente y moneda</h2>
+    <p class="desc">Cómo se arma el precio de venta: conversión a USD si hace falta, y la regla de comisión del agente más específica que aplique.</p>
     <pre class="mermaid">
 flowchart TD
   s(["Precio del proveedor"]) --> q1{"¿La moneda es USD?"}
@@ -135,7 +135,7 @@ flowchart TD
   classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
   class s,o term;
     </pre>
-    <div class="example"><b>Ejemplos de markup (a definir con el cliente):</b>
+    <div class="example"><b>Ejemplos de comisión del agente (a definir con el cliente):</b>
       Passion Events · Fútbol → +20% &nbsp;·&nbsp; Passion Events · F1 → +15% &nbsp;·&nbsp;
       Passion Events · Conciertos → +25% &nbsp;·&nbsp; Default del proveedor → +18% &nbsp;·&nbsp; Default global → +20%.</div>
   </section>
@@ -168,7 +168,7 @@ flowchart TD
 flowchart TD
   s(["Nuevo proveedor"]) --> m["Módulo aparte (conector) — trae sus datos"]
   m --> n["Los traduce al formato común"]
-  n --> rg["Aplica las reglas de markup del proveedor"]
+  n --> rg["Aplica la comisión del agente del proveedor"]
   rg --> db["Se conecta directo a la base de datos"]
   db --> lv(["Proveedor activo en el catálogo"])
   classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
