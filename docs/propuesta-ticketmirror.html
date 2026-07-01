@@ -173,23 +173,20 @@
     <h3>Panel de administración</h3>
     <p>Proveedores y reglas de markup, usuarios y roles, carga manual de entradas propias, <strong>Solicitudes On Request</strong> con sus estados, y <strong>reportes exportables</strong>.</p>
     <h3>Dashboard de pedidos (accionable)</h3>
-    <p>Cada pedido nuevo aparece en un tablero para resolver, sea una <strong>reserva</strong> (entrada
-    inmediata) o una <strong>solicitud On Request</strong>. Desde ahí el equipo lo resuelve —confirmar y marcar
-    vendido; o, si es On Request, emitir invoice, ofrecer alternativa o rechazar— y se encarga de la
-    <strong>entrega</strong> (estado <em>vendido → entregado</em>).</p>
-    <p><strong>Un solo tablero, con vistas por permiso:</strong> cada vendedor entra y ve <strong>“Míos”</strong>,
-    <strong>“Sin asignar”</strong> y <strong>“Todos”</strong>; el admin ve todo y puede reasignar. No hace falta
-    una app por persona, y escala igual de 2 a N vendedores.</p>
-    <p><strong>Cómo se asigna cada pedido</strong> (regla configurable):</p>
-    <ul>
-      <li><strong>El que lo genera:</strong> si lo crea un vendedor logueado, queda suyo.</li>
-      <li><strong>Cola compartida:</strong> si entra suelto (web / WhatsApp), va a “Sin asignar” y lo toma quien esté, o lo reparte el admin.</li>
-      <li><strong>Reasignación</strong> a mano, siempre disponible.</li>
-    </ul>
-    <div class="note"><b>A definir:</b> ¿los vendedores van a ser solo <strong>Christian e Ignacio</strong> o va a
-    haber más gente vendiendo? ¿Cada uno trae sus propios clientes (→ “el que lo genera”) o atienden una bolsa
-    común (→ cola compartida)? Eso define usuarios, roles y la asignación.
-    <em>Default propuesto: cola compartida + auto-asignar al que lo generó + reasignación manual.</em></div>
+    <p>Los <strong>agentes/clientes</strong> <strong>piden</strong> (On Request) o <strong>reservan</strong>
+    (inmediata) desde el catálogo. Cada pedido cae en el tablero, en la cola <strong>“Sin asignar”</strong>, y
+    se avisa al equipo.</p>
+    <p><strong>El vendedor se asigna el pedido</strong> (lo toma) para coordinar la entrega. Al tomarlo queda
+    <strong>bloqueado a él</strong> (nadie más lo agarra). Desde ahí lo resuelve —confirmar y marcar vendido;
+    o, si es On Request, emitir invoice, ofrecer alternativa o rechazar— y coordina la <strong>entrega</strong>
+    (estado <em>vendido → entregado</em>).</p>
+    <p><strong>Un solo tablero, con vistas por permiso:</strong> cada vendedor ve <strong>“Sin asignar”</strong>,
+    <strong>“Míos”</strong> y <strong>“Todos”</strong>; el admin ve todo y puede <strong>reasignar</strong>. No
+    hace falta una app por persona, y escala igual de 2 a N vendedores.</p>
+    <div class="note"><b>A definir:</b> ¿cualquiera del equipo toma de la cola, o hay <strong>clientes/agencias
+    con vendedor fijo</strong> (cartera)? ¿Los vendedores son solo <strong>Christian e Ignacio</strong> o va a
+    haber más? <em>Default propuesto: cola compartida, el vendedor se asigna el pedido, y el admin puede
+    reasignar.</em></div>
   </section>
 
   <section>

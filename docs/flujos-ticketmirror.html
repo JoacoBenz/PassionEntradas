@@ -196,18 +196,15 @@ flowchart TD
 
   <section class="flow">
     <h2><span class="n">6.</span>Dashboard de pedidos — qué ve y hace el equipo</h2>
-    <p class="desc">Cada pedido nuevo cae en el tablero: primero se define a quién se asigna, y después se resuelve según el tipo (reserva u On Request).</p>
+    <p class="desc">El agente/cliente pide o reserva; el pedido cae a “Sin asignar” y un vendedor se lo asigna para coordinar la entrega.</p>
     <pre class="mermaid">
 flowchart TD
-  s(["Pedido nuevo — aparece en el Dashboard"]) --> q0{"¿Lo generó un vendedor logueado?"}
-  q0 -->|"Sí"| a1["Queda asignado a ese vendedor"]
-  q0 -->|"No — web / WhatsApp"| a2["Sin asignar: lo toma el equipo o lo reparte el admin"]
-  a1 --> t{"¿Tipo de pedido?"}
-  a2 --> t
-  t -->|"Reserva (inmediata)"| r1["Confirmar y coordinar el cobro"]
-  r1 --> rv["Marcar vendido"]
-  rv --> en(["Entregar la entrada"])
-  t -->|"On Request"| o1["El equipo confirma con el proveedor"]
+  s(["Agente/cliente pide o reserva una entrada"]) --> q["Pedido en cola 'Sin asignar' — avisa al equipo"]
+  q --> claim["Un vendedor (Christian / Ignacio) se lo asigna"]
+  claim --> t{"¿Tipo de pedido?"}
+  t -->|"Reserva (inmediata)"| r1["Confirma, cobra y coordina la entrega"]
+  r1 --> rv(["Vendido y entregado"])
+  t -->|"Pedido On Request"| o1["Confirma disponibilidad con el proveedor"]
   o1 --> o2{"¿Resultado?"}
   o2 -->|"Hay disponibilidad"| ap(["Aprobado — invoice y entrega"])
   o2 -->|"Se ofrece otra opción"| al(["Alternativa ofrecida"])
@@ -216,7 +213,7 @@ flowchart TD
   classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d;
   classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
   class s term;
-  class en,ap good;
+  class rv,ap good;
   class rj bad;
     </pre>
   </section>
