@@ -264,7 +264,7 @@ flowchart TD
   <section class="break">
     <h2><span class="n">4.</span>Reglas del negocio</h2>
     <ol>
-      <li><strong>Multiproveedor.</strong> Soporta varios proveedores; Passion Events es el primero. Sumar uno nuevo no requiere rehacer el sistema.</li>
+      <li><strong>Multiproveedor.</strong> Passion Events es el primero. Cada proveedor nuevo se suma en un <strong>módulo aparte</strong> conectado a la base, sin rehacer el sistema.</li>
       <li><strong>Tipo de producto (lo define el proveedor).</strong> Cada entrada es <strong>Inmediata</strong> (compra directa, con stock real) u <strong>On Request</strong> (a pedido: precio de referencia, sin stock garantizado).</li>
       <li><strong>Moneda.</strong> Toda la plataforma opera en <strong>USD</strong>.</li>
       <li><strong>Precio de venta (markup por reglas).</strong> Precio del proveedor + un %, donde el % depende de <strong>proveedor + categoría</strong>, con un % por defecto del proveedor y uno global. (Ver flujo 3.3.)</li>
@@ -277,34 +277,23 @@ flowchart TD
 
   <section class="break">
     <h2><span class="n">5.</span>Cómo se suman proveedores</h2>
-    <p>El sistema se conecta con cada proveedor mediante un <strong>conector</strong> propio que trae sus
-    datos y los traduce al formato común; del conector para adentro, <strong>todo funciona igual</strong>.
-    Sumar un proveedor puede ser de tres formas:</p>
-    <table>
-      <thead><tr><th>Forma</th><th>Cuándo</th><th>Costo y estabilidad</th></tr></thead>
-      <tbody>
-        <tr><td><strong>Carga manual</strong></td><td>Entradas propias, desde el panel</td><td>Ya incluido</td></tr>
-        <tr><td><strong>API / feed oficial</strong></td><td>El proveedor da una API, Excel o planilla</td><td>Barato y <strong>estable</strong></td></tr>
-        <tr><td><strong>Scraping</strong> (como Passion Events)</td><td>No hay API; hay que leer sus páginas</td><td>A medida por sitio <strong>+ mantenimiento</strong></td></tr>
-      </tbody>
-    </table>
+    <p><strong>Primero ponemos el sistema en producción con Passion Events.</strong> Después, ya andando y
+    vendiendo, sumamos más proveedores de a uno. Cada proveedor nuevo se agrega en un <strong>módulo aparte</strong>
+    (un conector) que trae sus datos, los traduce al formato común y <strong>los conecta directo a la base de
+    datos</strong> —exactamente como funciona hoy Passion Events—. El resto del sistema no se toca.</p>
     <pre class="mermaid">
 flowchart TD
-  s(["Nuevo proveedor"]) --> q1{"¿Tiene API o feed oficial?"}
-  q1 -->|"Sí"| a1["Adaptador API o feed — barato y estable"]
-  q1 -->|"No"| q2{"¿Se pueden leer sus páginas?"}
-  q2 -->|"Sí"| a2["Adaptador de scraping — a medida y con mantenimiento"]
-  q2 -->|"No"| a3["Carga manual desde el panel"]
-  a1 --> rg["Registrar proveedor + reglas de markup"]
-  a2 --> rg
-  a3 --> rg
-  rg --> lv(["Proveedor activo en el catálogo"])
+  s(["Nuevo proveedor"]) --> m["Módulo aparte (conector) — trae sus datos"]
+  m --> n["Los traduce al formato común"]
+  n --> rg["Aplica las reglas de markup del proveedor"]
+  rg --> db["Se conecta directo a la base de datos"]
+  db --> lv(["Proveedor activo en el catálogo"])
   classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
   classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d;
   class s term;
   class lv good;
     </pre>
-    <div class="example"><b>Proveedor por scraping (como el actual, sin API) — datos que se necesitan:</b>
+    <div class="example"><b>Datos que necesita cada proveedor nuevo (su módulo, como Passion Events):</b>
       <ul>
         <li>Nombre del proveedor y moneda de origen (ej. Passion Events, EUR).</li>
         <li>Dirección del sitio y de la página de login.</li>
@@ -313,15 +302,14 @@ flowchart TD
         <li>Frecuencia de actualización y reglas de markup (proveedor + categoría).</li>
         <li>Desarrollo del conector: cómo leer sus páginas de lista y de detalle (a medida por sitio).</li>
       </ul></div>
-    <div class="note"><b>Importante:</b> el <strong>marco multiproveedor</strong> está incluido en el plan
-    completo; <strong>cada proveedor nuevo por scraping se cotiza aparte</strong> según el sitio. Conviene
-    priorizar proveedores con API/feed.</div>
+    <div class="note"><b>Importante:</b> el <strong>marco multiproveedor</strong> —el motor que permite
+    enchufar módulos— va en el plan completo; <strong>cada proveedor nuevo se cotiza aparte</strong> según el
+    sitio, porque cada módulo se desarrolla a medida.</div>
     <h3>Definiciones a cerrar</h3>
     <ul>
       <li>¿Las <strong>categorías</strong> del markup son una lista común o las de cada proveedor?</li>
       <li>Si un proveedor cotiza en <strong>otra moneda</strong>, ¿se convierte a USD y con qué cotización?</li>
       <li>Si dos proveedores tienen el <strong>mismo evento/sector</strong>, ¿se muestran ambos, el más barato, o se unifican?</li>
-      <li>¿El <strong>alta de un proveedor</strong> la hace el admin desde el panel o es siempre un desarrollo?</li>
     </ul>
   </section>
 
@@ -353,15 +341,15 @@ flowchart TD
 
   <section class="break">
     <h2><span class="n">8.</span>Cómo lo entregamos</h2>
+    <p>En dos fases, cada una con un resultado que aprobás.</p>
     <table>
-      <thead><tr><th>Etapa</th><th>Qué entregamos</th><th>Plazo</th></tr></thead>
+      <thead><tr><th style="width:30%">Fase</th><th>Qué entregamos</th></tr></thead>
       <tbody>
-        <tr><td>Etapa 1</td><td>Sincronización de Passion Events + catálogo web + carga manual</td><td>Fin mes 1</td></tr>
-        <tr><td>Etapa 2</td><td>Reglas de markup por proveedor/categoría + accesos de agencias/roles</td><td>Fin mes 2</td></tr>
-        <tr><td>Etapa 3</td><td>Multiproveedor + flujo On Request (solicitudes, avisos, estados) + reportes</td><td>Fin mes 3</td></tr>
+        <tr><td><strong>1 · Passion Events a producción</strong></td><td>El sistema andando de punta a punta con Passion Events: sincronización, catálogo web en USD, panel, carga manual y markup. Listo para vender.</td></tr>
+        <tr><td><strong>2 · Sumar proveedores</strong></td><td>Ya en producción, se suman más proveedores de a uno. Cada uno en un <strong>módulo aparte</strong> conectado directo a la base —como Passion Events hoy—, con reglas de markup por proveedor, accesos de agencias/roles y reportes.</td></tr>
       </tbody>
     </table>
-    <p class="kicker"><strong>Pagás contra resultados:</strong> cada etapa la abonás al aprobar la entrega, con un anticipo chico para arrancar.</p>
+    <p class="kicker"><strong>Pagás contra resultados:</strong> cada fase la abonás al aprobar la entrega, con un anticipo chico para arrancar.</p>
   </section>
 
   <section>
