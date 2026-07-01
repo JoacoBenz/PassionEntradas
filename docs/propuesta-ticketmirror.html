@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Bexovar · Propuesta integral · TicketMirror</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink2:#1e293b; --body:#334155; --mute:#64748b; --faint:#94a3b8;
+    --accent:#0284c7; --accent-d:#0369a1; --line:#e2e8f0; --bg-accent:#f0f9ff; --bg-soft:#f1f5f9;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body{
+    font-family:"Liberation Sans", Arial, Helvetica, sans-serif;
+    color:var(--body); font-size:10.5pt; line-height:1.55; margin:0;
+  }
+  h1,h2,h3{ color:var(--ink); margin:0; }
+  p{ margin:0 0 9px; }
+  strong{ color:var(--ink2); }
+  ul{ margin:0 0 10px; padding-left:18px; }
+  li{ margin:3px 0; }
+  a{ color:var(--accent); text-decoration:none; }
+  small{ font-size:8.5pt; }
+
+  /* ---- portada ---- */
+  .brandbar{ display:flex; align-items:center; justify-content:space-between;
+    border-bottom:2px solid var(--ink); padding-bottom:8px; }
+  .brand{ font-weight:800; letter-spacing:.32em; color:var(--ink); font-size:12pt; }
+  .brand-r{ font-size:8pt; letter-spacing:.12em; color:var(--mute); text-transform:uppercase; }
+  .eyebrow{ margin-top:26px; color:var(--accent); font-size:8.5pt; font-weight:700;
+    letter-spacing:.16em; text-transform:uppercase; }
+  h1.title{ font-size:30pt; font-weight:800; letter-spacing:-.01em; margin:6px 0 2px; }
+  .subtitle{ font-size:13pt; color:var(--mute); font-weight:500; }
+  .meta{ margin-top:14px; font-size:9pt; color:var(--faint); letter-spacing:.02em; }
+  .lead{ margin-top:16px; padding-top:16px; border-top:1px solid var(--line); font-size:11pt; color:var(--ink2); }
+
+  /* ---- secciones ---- */
+  section{ margin-top:24px; }
+  h2{ font-size:14pt; font-weight:800; padding-bottom:7px; border-bottom:2px solid var(--line);
+      margin-bottom:12px; break-after:avoid; }
+  h2 .n{ color:var(--accent); margin-right:8px; }
+  h3{ font-size:10.5pt; color:var(--ink); margin:12px 0 4px; }
+
+  /* ---- tablas ---- */
+  table{ width:100%; border-collapse:collapse; margin:10px 0; font-size:9.7pt; break-inside:avoid; }
+  th,td{ border:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; }
+  thead th{ background:var(--bg-soft); color:var(--ink); font-weight:700; }
+  tbody tr:nth-child(even) td{ background:#fafbfc; }
+
+  /* ---- cajas ---- */
+  .note{ background:var(--bg-accent); border:1px solid #cde8f7; border-left:3px solid var(--accent);
+    border-radius:5px; padding:10px 13px; margin:12px 0; font-size:9.7pt; color:var(--ink2); break-inside:avoid; }
+  .note b{ color:var(--accent-d); }
+
+  /* ---- diagrama ---- */
+  .diagram{ margin:14px 0; break-inside:avoid; }
+  .drow{ display:flex; gap:10px; justify-content:center; }
+  .dbox{ flex:1; border:1px solid var(--line); border-radius:6px; padding:9px 10px; text-align:center;
+    background:#fff; }
+  .dbox b{ color:var(--ink); font-size:9.5pt; } .dbox small{ display:block; color:var(--mute); }
+  .dcenter{ margin:8px auto; max-width:60%; text-align:center; background:var(--ink); color:#fff;
+    border-radius:6px; padding:9px; font-weight:700; letter-spacing:.08em; font-size:9.5pt; }
+
+  .steps{ counter-reset:s; margin:8px 0; }
+  .step{ display:flex; gap:10px; align-items:flex-start; margin:5px 0; }
+  .step .b{ flex:none; width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff;
+    font-size:9pt; font-weight:700; display:flex; align-items:center; justify-content:center; margin-top:1px; }
+
+  /* ---- inversión ---- */
+  .price{ color:var(--accent-d); font-weight:800; white-space:nowrap; font-size:11pt; }
+  .plan-complete td{ background:var(--bg-accent) !important; }
+
+  .kicker{ color:var(--mute); font-size:9pt; }
+  .divider{ height:2px; background:var(--ink); margin:22px 0 0; }
+  .signoff{ margin-top:10px; font-size:10pt; color:var(--ink); font-weight:700; letter-spacing:.02em; }
+
+  .break{ break-before:page; }
+</style>
+</head>
+<body>
+
+  <header class="brandbar">
+    <span class="brand">BEXOVAR</span>
+    <span class="brand-r">Desarrollo a medida</span>
+  </header>
+
+  <div class="eyebrow">Propuesta · Plataforma de reventa de entradas</div>
+  <h1 class="title">Propuesta integral</h1>
+  <div class="subtitle">El sistema en un documento</div>
+  <div class="meta">Preparado por Bexovar · 1 de julio de 2026</div>
+
+  <p class="lead">Estimados de <strong>TicketMirror</strong>: este documento reúne todo lo que necesitan
+  saber para evaluar la plataforma que proponemos para <strong>vender entradas de eventos con inventario
+  y precios actualizados</strong>, a clientes y agencias. Qué resuelve, cómo funciona, las reglas del
+  negocio y qué inversión implica.</p>
+
+  <section>
+    <h2><span class="n">1.</span>La situación hoy</h2>
+    <p>Hoy el inventario vive en el <strong>portal de un proveedor (Passion Events)</strong>: precios y
+    disponibilidad que cambian todo el tiempo, que hay que mirar y pasar <strong>a mano</strong> para cada
+    cliente. No hay un catálogo propio, en tiempo real, con <strong>tu precio de venta ya calculado</strong>.</p>
+    <p>Eso tiene un costo real, aunque no aparezca en ninguna factura:</p>
+    <ul>
+      <li><strong>Ventas que se pierden:</strong> precios o stock desactualizados, consultas que llegan tarde.</li>
+      <li><strong>Horas de trabajo:</strong> revisar el portal, calcular el margen, responder uno por uno.</li>
+      <li><strong>Techo para crecer:</strong> sin catálogo propio es difícil sumar agencias, vendedores o más proveedores.</li>
+      <li><strong>Dependencia de un solo origen:</strong> si ese proveedor cambia o corta el acceso, el negocio se queda sin base.</li>
+    </ul>
+    <p>Seguir así no es gratis: es el costo invisible de la gestión manual, todos los meses.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">2.</span>¿Por qué conviene el sistema?</h2>
+    <p>Porque convierte ese trabajo manual en una <strong>plataforma propia</strong> que muestra, en tiempo
+    real, qué hay y a qué precio —con tu markup ya aplicado— y te deja <strong>atender agencias y escalar a
+    más proveedores</strong> sin rehacer nada.</p>
+    <table>
+      <thead><tr><th>De lo manual…</th><th>…al sistema</th></tr></thead>
+      <tbody>
+        <tr><td>Mirar el portal y pasar precios a mano</td><td>Catálogo propio actualizado solo, cada pocos minutos</td></tr>
+        <tr><td>Calcular el margen caso por caso</td><td>Precio de venta con markup automático por reglas</td></tr>
+        <tr><td>Un solo proveedor, atado a su portal</td><td>Arquitectura lista para <strong>varios proveedores</strong></td></tr>
+        <tr><td>Responder consultas de a una</td><td>Agencias con su usuario viendo todo en vivo</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><b>Nota honesta:</b> hoy el acceso a Passion Events es por sincronización automática,
+    <strong>sin acuerdo comercial formal</strong>. Por eso el sistema se diseña independiente del proveedor:
+    si mañana hay que sumar o cambiar de origen, la plataforma sigue funcionando. Recomendamos, en paralelo,
+    gestionar un acuerdo formal de datos/reventa.</div>
+  </section>
+
+  <section>
+    <h2><span class="n">3.</span>Cómo funciona</h2>
+    <p>Es una <strong>aplicación web</strong>: se entra desde el navegador del celular o la computadora, sin
+    instalar nada. Tiene dos caras que trabajan juntas.</p>
+    <div class="diagram">
+      <div class="drow">
+        <div class="dbox"><b>Catálogo</b><small>agencias y clientes</small></div>
+        <div class="dbox"><b>Panel de administración</b><small>gestiona y concilia</small></div>
+      </div>
+      <div class="dcenter">PLATAFORMA TICKERMIRROR</div>
+      <div class="drow">
+        <div class="dbox"><b>Sincronización</b><small>proveedores</small></div>
+        <div class="dbox"><b>Base de datos</b><small>catálogo en USD</small></div>
+        <div class="dbox"><b>Avisos</b><small>email automático</small></div>
+      </div>
+    </div>
+    <ul>
+      <li>Una <strong>sincronización automática</strong> trae del proveedor eventos, precios y stock cada <strong>5–10 minutos</strong>.</li>
+      <li>Una <strong>base de datos segura</strong> guarda el catálogo con tu precio de venta ya calculado.</li>
+      <li>El sistema arma el catálogo y <strong>avisa</strong> por email cuando corresponde.</li>
+    </ul>
+    <h3>¿Qué pasa si…?</h3>
+    <table>
+      <thead><tr><th>Situación</th><th>Qué hace el sistema</th></tr></thead>
+      <tbody>
+        <tr><td>El proveedor falla o tarda</td><td>Conserva el último catálogo válido; <strong>nunca se vacía</strong> por un error</td></tr>
+        <tr><td>Un evento se agota</td><td>Pasa a “a consultar”, sin borrarlo</td></tr>
+        <tr><td>Aparece un captcha o bloqueo</td><td>Se detiene y avisa (no se fuerza el acceso)</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><b>Seguridad:</b> no se procesan pagos en la plataforma, así que <strong>no se guardan
+    datos de tarjetas</strong>. Las claves se guardan cifradas, el catálogo es de solo lectura para el público,
+    y hay copias de seguridad automáticas.</div>
+  </section>
+
+  <section class="break">
+    <h2><span class="n">4.</span>Reglas del negocio (cómo decide el sistema)</h2>
+    <ol>
+      <li><strong>Multiproveedor.</strong> Soporta varios proveedores; Passion Events es el primero. Sumar uno nuevo <strong>no requiere rehacer</strong> el sistema.</li>
+      <li><strong>Tipo de producto (lo define el proveedor).</strong> Cada entrada es <strong>Inmediata</strong> (compra directa, con stock real) u <strong>On Request</strong> (a pedido: precio de referencia, sin stock garantizado). El sistema respeta esa marca tal cual viene.</li>
+      <li><strong>Moneda.</strong> Toda la plataforma opera en <strong>USD</strong>. Sin conversión de moneda en esta etapa.</li>
+      <li><strong>Precio de venta (markup por reglas).</strong> <code>precio_venta = precio_proveedor × (1 + %)</code>. El <strong>% no es único</strong>: depende de <strong>(proveedor + categoría)</strong>. Ej.: Passion Events/Fútbol 20%, Passion Events/F1 15%. Hay un <strong>% por defecto</strong> si no existe regla específica. Todo administrable desde el panel.</li>
+      <li><strong>Sincronización y anti-vaciado.</strong> Para proveedores tipo portal, sync cada 5–10 min. Si un ciclo trae muy pocos datos (caída del proveedor), <strong>se aborta la actualización y se conserva el catálogo anterior</strong>.</li>
+      <li><strong>Accesos y permisos.</strong>
+        <ul>
+          <li><strong>Agencias/vendedores:</strong> usuario y clave propios; ven el catálogo en tiempo real con el precio ya con markup; solo ven lo que les corresponde.</li>
+          <li><strong>Administrador:</strong> gestiona proveedores, reglas de markup, usuarios/roles, solicitudes y reportes.</li>
+          <li><strong>Carga manual:</strong> el equipo publica entradas propias (fuera del portal); la sincronización <strong>nunca las toca ni las borra</strong>.</li>
+        </ul>
+      </li>
+      <li><strong>Pago.</strong> <strong>Sin checkout ni pasarela</strong> en esta etapa: se arregla por fuera (transferencia, cuenta corriente). El sistema registra el estado, no procesa el dinero.</li>
+      <li><strong>Flujo “On Request” (con estados):</strong>
+        <div class="steps">
+          <div class="step"><span class="b">1</span><span>La agencia ve un <strong>precio de referencia</strong> (no stock real) y elige cantidad → se crea una <strong>Solicitud</strong>.</span></div>
+          <div class="step"><span class="b">2</span><span>El sistema manda un <strong>email automático</strong> avisando que está en revisión.</span></div>
+          <div class="step"><span class="b">3</span><span>El equipo <strong>confirma con el proveedor</strong> por fuera del sistema.</span></div>
+          <div class="step"><span class="b">4</span><span>Estado final: <strong>Aprobado</strong> (se emite invoice) · <strong>Alternativa</strong> ofrecida · <strong>Rechazado</strong>.</span></div>
+        </div>
+        Cada Solicitud lleva estado en el panel: <em>Pendiente → Aprobado / Alternativa / Rechazado</em>, actualizado por el equipo.
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="n">5.</span>Qué hace el sistema</h2>
+    <h3>Catálogo para agencias y clientes</h3>
+    <p>Buscador por evento, lugar y fecha; precio y disponibilidad por sector, con el markup ya incluido; contacto directo para cerrar la operación.</p>
+    <h3>Sincronización + markup automáticos</h3>
+    <p>Trae eventos, precios y stock del proveedor, aplica la regla de markup y mantiene el catálogo al día solo.</p>
+    <h3>Panel de administración</h3>
+    <p>Proveedores y reglas de markup, usuarios y roles, carga manual de entradas propias, <strong>Solicitudes On Request</strong> con sus estados, y <strong>reportes exportables</strong>.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">6.</span>Resultados esperados</h2>
+    <table>
+      <thead><tr><th>Indicador</th><th>Hoy (manual)</th><th>Con el sistema</th></tr></thead>
+      <tbody>
+        <tr><td>Actualización de precios/stock</td><td>A mano, se desactualiza</td><td>Automática, cada pocos minutos</td></tr>
+        <tr><td>Cálculo del margen</td><td>Caso por caso</td><td>Automático por reglas</td></tr>
+        <tr><td>Atención a agencias</td><td>Uno por uno</td><td>Autoservicio en tiempo real</td></tr>
+        <tr><td>Sumar proveedores</td><td>Rehacer todo</td><td>Alta sin rediseño</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><b>El sistema se paga solo (ejemplo ilustrativo — reemplazar por números reales).</b>
+    Si tener el catálogo siempre al día y el acceso de agencias te permite cerrar aunque sea unas pocas
+    ventas más por mes, con el margen habitual de reventa el sistema se recupera en el primer mes o dos, y lo
+    demás sigue entrando todos los meses siguientes.</div>
+  </section>
+
+  <section class="break">
+    <h2><span class="n">7.</span>Cómo lo entregamos</h2>
+    <p>Por <strong>etapas</strong>, cada una con un resultado concreto que ustedes aprueban.</p>
+    <table>
+      <thead><tr><th>Etapa</th><th>Qué entregamos</th><th>Plazo</th></tr></thead>
+      <tbody>
+        <tr><td>Etapa 1</td><td>Sincronización de Passion Events + catálogo web + carga manual</td><td>Fin mes 1</td></tr>
+        <tr><td>Etapa 2</td><td>Reglas de markup por proveedor/categoría + accesos de agencias/roles</td><td>Fin mes 2</td></tr>
+        <tr><td>Etapa 3</td><td>Multiproveedor + flujo On Request (solicitudes, mails, estados) + reportes</td><td>Fin mes 3</td></tr>
+      </tbody>
+    </table>
+    <p class="kicker"><strong>Pagan contra resultados:</strong> cada etapa se abona al aprobar su entrega, con un anticipo chico para empezar. Riesgo mínimo.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">8.</span>Inversión</h2>
+    <p>Dos planes; elegís según hasta dónde querés llegar ahora. <strong>Montos en USD, por única vez.</strong>
+    Los costos mensuales de terceros (hosting y envío de emails) van aparte y son bajos.</p>
+    <table>
+      <thead><tr><th style="width:26%">Plan</th><th>Qué incluye</th><th style="width:16%">Inversión</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Sistema actual</strong><br><small class="kicker">Passion Events</small></td>
+          <td>Sincronización de Passion Events (Inmediato/On Request, precio + stock), markup aplicado, catálogo web en USD, panel de carga manual, base de datos y seguridad.</td>
+          <td class="price">US$ 2.000</td>
+        </tr>
+        <tr class="plan-complete">
+          <td><strong>Sistema completo</strong></td>
+          <td>Todo lo anterior <strong>+</strong> multiproveedor, markup por reglas (proveedor + categoría), accesos de agencias/vendedores con roles, flujo On Request completo (solicitudes, mails, estados, invoice) y reportes.</td>
+          <td class="price">US$ 3.000</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="kicker">Forma de pago sugerida: anticipo para arrancar y el resto contra la entrega de cada etapa.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">9.</span>Por qué Bexovar</h2>
+    <ul>
+      <li><strong>Desarrollo a medida:</strong> el sistema se ajusta a cómo trabajás vos, y queda tuyo.</li>
+      <li><strong>Independiente del proveedor:</strong> diseñado para no depender de un solo origen de inventario.</li>
+      <li><strong>Tecnología estándar y documentada:</strong> fácil de mantener y de escalar.</li>
+      <li><strong>Entrega por etapas:</strong> pagás contra resultados, con riesgo mínimo.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="n">10.</span>Próximos pasos</h2>
+    <div class="steps">
+      <div class="step"><span class="b">1</span><span>Elegís el plan (actual o completo).</span></div>
+      <div class="step"><span class="b">2</span><span>Con un anticipo chico, arrancamos por la Etapa 1.</span></div>
+    </div>
+    <p>Quedamos a disposición para avanzar cuando lo decidan.</p>
+    <div class="divider"></div>
+    <p class="signoff">Bexovar · bexovar@gmail.com · +54 9 11 2388 5910</p>
+  </section>
+
+</body>
+</html>
