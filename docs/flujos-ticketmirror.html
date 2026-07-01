@@ -194,6 +194,29 @@ flowchart TD
     </pre>
   </section>
 
+  <section class="flow">
+    <h2><span class="n">6.</span>Dashboard de pedidos — qué ve y hace el equipo</h2>
+    <p class="desc">Cada pedido nuevo (una reserva o una solicitud On Request) cae en el tablero para resolverlo, con su estado y sus acciones.</p>
+    <pre class="mermaid">
+flowchart TD
+  s(["Pedido nuevo — aparece en el Dashboard"]) --> as["Se asigna a un vendedor"]
+  as --> t{"¿Tipo de pedido?"}
+  t -->|"Reserva (inmediata)"| r1["Confirmar y coordinar el cobro"]
+  r1 --> rv(["Marcar vendido"])
+  t -->|"On Request"| o1["El equipo confirma con el proveedor"]
+  o1 --> o2{"¿Resultado?"}
+  o2 -->|"Hay disponibilidad"| ap(["Aprobado — se emite invoice"])
+  o2 -->|"Se ofrece otra opción"| al(["Alternativa ofrecida"])
+  o2 -->|"Sin disponibilidad"| rj(["Rechazado"])
+  classDef term fill:#0f172a,stroke:#0f172a,color:#ffffff;
+  classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d;
+  classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+  class s term;
+  class rv,ap good;
+  class rj bad;
+    </pre>
+  </section>
+
   <footer></footer>
 
   <script src="vendor/mermaid.min.js"></script>
