@@ -34,7 +34,12 @@ export async function POST(request: Request) {
   const monto = Math.trunc(Number(body.monto));
   const fee = Math.trunc(Number(body.fee));
   const ticket_id = body.ticket_id ? String(body.ticket_id) : null;
+  const fecha_evento = body.fecha_evento ? String(body.fecha_evento) : null;
+  const notas = body.notas ? String(body.notas).trim().slice(0, 2000) : null;
 
+  if (fecha_evento && !/^\d{4}-\d{2}-\d{2}$/.test(fecha_evento)) {
+    return NextResponse.json({ error: "Fecha inválida" }, { status: 400 });
+  }
   if (!evento) {
     return NextResponse.json(
       { error: "El evento es obligatorio" },
@@ -49,7 +54,7 @@ export async function POST(request: Request) {
   }
 
   if (isMock()) {
-    const op = mockCreateOp({ evento, comprador_alias, vendedor_alias, monto, fee, ticket_id });
+    const op = mockCreateOp({ evento, comprador_alias, vendedor_alias, monto, fee, ticket_id, fecha_evento, notas });
     return NextResponse.json({ id: op.id, code: op.code }, { status: 201 });
   }
 
@@ -68,6 +73,8 @@ export async function POST(request: Request) {
         monto,
         fee,
         ticket_id,
+        fecha_evento,
+        notas,
       })
       .select("id, code")
       .single();

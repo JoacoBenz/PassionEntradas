@@ -23,6 +23,10 @@ export type Operacion = {
   status: Status;
   entrada_recibida_at: string | null;
   pago_confirmado_at: string | null;
+  // Fecha del evento (date, sin hora): prioriza lo urgente en el panel.
+  fecha_evento: string | null;
+  // Notas internas del panel. NUNCA se exponen en la vista pública.
+  notas: string | null;
   // Entrada del catálogo de la tienda que originó la operación (opcional).
   ticket_id: string | null;
   created_at: string;
@@ -41,6 +45,7 @@ export type OperacionPublica = Pick<
   | "status"
   | "entrada_recibida_at"
   | "pago_confirmado_at"
+  | "fecha_evento"
   | "updated_at"
 >;
 
@@ -98,6 +103,28 @@ export type StatusAction =
   | { action: "pago"; done: boolean }
   | { action: "cancelar" }
   | { action: "reabrir" };
+
+// Días que faltan hasta la fecha del evento (0 = hoy, negativo = ya pasó).
+// null si la operación no tiene fecha cargada.
+export function diasHastaEvento(fecha_evento: string | null): number | null {
+  if (!fecha_evento) return null;
+  const [y, m, d] = fecha_evento.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const evento = new Date(y, m - 1, d);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  return Math.round((evento.getTime() - hoy.getTime()) / 86_400_000);
+}
+
+// Fecha del evento formateada corta, ej "12 ago 2026".
+export function formatFecha(fecha_evento: string): string {
+  const [y, m, d] = fecha_evento.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("es-AR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 // Genera el code legible para el admin, ej "BX-7F3K9Q2M".
 // Sin caracteres ambiguos (0/O, 1/I).

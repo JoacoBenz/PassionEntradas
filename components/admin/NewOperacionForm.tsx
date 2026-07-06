@@ -16,6 +16,8 @@ const empty = {
   vendedor_alias: "",
   monto: "",
   fee: "",
+  fecha_evento: "",
+  notas: "",
 };
 
 // Formulario "Nueva operación".
@@ -46,6 +48,8 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
           monto: Number(form.monto || 0),
           fee: Number(form.fee || 0),
           ticket_id: ticketId,
+          fecha_evento: form.fecha_evento || null,
+          notas: form.notas || null,
         }),
       });
       const data = await res.json();
@@ -67,6 +71,8 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
         status: "esperando_entrada",
         entrada_recibida_at: null,
         pago_confirmado_at: null,
+        fecha_evento: form.fecha_evento || null,
+        notas: form.notas.trim() || null,
         ticket_id: ticketId,
         created_at: now,
         updated_at: now,
@@ -140,6 +146,19 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
             </div>
           </div>
 
+          <div>
+            <label htmlFor="fecha_evento" className={labelCls}>
+              Fecha del evento (opcional)
+            </label>
+            <input
+              id="fecha_evento"
+              type="date"
+              className={inputCls}
+              value={form.fecha_evento}
+              onChange={(e) => set("fecha_evento", e.target.value)}
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="monto" className={labelCls}>
@@ -171,6 +190,21 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
                 placeholder="6000"
               />
             </div>
+          </div>
+
+          <div>
+            <label htmlFor="notas" className={labelCls}>
+              Notas internas (no se ven en el link)
+            </label>
+            <textarea
+              id="notas"
+              rows={2}
+              maxLength={2000}
+              className={`${inputCls} resize-y`}
+              value={form.notas}
+              onChange={(e) => set("notas", e.target.value)}
+              placeholder="Vendedor manda el QR el jueves…"
+            />
           </div>
         </div>
 

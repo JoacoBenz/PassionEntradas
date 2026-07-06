@@ -36,6 +36,8 @@ function seed(): MockDB {
       status: "entrada_recibida",
       entrada_recibida_at: iso(90),
       pago_confirmado_at: null,
+      fecha_evento: "2026-07-18",
+      notas: "Vendedor manda el QR el jueves.",
       ticket_id: "3001::1",
       created_at: iso(60 * 26),
       updated_at: iso(90),
@@ -51,6 +53,8 @@ function seed(): MockDB {
       status: "esperando_entrada",
       entrada_recibida_at: null,
       pago_confirmado_at: null,
+      fecha_evento: "2026-07-09",
+      notas: null,
       ticket_id: "manual::demo-1",
       created_at: iso(60 * 3),
       updated_at: iso(60 * 3),
@@ -66,6 +70,8 @@ function seed(): MockDB {
       status: "confirmada",
       entrada_recibida_at: iso(60 * 24 * 3),
       pago_confirmado_at: iso(60 * 24 * 2),
+      fecha_evento: null,
+      notas: null,
       ticket_id: null,
       created_at: iso(60 * 24 * 4),
       updated_at: iso(60 * 24 * 2),
@@ -109,8 +115,8 @@ export function mockListOps(limit?: number): Operacion[] {
 export function mockOpPublica(id: string): OperacionPublica | null {
   const op = db().ops.find((o) => o.id === id);
   if (!op) return null;
-  const { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, updated_at } = op;
-  return { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, updated_at };
+  const { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, fecha_evento, updated_at } = op;
+  return { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, fecha_evento, updated_at };
 }
 
 export function mockCreateOp(input: {
@@ -120,6 +126,8 @@ export function mockCreateOp(input: {
   monto: number;
   fee: number;
   ticket_id: string | null;
+  fecha_evento: string | null;
+  notas: string | null;
 }): Operacion {
   const now = new Date().toISOString();
   const op: Operacion = {
@@ -163,6 +171,18 @@ export function mockApplyAction(
       op.status = "esperando_entrada";
       break;
   }
+  op.updated_at = new Date().toISOString();
+  return { ok: true, op };
+}
+
+export function mockUpdateOp(
+  id: string,
+  patch: Partial<Pick<Operacion, "notas" | "fecha_evento">>
+): { ok: true; op: Operacion } | { ok: false; status: number; error: string } {
+  const op = db().ops.find((o) => o.id === id);
+  if (!op) return { ok: false, status: 404, error: "Operación no encontrada" };
+  if ("notas" in patch) op.notas = patch.notas ?? null;
+  if ("fecha_evento" in patch) op.fecha_evento = patch.fecha_evento ?? null;
   op.updated_at = new Date().toISOString();
   return { ok: true, op };
 }

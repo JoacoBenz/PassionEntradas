@@ -4,6 +4,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AppHeader from "@/components/AppHeader";
+import AutoRefresh from "@/components/AutoRefresh";
 import type { Operacion } from "@/lib/operaciones";
 import { isMock, MOCK_USER, mockListOps } from "@/lib/mock-db";
 
@@ -60,6 +61,9 @@ export default async function AdminPage() {
           { href: "/admin/entradas", label: "Entradas" },
         ]}
       />
+      {/* Lista viva: refresca el server component en intervalo; el dashboard
+          sincroniza su estado local cuando cambia `initial`. */}
+      <AutoRefresh intervalMs={15000} />
       <AdminDashboard initial={ops} baseUrl={getBaseUrl()} />
     </main>
   );

@@ -3,6 +3,7 @@ import {
   ESTADO_LABEL,
   estadoDe,
   formatARS,
+  formatFecha,
   type OperacionPublica,
 } from "@/lib/operaciones";
 import ProgressSteps from "./ProgressSteps";
@@ -78,6 +79,11 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
             <h1 className="mt-4 font-display text-[1.7rem] font-bold leading-tight tracking-tight">
               {op.evento}
             </h1>
+            {op.fecha_evento && (
+              <p className="mt-1.5 text-sm text-white/60">
+                {formatFecha(op.fecha_evento)}
+              </p>
+            )}
           </div>
         </div>
 

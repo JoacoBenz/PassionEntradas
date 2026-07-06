@@ -1,7 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { estadoDe, type Operacion, type StatusAction } from "@/lib/operaciones";
+import { useEffect, useMemo, useState } from "react";
+import {
+  diasHastaEvento,
+  estadoDe,
+  type Operacion,
+  type StatusAction,
+} from "@/lib/operaciones";
 import OperacionCard from "./OperacionCard";
 import { ToastViewport, useToast } from "./Toast";
 
@@ -39,7 +44,16 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
   const [ops, setOps] = useState<Operacion[]>(initial);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("todas");
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"recientes" | "urgentes">("recientes");
   const { toasts, push } = useToast();
+
+  // Lista viva: cuando AutoRefresh refresca el server component, `initial`
+  // llega con datos nuevos (operaciones cargadas por el moderador, cambios
+  // de otro admin) y sincronizamos el estado local.
+  useEffect(() => {
+    setOps(initial);
+  }, [initial]);
 
   const stats = useMemo(() => {
     const estados = ops.map(estadoDe);
@@ -50,10 +64,30 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
     return { enCurso, confirmadas, total: ops.length };
   }, [ops]);
 
-  const visible = useMemo(
-    () => ops.filter((o) => matches(o, filter)),
-    [ops, filter]
-  );
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    let out = ops.filter(
+      (o) =>
+        matches(o, filter) &&
+        (!q ||
+          o.evento.toLowerCase().includes(q) ||
+          o.code.toLowerCase().includes(q) ||
+          (o.comprador_alias ?? "").toLowerCase().includes(q) ||
+          (o.vendedor_alias ?? "").toLowerCase().includes(q))
+    );
+    if (sort === "urgentes") {
+      // Fecha de evento más próxima primero; sin fecha al final.
+      out = [...out].sort((a, b) => {
+        const da = diasHastaEvento(a.fecha_evento);
+        const db = diasHastaEvento(b.fecha_evento);
+        if (da == null && db == null) return b.created_at.localeCompare(a.created_at);
+        if (da == null) return 1;
+        if (db == null) return -1;
+        return da - db;
+      });
+    }
+    return out;
+  }, [ops, filter, query, sort]);
 
   async function applyAction(op: Operacion, action: StatusAction, okMsg: string) {
     setBusyId(op.id);
@@ -88,6 +122,39 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
     }
   }
 
+  // Edición de datos internos (notas / fecha) vía PATCH /api/operaciones/[id].
+  async function updateOp(
+    op: Operacion,
+    patch: Partial<Pick<Operacion, "notas" | "fecha_evento">>,
+    okMsg: string
+  ) {
+    setBusyId(op.id);
+    try {
+      const res = await fetch(`/api/operaciones/${op.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        push("error", data.error ?? "No se pudo guardar");
+        return;
+      }
+      setOps((prev) =>
+        prev.map((o) =>
+          o.id === op.id
+            ? { ...o, notas: data.notas, fecha_evento: data.fecha_evento }
+            : o
+        )
+      );
+      push("success", okMsg);
+    } catch {
+      push("error", "Error de red al guardar");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
       {/* Mini stats: tira única estilo talón, dividida por líneas punteadas */}
@@ -98,6 +165,27 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
           <Stat label="Totales" value={stats.total} accent="#6C5BF2" />
         </div>
       </section>
+
+      {/* Búsqueda + orden */}
+      <div className="mb-3 flex flex-wrap gap-2">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar por evento, code o alias…"
+          aria-label="Buscar operaciones"
+          className="min-w-0 flex-1 rounded-xl border border-line bg-white px-3.5 py-2 text-sm shadow-sm outline-none transition-colors placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/15"
+        />
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as "recientes" | "urgentes")}
+          aria-label="Ordenar operaciones"
+          className="rounded-xl border border-line bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-brand"
+        >
+          <option value="recientes">Más recientes</option>
+          <option value="urgentes">Evento más próximo</option>
+        </select>
+      </div>
 
       {/* Filtros por estado */}
       <div
@@ -140,6 +228,7 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
               baseUrl={baseUrl}
               busy={busyId === op.id}
               onAction={applyAction}
+              onUpdate={updateOp}
               onCopied={(m) => push("success", m)}
             />
           ))

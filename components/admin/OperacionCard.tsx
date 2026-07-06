@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import {
   ESTADO_COLOR,
   HITO_COLOR,
+  diasHastaEvento,
   estadoDe,
   formatARS,
+  formatFecha,
   whatsappMessage,
   type Operacion,
   type StatusAction,
@@ -18,8 +21,34 @@ type Props = {
   // readOnly: modo moderador — sin botones de cambio de estado.
   readOnly?: boolean;
   onAction?: (op: Operacion, action: StatusAction, okMsg: string) => void;
+  onUpdate?: (
+    op: Operacion,
+    patch: Partial<Pick<Operacion, "notas" | "fecha_evento">>,
+    okMsg: string
+  ) => void;
   onCopied: (text: string) => void;
 };
+
+// Aviso de urgencia según la fecha del evento (solo operaciones en curso).
+function UrgenciaChip({ dias }: { dias: number }) {
+  const label =
+    dias < 0
+      ? "El evento ya pasó"
+      : dias === 0
+        ? "¡El evento es HOY!"
+        : dias === 1
+          ? "El evento es mañana"
+          : `Evento en ${dias} días`;
+  const color = dias <= 1 ? "#D14D68" : dias <= 7 ? "#B07A14" : "#5F6577";
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+      style={{ color, backgroundColor: `${color}14`, boxShadow: `inset 0 0 0 1px ${color}33` }}
+    >
+      {label}
+    </span>
+  );
+}
 
 // Card de una operación en el panel, con estética de ticket: lomo de color
 // por estado, dos hitos independientes (entrada / pago) que se marcan y
@@ -30,6 +59,7 @@ export default function OperacionCard({
   busy = false,
   readOnly = false,
   onAction,
+  onUpdate,
   onCopied,
 }: Props) {
   const link = `${baseUrl}/op/${op.id}`;
@@ -38,6 +68,11 @@ export default function OperacionCard({
   const cancelada = estado === "cancelada";
   const entrada = !!op.entrada_recibida_at;
   const pago = !!op.pago_confirmado_at;
+  const dias = diasHastaEvento(op.fecha_evento);
+  const enCurso = estado !== "confirmada" && !cancelada;
+
+  const [editingNotas, setEditingNotas] = useState(false);
+  const [notasDraft, setNotasDraft] = useState(op.notas ?? "");
 
   async function copy(text: string, label: string) {
     try {
@@ -73,6 +108,13 @@ export default function OperacionCard({
             {op.evento}
           </h3>
 
+          {(op.fecha_evento || (enCurso && dias != null)) && (
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#6A6E7E]">
+              {op.fecha_evento && <span>📅 {formatFecha(op.fecha_evento)}</span>}
+              {enCurso && dias != null && dias <= 14 && <UrgenciaChip dias={dias} />}
+            </div>
+          )}
+
           <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
             <span className="font-display text-base font-bold tabular-nums">
               {formatARS(op.monto)}
@@ -93,6 +135,76 @@ export default function OperacionCard({
                   Vendedor:{" "}
                   <span className="font-medium">{op.vendedor_alias}</span>
                 </span>
+              )}
+            </div>
+          )}
+
+          {/* Notas internas (solo panel; nunca van al link público) */}
+          {(op.notas || (!readOnly && onUpdate)) && (
+            <div className="mt-3 rounded-xl bg-canvas px-3 py-2.5 text-xs">
+              {editingNotas ? (
+                <div className="space-y-2">
+                  <textarea
+                    rows={3}
+                    maxLength={2000}
+                    autoFocus
+                    value={notasDraft}
+                    onChange={(e) => setNotasDraft(e.target.value)}
+                    className="w-full resize-y rounded-lg border border-line bg-white px-2.5 py-2 text-xs outline-none focus:border-brand"
+                    placeholder="Notas internas de la operación…"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        onUpdate?.(
+                          op,
+                          { notas: notasDraft.trim() || null },
+                          "Notas guardadas"
+                        );
+                        setEditingNotas(false);
+                      }}
+                      disabled={busy}
+                      className="rounded-lg bg-ink px-3 py-1.5 font-semibold text-white disabled:opacity-60"
+                    >
+                      Guardar notas
+                    </button>
+                    <button
+                      onClick={() => {
+                        setNotasDraft(op.notas ?? "");
+                        setEditingNotas(false);
+                      }}
+                      className="rounded-lg px-3 py-1.5 font-medium text-[#6A6E7E] hover:bg-white"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start justify-between gap-3">
+                  <p className="whitespace-pre-wrap text-[#4A4E5E]">
+                    {op.notas ? (
+                      <>
+                        <span className="mr-1 font-semibold uppercase tracking-wide text-muted">
+                          Nota:
+                        </span>
+                        {op.notas}
+                      </>
+                    ) : (
+                      <span className="text-muted">Sin notas internas.</span>
+                    )}
+                  </p>
+                  {!readOnly && onUpdate && (
+                    <button
+                      onClick={() => {
+                        setNotasDraft(op.notas ?? "");
+                        setEditingNotas(true);
+                      }}
+                      className="shrink-0 rounded-lg border border-line bg-white px-2.5 py-1 font-medium text-[#4A4E5E] transition-colors hover:bg-white/60"
+                    >
+                      {op.notas ? "Editar" : "Agregar nota"}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
