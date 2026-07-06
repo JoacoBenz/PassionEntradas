@@ -104,6 +104,7 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
                     hour: "2-digit",
                     minute: "2-digit",
                     hour12: false,
+                    timeZone: "America/Argentina/Buenos_Aires",
                   })
                 : "—"
             }
@@ -289,6 +290,8 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
                       month: "2-digit",
                       hour: "2-digit",
                       minute: "2-digit",
+                      hour12: false,
+                      timeZone: "America/Argentina/Buenos_Aires",
                     })}
                   </span>
                 </div>

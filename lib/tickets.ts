@@ -86,15 +86,22 @@ export function fmtPrice(eur: number | null, cur: Currency, rates: Rates): strin
 export function fmtDate(iso: string | null) {
   if (!iso) return { d: "—", m: "", y: "", full: "Fecha a confirmar" };
   const dt = new Date(iso);
+  // Fechas sin hora ("2026-07-11") se parsean como medianoche UTC: hay que
+  // formatearlas en UTC para que no retrocedan un día en Argentina (UTC-3).
+  // Con hora real, se muestra en hora argentina.
+  const timeZone = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+    ? "UTC"
+    : "America/Argentina/Buenos_Aires";
   return {
-    d: dt.toLocaleDateString("es-AR", { day: "2-digit" }),
-    m: dt.toLocaleDateString("es-AR", { month: "short" }).replace(".", "").toUpperCase(),
-    y: dt.toLocaleDateString("es-AR", { year: "numeric" }),
+    d: dt.toLocaleDateString("es-AR", { day: "2-digit", timeZone }),
+    m: dt.toLocaleDateString("es-AR", { month: "short", timeZone }).replace(".", "").toUpperCase(),
+    y: dt.toLocaleDateString("es-AR", { year: "numeric", timeZone }),
     full: dt.toLocaleDateString("es-AR", {
       weekday: "long",
       day: "2-digit",
       month: "long",
       year: "numeric",
+      timeZone,
     }),
   };
 }
@@ -123,7 +130,9 @@ export const mesKey = (iso: string | null) => (iso ? iso.slice(0, 7) : "0000-00"
 export const mesLabel = (iso: string | null) =>
   iso
     ? new Date(iso)
-        .toLocaleDateString("es-AR", { month: "long", year: "numeric" })
+        // UTC: las fechas sin hora se parsean como medianoche UTC y en
+        // Argentina (UTC-3) el mes podría retroceder en el día 1.
+        .toLocaleDateString("es-AR", { month: "long", year: "numeric", timeZone: "UTC" })
         .replace(/^\w/, (c) => c.toUpperCase())
     : "A confirmar";
 

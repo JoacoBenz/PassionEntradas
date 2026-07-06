@@ -47,12 +47,16 @@ function Microtext({ dark = false }: { dark?: boolean }) {
 export default function StatusStub({ op }: { op: OperacionPublica }) {
   const estado = estadoDe(op);
   const color = ESTADO_COLOR[estado];
+  // Hora de Argentina explícita: esto se renderiza en el server (UTC en
+  // Vercel) y sin timeZone mostraría la hora corrida 3 horas.
   const actualizado = new Date(op.updated_at).toLocaleString("es-AR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
+    timeZone: "America/Argentina/Buenos_Aires",
   });
 
   return (
