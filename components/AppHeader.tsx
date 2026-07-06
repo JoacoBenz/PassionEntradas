@@ -11,8 +11,10 @@ type Props = {
 export default function AppHeader({ subtitle, email, actions }: Props) {
   return (
     <header className="surface-ink text-white">
-      <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-4">
-        <div className="flex items-center gap-2.5">
+      {/* flex-wrap: en móvil las acciones bajan a una segunda fila en vez de
+          desbordar; la marca empuja el resto a la derecha con mr-auto. */}
+      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
+        <div className="mr-auto flex items-center gap-2.5">
           <span
             className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand font-display text-sm font-bold"
             aria-hidden
@@ -26,12 +28,12 @@ export default function AppHeader({ subtitle, email, actions }: Props) {
             · {subtitle}
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {actions?.map((a) => (
             <Link
               key={a.href}
               href={a.href}
-              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-deep"
+              className="whitespace-nowrap rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-deep"
             >
               {a.label}
             </Link>

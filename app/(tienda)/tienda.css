@@ -501,6 +501,10 @@
   .rank-aside { text-align: left; margin-top: 8px; display: flex; align-items: baseline; gap: 10px; }
   .rank-stock { font-size: 18px; }
   .rank-act { justify-self: stretch; text-align: center; margin-top: 12px; }
+
+  /* pasos y tarjetas apilados: 3 columnas no entran a este ancho */
+  .steps { grid-template-columns: 1fr; }
+  .cards3 { grid-template-columns: 1fr; gap: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
