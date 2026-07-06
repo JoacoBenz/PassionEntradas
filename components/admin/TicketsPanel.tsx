@@ -1,0 +1,328 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import type { SyncRun, TicketFull } from "@/lib/tickets";
+import { ToastViewport, useToast } from "./Toast";
+
+type Props = {
+  initial: TicketFull[];
+  syncRuns: SyncRun[];
+  portalCount: number;
+};
+
+const empty = {
+  evento: "",
+  competicion: "",
+  fecha: "",
+  ciudad: "",
+  categoria: "",
+  precio: "",
+  stock: "0",
+};
+
+// Panel de catálogo: carga de entradas propias (source=manual) junto a las
+// sincronizadas del portal, y salud de las últimas corridas del worker.
+export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) {
+  const [tickets, setTickets] = useState<TicketFull[]>(initial);
+  const [form, setForm] = useState(empty);
+  const [loading, setLoading] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const { toasts, push } = useToast();
+
+  function set<K extends keyof typeof empty>(key: K, value: string) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.evento.trim()) {
+      push("error", "El evento es obligatorio");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticket: form }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        push("error", data.error ?? "No se pudo publicar la entrada");
+        return;
+      }
+      setTickets((prev) => [data.row as TicketFull, ...prev]);
+      setForm(empty);
+      push("success", "Entrada publicada en la tienda");
+    } catch {
+      push("error", "Error de red al publicar");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onDelete(id: string) {
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/tickets/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        push("error", data.error ?? "No se pudo borrar");
+        return;
+      }
+      setTickets((prev) => prev.filter((t) => t.id !== id));
+      push("success", "Entrada borrada");
+    } catch {
+      push("error", "Error de red al borrar");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const inputCls =
+    "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15";
+  const labelCls =
+    "mb-1 block text-xs font-medium uppercase tracking-wide text-[#6A6E7E]";
+
+  const lastSync = syncRuns[0];
+
+  return (
+    <div className="mx-auto w-full max-w-3xl px-4 py-6">
+      {/* Salud del catálogo / worker */}
+      <section className="card-shadow mb-5 overflow-hidden rounded-2xl bg-white">
+        <div className="grid grid-cols-3 divide-x divide-dashed divide-line">
+          <Stat label="Del portal" value={String(portalCount)} accent="#6C5BF2" />
+          <Stat label="Propias" value={String(tickets.length)} accent="#0D9377" />
+          <Stat
+            label="Última sync"
+            value={
+              lastSync
+                ? new Date(lastSync.created_at).toLocaleTimeString("es-AR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "—"
+            }
+            accent={lastSync?.status === "ok" ? "#0D9377" : "#D14D68"}
+            sub={lastSync ? lastSync.status : "sin corridas"}
+          />
+        </div>
+      </section>
+
+      <div className="grid gap-6 md:grid-cols-[minmax(0,340px)_1fr]">
+        {/* Formulario de carga manual */}
+        <form
+          onSubmit={onSubmit}
+          className="card-shadow overflow-hidden rounded-2xl md:sticky md:top-6 md:self-start"
+        >
+          <div className="surface-ink punch-b px-5 py-4 text-white">
+            <p className="text-[10px] font-medium uppercase tracking-[0.25em] text-white/50">
+              Catálogo de la tienda
+            </p>
+            <h2 className="mt-0.5 font-display text-lg font-bold tracking-tight">
+              Cargar entrada propia
+            </h2>
+          </div>
+          <div className="punch-t bg-white">
+            <div className="perf-line-light mx-5" />
+            <div className="space-y-3 p-5">
+              <div>
+                <label className={labelCls}>Evento *</label>
+                <input
+                  className={inputCls}
+                  value={form.evento}
+                  onChange={(e) => set("evento", e.target.value)}
+                  placeholder="River vs Boca — Superclásico"
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Categoría / competición</label>
+                <input
+                  className={inputCls}
+                  value={form.competicion}
+                  onChange={(e) => set("competicion", e.target.value)}
+                  placeholder="Primera División"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Fecha</label>
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={form.fecha}
+                    onChange={(e) => set("fecha", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Sector</label>
+                  <input
+                    className={inputCls}
+                    value={form.categoria}
+                    onChange={(e) => set("categoria", e.target.value)}
+                    placeholder="Platea Alta"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Lugar / sede</label>
+                <input
+                  className={inputCls}
+                  value={form.ciudad}
+                  onChange={(e) => set("ciudad", e.target.value)}
+                  placeholder="Estadio Monumental, Buenos Aires (ARG)"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Precio (EUR)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    className={`${inputCls} font-mono`}
+                    value={form.precio}
+                    onChange={(e) => set("precio", e.target.value)}
+                    placeholder="120"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Stock</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    className={`${inputCls} font-mono`}
+                    value={form.stock}
+                    onChange={(e) => set("stock", e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="px-5 pb-5">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-deep disabled:opacity-60"
+              >
+                {loading ? "Publicando…" : "Publicar en la tienda"}
+              </button>
+            </div>
+          </div>
+        </form>
+
+        {/* Lista de entradas propias */}
+        <div className="space-y-3">
+          <h2 className="text-xs font-medium uppercase tracking-widest text-muted">
+            Entradas propias publicadas
+          </h2>
+          {tickets.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[#C5C9D6] bg-white/50 px-4 py-10 text-center text-sm text-muted">
+              Todavía no cargaste entradas propias. Se publican junto a las del
+              portal y la sincronización no las toca.
+            </div>
+          ) : (
+            tickets.map((t) => (
+              <div
+                key={t.id}
+                className="card-shadow flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-display font-semibold">{t.evento}</p>
+                  <p className="text-xs text-muted">
+                    {t.categoria ? `${t.categoria} · ` : ""}
+                    {t.precio_final != null ? `€ ${t.precio_final}` : "a consultar"} · stock{" "}
+                    {t.stock ?? 0}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Link
+                    href={`/moderador?evento=${encodeURIComponent(t.evento)}&ticket=${encodeURIComponent(t.id)}`}
+                    className="rounded-lg border border-brand px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/5"
+                  >
+                    Crear operación
+                  </Link>
+                  <button
+                    onClick={() => onDelete(t.id)}
+                    disabled={busyId === t.id}
+                    className="rounded-lg border border-estado-cancelada px-3 py-1.5 text-xs font-semibold text-estado-cancelada transition-colors hover:bg-estado-cancelada/5 disabled:opacity-60"
+                  >
+                    {busyId === t.id ? "Borrando…" : "Borrar"}
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+
+          {/* Últimas corridas del worker */}
+          <h2 className="pt-4 text-xs font-medium uppercase tracking-widest text-muted">
+            Últimas sincronizaciones del portal
+          </h2>
+          {syncRuns.length === 0 ? (
+            <p className="text-sm text-muted">
+              Sin corridas registradas. El worker escribe acá en cada ciclo.
+            </p>
+          ) : (
+            <div className="card-shadow overflow-hidden rounded-2xl bg-white text-sm">
+              {syncRuns.map((r) => (
+                <div
+                  key={r.id}
+                  className="flex items-center justify-between border-b border-dashed border-line px-4 py-2.5 last:border-b-0"
+                >
+                  <span
+                    className="font-mono text-xs font-bold"
+                    style={{ color: r.status === "ok" ? "#0D9377" : "#D14D68" }}
+                  >
+                    {r.status.toUpperCase()}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {r.upserted ?? 0} actualizadas
+                    {r.reason ? ` · ${r.reason}` : ""}
+                  </span>
+                  <span className="font-mono text-xs text-muted">
+                    {new Date(r.created_at).toLocaleString("es-AR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <ToastViewport toasts={toasts} />
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  accent,
+  sub,
+}: {
+  label: string;
+  value: string;
+  accent: string;
+  sub?: string;
+}) {
+  return (
+    <div className="px-4 py-4 text-center sm:text-left">
+      <p className="text-[11px] font-medium uppercase tracking-widest text-muted">{label}</p>
+      <p
+        className="mt-0.5 font-display text-2xl font-bold tabular-nums tracking-tight"
+        style={{ color: accent }}
+      >
+        {value}
+      </p>
+      {sub && <p className="text-[11px] text-muted">{sub}</p>}
+    </div>
+  );
+}
