@@ -66,10 +66,11 @@ export default function OperacionCard({
   const estado = estadoDe(op);
   const color = ESTADO_COLOR[estado];
   const cancelada = estado === "cancelada";
+  const cerrada = estado === "cerrada";
   const entrada = !!op.entrada_recibida_at;
   const pago = !!op.pago_confirmado_at;
   const dias = diasHastaEvento(op.fecha_evento);
-  const enCurso = estado !== "confirmada" && !cancelada;
+  const enCurso = !cerrada && !cancelada;
 
   const [editingNotas, setEditingNotas] = useState(false);
   const [notasDraft, setNotasDraft] = useState(op.notas ?? "");
@@ -210,7 +211,7 @@ export default function OperacionCard({
           )}
 
           {/* Hitos independientes: cada uno se marca/desmarca por separado */}
-          {!readOnly && !cancelada && (
+          {!readOnly && !cancelada && !cerrada && (
             <div className="mt-4 grid grid-cols-2 gap-2">
               <HitoButton
                 label="Entrada recibida"
@@ -238,6 +239,47 @@ export default function OperacionCard({
                   )
                 }
               />
+            </div>
+          )}
+
+          {/* Tercer paso accionable: con entrada y pago listos, se cierra */}
+          {!readOnly && estado === "lista_para_cerrar" && (
+            <button
+              onClick={() =>
+                onAction?.(op, { action: "cerrar", done: true }, "Operación cerrada")
+              }
+              disabled={busy}
+              className="mt-2 w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-60"
+              style={{ backgroundColor: HITO_COLOR.listo }}
+            >
+              ✓ Cerrar operación
+            </button>
+          )}
+
+          {/* Cerrada: resumen con opción de reabrir el cierre */}
+          {!readOnly && cerrada && (
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-ink px-4 py-3 text-white">
+              <span className="text-sm font-semibold">
+                ✓ Operación cerrada
+                {op.cerrada_at && (
+                  <span className="ml-2 font-normal text-white/60">
+                    {new Date(op.cerrada_at).toLocaleDateString("es-AR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      timeZone: "America/Argentina/Buenos_Aires",
+                    })}
+                  </span>
+                )}
+              </span>
+              <button
+                onClick={() =>
+                  onAction?.(op, { action: "cerrar", done: false }, "Cierre reabierto")
+                }
+                disabled={busy}
+                className="rounded-lg border border-white/25 px-3 py-1.5 text-xs font-medium text-white/85 transition-colors hover:bg-white/10 disabled:opacity-60"
+              >
+                Reabrir
+              </button>
             </div>
           )}
         </div>
@@ -284,7 +326,7 @@ export default function OperacionCard({
                 Reabrir
               </button>
             ) : (
-              estado !== "confirmada" && (
+              !cerrada && (
                 <button
                   onClick={() =>
                     onAction?.(op, { action: "cancelar" }, "Operación cancelada")

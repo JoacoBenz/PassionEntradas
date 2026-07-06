@@ -15,12 +15,13 @@ type Props = {
   baseUrl: string;
 };
 
-type Filter = "todas" | "en_curso" | "confirmadas" | "canceladas";
+type Filter = "todas" | "en_curso" | "para_cerrar" | "cerradas" | "canceladas";
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "todas", label: "Todas" },
   { key: "en_curso", label: "En curso" },
-  { key: "confirmadas", label: "Confirmadas" },
+  { key: "para_cerrar", label: "Para cerrar" },
+  { key: "cerradas", label: "Cerradas" },
   { key: "canceladas", label: "Canceladas" },
 ];
 
@@ -30,9 +31,15 @@ function matches(op: Operacion, filter: Filter): boolean {
     case "todas":
       return true;
     case "en_curso":
-      return estado !== "confirmada" && estado !== "cancelada";
-    case "confirmadas":
-      return estado === "confirmada";
+      return (
+        estado !== "cerrada" &&
+        estado !== "cancelada" &&
+        estado !== "lista_para_cerrar"
+      );
+    case "para_cerrar":
+      return estado === "lista_para_cerrar";
+    case "cerradas":
+      return estado === "cerrada";
     case "canceladas":
       return estado === "cancelada";
   }
@@ -58,10 +65,11 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
   const stats = useMemo(() => {
     const estados = ops.map(estadoDe);
     const enCurso = estados.filter(
-      (e) => e !== "confirmada" && e !== "cancelada"
+      (e) => e !== "cerrada" && e !== "cancelada" && e !== "lista_para_cerrar"
     ).length;
-    const confirmadas = estados.filter((e) => e === "confirmada").length;
-    return { enCurso, confirmadas, total: ops.length };
+    const paraCerrar = estados.filter((e) => e === "lista_para_cerrar").length;
+    const cerradas = estados.filter((e) => e === "cerrada").length;
+    return { enCurso, paraCerrar, cerradas };
   }, [ops]);
 
   const visible = useMemo(() => {
@@ -110,6 +118,7 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
                 status: data.status,
                 entrada_recibida_at: data.entrada_recibida_at,
                 pago_confirmado_at: data.pago_confirmado_at,
+                cerrada_at: data.cerrada_at,
               }
             : o
         )
@@ -161,8 +170,8 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
       <section className="card-shadow mb-5 overflow-hidden rounded-2xl bg-white">
         <div className="grid grid-cols-3 divide-x divide-dashed divide-line">
           <Stat label="En curso" value={stats.enCurso} accent="#B07A14" />
-          <Stat label="Confirmadas" value={stats.confirmadas} accent="#0D9377" />
-          <Stat label="Totales" value={stats.total} accent="#6C5BF2" />
+          <Stat label="Para cerrar" value={stats.paraCerrar} accent="#0D9377" />
+          <Stat label="Cerradas" value={stats.cerradas} accent="#6C5BF2" />
         </div>
       </section>
 

@@ -71,6 +71,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
         status: "esperando_entrada",
         entrada_recibida_at: null,
         pago_confirmado_at: null,
+        cerrada_at: null,
         fecha_evento: form.fecha_evento || null,
         notas: form.notas.trim() || null,
         ticket_id: ticketId,

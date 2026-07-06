@@ -23,6 +23,8 @@ export type Operacion = {
   status: Status;
   entrada_recibida_at: string | null;
   pago_confirmado_at: string | null;
+  // Cierre explícito: con los dos hitos listos, el admin cierra la operación.
+  cerrada_at: string | null;
   // Fecha del evento (date, sin hora): prioriza lo urgente en el panel.
   fecha_evento: string | null;
   // Notas internas del panel. NUNCA se exponen en la vista pública.
@@ -45,40 +47,52 @@ export type OperacionPublica = Pick<
   | "status"
   | "entrada_recibida_at"
   | "pago_confirmado_at"
+  | "cerrada_at"
   | "fecha_evento"
   | "updated_at"
 >;
 
-// Estado visible, derivado de cancelada + los dos hitos.
+// Estado visible, derivado de cancelada + los hitos + el cierre.
 export type Estado =
   | "esperando"
   | "entrada_recibida"
   | "pago_confirmado"
-  | "confirmada"
+  | "lista_para_cerrar"
+  | "cerrada"
   | "cancelada";
 
 type Hitos = Pick<
   Operacion,
-  "status" | "entrada_recibida_at" | "pago_confirmado_at"
+  "status" | "entrada_recibida_at" | "pago_confirmado_at" | "cerrada_at"
 >;
 
 export function estadoDe(op: Hitos): Estado {
   if (op.status === "cancelada") return "cancelada";
+  if (op.cerrada_at) return "cerrada";
   const entrada = !!op.entrada_recibida_at;
   const pago = !!op.pago_confirmado_at;
-  if (entrada && pago) return "confirmada";
+  if (entrada && pago) return "lista_para_cerrar";
   if (entrada) return "entrada_recibida";
   if (pago) return "pago_confirmado";
   return "esperando";
 }
 
-// Etiquetas para la UI.
+// Etiquetas del panel.
 export const ESTADO_LABEL: Record<Estado, string> = {
   esperando: "En espera",
   entrada_recibida: "Entrada recibida",
   pago_confirmado: "Pago confirmado",
-  confirmada: "Confirmada",
+  lista_para_cerrar: "Lista para cerrar",
+  cerrada: "Cerrada",
   cancelada: "Cancelada",
+};
+
+// Etiquetas del link público: "lista para cerrar" es jerga interna; para
+// las partes, con entrada y pago listos la operación está confirmada.
+export const ESTADO_LABEL_PUBLICO: Record<Estado, string> = {
+  ...ESTADO_LABEL,
+  lista_para_cerrar: "Confirmada",
+  cerrada: "Completada",
 };
 
 // Colores por estado (NO semáforo). Se usan tanto en talón como en chips.
@@ -86,7 +100,8 @@ export const ESTADO_COLOR: Record<Estado, string> = {
   esperando: "#5F6577", // pizarra
   entrada_recibida: "#B07A14", // ámbar
   pago_confirmado: "#6C5BF2", // violeta marca
-  confirmada: "#0D9377", // verde-teal
+  lista_para_cerrar: "#0D9377", // verde-teal (todo listo, falta cerrar)
+  cerrada: "#171B2B", // tinta: sello final, tipo "CANJEADO"
   cancelada: "#D14D68", // rosa
 };
 
@@ -101,6 +116,7 @@ export const HITO_COLOR = {
 export type StatusAction =
   | { action: "entrada"; done: boolean }
   | { action: "pago"; done: boolean }
+  | { action: "cerrar"; done: boolean }
   | { action: "cancelar" }
   | { action: "reabrir" };
 

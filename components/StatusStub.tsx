@@ -1,6 +1,6 @@
 import {
   ESTADO_COLOR,
-  ESTADO_LABEL,
+  ESTADO_LABEL_PUBLICO,
   estadoDe,
   formatARS,
   formatFecha,
@@ -106,7 +106,7 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
                 className="mt-0.5 block font-display text-xl font-bold leading-tight tracking-wide sm:text-2xl"
                 style={{ textWrap: "balance" }}
               >
-                {ESTADO_LABEL[estado]}
+                {ESTADO_LABEL_PUBLICO[estado]}
               </span>
             </div>
           </div>
@@ -122,6 +122,7 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
             <ProgressSteps
               entrada={!!op.entrada_recibida_at}
               pago={!!op.pago_confirmado_at}
+              cerrada={!!op.cerrada_at}
               cancelada={estado === "cancelada"}
             />
 

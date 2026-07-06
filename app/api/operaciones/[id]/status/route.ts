@@ -15,7 +15,7 @@ function parseAction(body: any): StatusAction | null {
     return { action: body.action };
   }
   if (
-    (body?.action === "entrada" || body?.action === "pago") &&
+    (body?.action === "entrada" || body?.action === "pago" || body?.action === "cerrar") &&
     typeof body.done === "boolean"
   ) {
     return { action: body.action, done: body.done };
@@ -70,7 +70,7 @@ export async function PATCH(
 
   const { data: current, error: readErr } = await admin
     .from("operaciones")
-    .select("status, entrada_recibida_at, pago_confirmado_at")
+    .select("status, entrada_recibida_at, pago_confirmado_at, cerrada_at")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -96,9 +96,31 @@ export async function PATCH(
           { status: 409 }
         );
       }
+      if (current.cerrada_at) {
+        return NextResponse.json(
+          { error: "La operación está cerrada; reabrí el cierre para editar hitos" },
+          { status: 409 }
+        );
+      }
       const col =
         action.action === "entrada" ? "entrada_recibida_at" : "pago_confirmado_at";
       patch = { [col]: action.done ? new Date().toISOString() : null };
+      break;
+    }
+    case "cerrar": {
+      if (cancelada) {
+        return NextResponse.json(
+          { error: "La operación está cancelada; no se puede cerrar" },
+          { status: 409 }
+        );
+      }
+      if (action.done && !(current.entrada_recibida_at && current.pago_confirmado_at)) {
+        return NextResponse.json(
+          { error: "Para cerrar hacen falta la entrada recibida y el pago confirmado" },
+          { status: 409 }
+        );
+      }
+      patch = { cerrada_at: action.done ? new Date().toISOString() : null };
       break;
     }
     case "cancelar": {
@@ -127,7 +149,7 @@ export async function PATCH(
     .from("operaciones")
     .update(patch)
     .eq("id", params.id)
-    .select("id, status, entrada_recibida_at, pago_confirmado_at, updated_at")
+    .select("id, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, updated_at")
     .single();
 
   if (error) {
@@ -137,12 +159,13 @@ export async function PATCH(
   return NextResponse.json(pickResult(data as Operacion));
 }
 
-function pickResult(op: Pick<Operacion, "id" | "status" | "entrada_recibida_at" | "pago_confirmado_at"> & { updated_at?: string }) {
+function pickResult(op: Pick<Operacion, "id" | "status" | "entrada_recibida_at" | "pago_confirmado_at" | "cerrada_at"> & { updated_at?: string }) {
   return {
     id: op.id,
     status: op.status,
     entrada_recibida_at: op.entrada_recibida_at,
     pago_confirmado_at: op.pago_confirmado_at,
+    cerrada_at: op.cerrada_at,
     estado: estadoDe(op),
   };
 }

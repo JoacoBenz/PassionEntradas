@@ -36,6 +36,7 @@ function seed(): MockDB {
       status: "entrada_recibida",
       entrada_recibida_at: iso(90),
       pago_confirmado_at: null,
+      cerrada_at: null,
       fecha_evento: "2026-07-18",
       notas: "Vendedor manda el QR el jueves.",
       ticket_id: "3001::1",
@@ -53,6 +54,7 @@ function seed(): MockDB {
       status: "esperando_entrada",
       entrada_recibida_at: null,
       pago_confirmado_at: null,
+      cerrada_at: null,
       fecha_evento: "2026-07-09",
       notas: null,
       ticket_id: "manual::demo-1",
@@ -70,6 +72,7 @@ function seed(): MockDB {
       status: "confirmada",
       entrada_recibida_at: iso(60 * 24 * 3),
       pago_confirmado_at: iso(60 * 24 * 2),
+      cerrada_at: null,
       fecha_evento: null,
       notas: null,
       ticket_id: null,
@@ -115,8 +118,8 @@ export function mockListOps(limit?: number): Operacion[] {
 export function mockOpPublica(id: string): OperacionPublica | null {
   const op = db().ops.find((o) => o.id === id);
   if (!op) return null;
-  const { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, fecha_evento, updated_at } = op;
-  return { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, fecha_evento, updated_at };
+  const { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at } = op;
+  return { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at };
 }
 
 export function mockCreateOp(input: {
@@ -137,6 +140,7 @@ export function mockCreateOp(input: {
     status: "esperando_entrada",
     entrada_recibida_at: null,
     pago_confirmado_at: null,
+    cerrada_at: null,
     created_at: now,
     updated_at: now,
   };
@@ -158,10 +162,20 @@ export function mockApplyAction(
       if (cancelada) {
         return { ok: false, status: 409, error: "La operación está cancelada; reabrila para editar hitos" };
       }
+      if (op.cerrada_at) {
+        return { ok: false, status: 409, error: "La operación está cerrada; reabrí el cierre para editar hitos" };
+      }
       const col = action.action === "entrada" ? "entrada_recibida_at" : "pago_confirmado_at";
       op[col] = action.done ? new Date().toISOString() : null;
       break;
     }
+    case "cerrar":
+      if (cancelada) return { ok: false, status: 409, error: "La operación está cancelada; no se puede cerrar" };
+      if (action.done && !(op.entrada_recibida_at && op.pago_confirmado_at)) {
+        return { ok: false, status: 409, error: "Para cerrar hacen falta la entrada recibida y el pago confirmado" };
+      }
+      op.cerrada_at = action.done ? new Date().toISOString() : null;
+      break;
     case "cancelar":
       if (cancelada) return { ok: false, status: 409, error: "La operación ya está cancelada" };
       op.status = "cancelada";

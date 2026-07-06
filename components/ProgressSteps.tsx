@@ -3,17 +3,18 @@ import { HITO_COLOR } from "@/lib/operaciones";
 type Props = {
   entrada: boolean;
   pago: boolean;
+  cerrada: boolean;
   cancelada?: boolean;
 };
 
-// Los dos hitos de la operación, mostrados A LA VEZ (son independientes:
-// la entrada puede llegar antes o después del pago). "Listo" se enciende
-// cuando están los dos. En cancelada queda todo apagado.
-export default function ProgressSteps({ entrada, pago, cancelada = false }: Props) {
+// Los hitos de la operación, mostrados A LA VEZ (entrada y pago son
+// independientes: cualquiera puede llegar primero). "Listo" se enciende
+// cuando el admin cierra la operación. En cancelada queda todo apagado.
+export default function ProgressSteps({ entrada, pago, cerrada, cancelada = false }: Props) {
   const items = [
     { label: "Entrada", done: entrada && !cancelada, color: HITO_COLOR.entrada },
     { label: "Pago", done: pago && !cancelada, color: HITO_COLOR.pago },
-    { label: "Listo", done: entrada && pago && !cancelada, color: HITO_COLOR.listo },
+    { label: "Listo", done: cerrada && !cancelada, color: HITO_COLOR.listo },
   ];
 
   return (
