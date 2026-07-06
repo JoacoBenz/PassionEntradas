@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Archivo, Space_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -25,6 +25,15 @@ export const metadata: Metadata = {
   title: "AdminTickets — Custodia de operaciones",
   description:
     "Seguimiento en tiempo real de operaciones de compra-venta de entradas.",
+};
+
+// iOS: viewport-fit=cover habilita env(safe-area-inset-*) con notch;
+// themeColor pinta la barra de estado del color de la cabecera de tinta.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0c0e16",
 };
 
 export default function RootLayout({

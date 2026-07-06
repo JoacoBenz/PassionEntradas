@@ -11,6 +11,9 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* iOS: sin flash gris al tocar; el feedback lo dan los estados propios */
+  -webkit-tap-highlight-color: transparent;
+  background-color: var(--canvas);
 }
 
 body {
@@ -21,6 +24,37 @@ body {
   color: #1a1d2b;
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  /* iOS con notch en apaisado: el contenido no queda debajo del recorte */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* iOS: elimina los 300ms de espera del doble tap en controles */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"],
+[role="tab"] {
+  touch-action: manipulation;
+}
+
+/* iOS Safari hace zoom automático al enfocar inputs con fuente < 16px.
+   En pantallas táctiles chicas forzamos 16px para evitarlo. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Táctil: área de toque mínima cómoda para botones (HIG ~44pt) */
+@media (pointer: coarse) {
+  button {
+    min-height: 40px;
+  }
 }
 
 /* Foco visible en teclado para toda la app */

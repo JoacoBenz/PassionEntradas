@@ -10,7 +10,7 @@ type Props = {
 
 export default function AppHeader({ subtitle, email, actions }: Props) {
   return (
-    <header className="surface-ink text-white">
+    <header className="surface-ink pt-[env(safe-area-inset-top)] text-white">
       {/* flex-wrap: en móvil las acciones bajan a una segunda fila en vez de
           desbordar; la marca empuja el resto a la derecha con mr-auto. */}
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
