@@ -1,0 +1,212 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #0c0e16;
+  --ink-soft: #171b2b;
+  --canvas: #eff0f5;
+  --brand: #6c5bf2;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--canvas);
+  /* Trama de puntos sutil, papel de seguridad */
+  background-image: radial-gradient(rgba(108, 91, 242, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: #1a1d2b;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Foco visible en teclado para toda la app */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------------------
+   Superficie de tinta: fondo oscuro con guilloché sutil (papel de seguridad).
+--------------------------------------------------------------------------- */
+.surface-ink {
+  background-color: var(--ink);
+  background-image:
+    radial-gradient(ellipse 130% 90% at 15% -20%, rgba(108, 91, 242, 0.22), transparent 55%),
+    radial-gradient(ellipse 110% 80% at 95% 120%, rgba(13, 147, 119, 0.1), transparent 60%),
+    repeating-radial-gradient(
+      circle at 50% -80%,
+      transparent 0,
+      transparent 34px,
+      rgba(255, 255, 255, 0.022) 35px,
+      transparent 36px
+    );
+}
+
+/* ---------------------------------------------------------------------------
+   Troquelado real. Cada sección del ticket enmascara medio círculo en el
+   borde donde se une con la siguiente; las dos mitades forman un agujero
+   perforado de verdad, y a través se ve el fondo de la página.
+   Uso: el contenedor del ticket NO pinta fondo (cada sección pinta el suyo)
+   y las secciones llevan .punch-t / .punch-b / .punch-tb según su junta.
+--------------------------------------------------------------------------- */
+.punch-t,
+.punch-b,
+.punch-tb {
+  --notch-r: 11px;
+}
+.punch-t {
+  -webkit-mask-image: radial-gradient(circle var(--notch-r) at 0 0, transparent 98%, #000 100%),
+    radial-gradient(circle var(--notch-r) at 100% 0, transparent 98%, #000 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: radial-gradient(circle var(--notch-r) at 0 0, transparent 98%, #000 100%),
+    radial-gradient(circle var(--notch-r) at 100% 0, transparent 98%, #000 100%);
+  mask-composite: intersect;
+}
+.punch-b {
+  -webkit-mask-image: radial-gradient(circle var(--notch-r) at 0 100%, transparent 98%, #000 100%),
+    radial-gradient(circle var(--notch-r) at 100% 100%, transparent 98%, #000 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: radial-gradient(circle var(--notch-r) at 0 100%, transparent 98%, #000 100%),
+    radial-gradient(circle var(--notch-r) at 100% 100%, transparent 98%, #000 100%);
+  mask-composite: intersect;
+}
+.punch-tb {
+  -webkit-mask-image: radial-gradient(circle var(--notch-r) at 0 0, transparent 98%, #000 100%),
+    radial-gradient(circle var(--notch-r) at 100% 0, transparent 98%, #000 100%),
+    radial-gradient(circle var(--notch-r) at 0 100%, transparent 98%, #000 100%),
+    radial-gradient(circle var(--notch-r) at 100% 100%, transparent 98%, #000 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: radial-gradient(circle var(--notch-r) at 0 0, transparent 98%, #000 100%),
+    radial-gradient(circle var(--notch-r) at 100% 0, transparent 98%, #000 100%),
+    radial-gradient(circle var(--notch-r) at 0 100%, transparent 98%, #000 100%),
+    radial-gradient(circle var(--notch-r) at 100% 100%, transparent 98%, #000 100%);
+  mask-composite: intersect;
+}
+
+/* Sombra que respeta los agujeros del troquelado (sigue el alfa, no la caja) */
+.ticket-shadow {
+  filter: drop-shadow(0 2px 4px rgba(12, 14, 22, 0.1))
+    drop-shadow(0 20px 36px rgba(12, 14, 22, 0.18));
+}
+.card-shadow {
+  filter: drop-shadow(0 1px 2px rgba(12, 14, 22, 0.05))
+    drop-shadow(0 6px 18px rgba(12, 14, 22, 0.08));
+}
+
+/* Líneas de troquelado (los agujeros los hace la máscara del contenedor) */
+.perf-line {
+  border-top: 2px dashed rgba(255, 255, 255, 0.28);
+}
+.perf-line-light {
+  border-top: 2px dashed #e2e4ec;
+}
+
+/* ---------------------------------------------------------------------------
+   Sello estampado: doble borde rotado, con entrada "a golpe" al cargar.
+--------------------------------------------------------------------------- */
+.stamp {
+  transform: rotate(-3deg);
+  border: 3px solid currentColor;
+  border-radius: 14px;
+  outline: 1.5px solid currentColor;
+  outline-offset: 5px;
+  text-transform: uppercase;
+}
+
+@keyframes stamp-in {
+  0% {
+    opacity: 0;
+    transform: rotate(-10deg) scale(1.9);
+  }
+  55% {
+    opacity: 1;
+    transform: rotate(-2deg) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-3deg) scale(1);
+  }
+}
+
+.stamp-animate {
+  animation: stamp-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  animation-delay: 0.25s;
+}
+
+/* ---------------------------------------------------------------------------
+   Franja holográfica de seguridad + microtexto.
+--------------------------------------------------------------------------- */
+.holo-strip {
+  height: 5px;
+  background: linear-gradient(
+    100deg,
+    #6c5bf2 0%,
+    #38b6a5 25%,
+    #b07a14 50%,
+    #6c5bf2 75%,
+    #38b6a5 100%
+  );
+  background-size: 220% 100%;
+  animation: holo-slide 7s linear infinite;
+}
+
+@keyframes holo-slide {
+  from {
+    background-position: 0% 0;
+  }
+  to {
+    background-position: 220% 0;
+  }
+}
+
+.microtext {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Utilidades de movimiento
+--------------------------------------------------------------------------- */
+.card-lift {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.card-lift:hover {
+  transform: translateY(-1px);
+}
+
+@keyframes toast-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.toast-in {
+  animation: toast-up 0.25s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp-animate,
+  .holo-strip,
+  .toast-in {
+    animation: none;
+  }
+  .card-lift,
+  .card-lift:hover {
+    transition: none;
+    transform: none;
+  }
+}

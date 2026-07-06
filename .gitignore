@@ -1,32 +1,39 @@
-# Dependencies
+# dependencies
 node_modules/
+/.pnp
+.pnp.js
 
-# Build output
-dist/
+# next.js
+/.next/
+/out/
 
-# Secrets / runtime state — NUNCA commitear
-.env
-.env.*
-!.env.example
-*.local
+# production
+/build
 
-# Playwright session state (cookies = secreto)
-state/
-storageState.json
-*.storage.json
-
-# Logs
-*.log
-logs/
-
-# OS / editor
+# misc
 .DS_Store
-.idea/
-.vscode/
-*.swp
+*.pem
 
-# Test artifacts
-coverage/
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Salida del dry-run (puede contener datos del portal)
-dry-run-output.json
+# local env files
+.env
+.env*.local
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# vercel
+.vercel
+
+# worker build
+worker/dist/
+
+# scratch local
+.data/
+*.log
+dist/
