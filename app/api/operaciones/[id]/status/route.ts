@@ -1,18 +1,28 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
-import { canTransition, type Status } from "@/lib/operaciones";
+import { estadoDe, type Operacion, type StatusAction } from "@/lib/operaciones";
 import { getRol } from "@/lib/auth";
-import { isMock, mockSetOpStatus } from "@/lib/mock-db";
+import { isMock, mockApplyAction } from "@/lib/mock-db";
 
-const VALID: Status[] = [
-  "esperando_entrada",
-  "entrada_recibida",
-  "confirmada",
-  "cancelada",
-];
+// PATCH /api/operaciones/[id]/status — aplica una acción sobre la operación.
+// "entrada" y "pago" son hitos independientes que se marcan/desmarcan por
+// separado; cancelar/reabrir manejan el enum. Solo admin; service role.
+//
+// Body: { action: "entrada"|"pago", done: boolean } | { action: "cancelar"|"reabrir" }
 
-// PATCH /api/operaciones/[id]/status — cambia el estado respetando la
-// máquina de estados. Requiere admin logueado; escribe con service role.
+function parseAction(body: any): StatusAction | null {
+  if (body?.action === "cancelar" || body?.action === "reabrir") {
+    return { action: body.action };
+  }
+  if (
+    (body?.action === "entrada" || body?.action === "pago") &&
+    typeof body.done === "boolean"
+  ) {
+    return { action: body.action, done: body.done };
+  }
+  return null;
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
@@ -43,25 +53,24 @@ export async function PATCH(
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const to = body.status as Status;
-  if (!VALID.includes(to)) {
-    return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
+  const action = parseAction(body);
+  if (!action) {
+    return NextResponse.json({ error: "Acción inválida" }, { status: 400 });
   }
 
   if (isMock()) {
-    const res = mockSetOpStatus(params.id, to);
+    const res = mockApplyAction(params.id, action);
     if (!res.ok) {
       return NextResponse.json({ error: res.error }, { status: res.status });
     }
-    return NextResponse.json({ id: res.op.id, status: res.op.status });
+    return NextResponse.json(pickResult(res.op));
   }
 
   const admin = createAdminSupabase();
 
-  // Leemos el estado actual para validar la transición en el servidor.
   const { data: current, error: readErr } = await admin
     .from("operaciones")
-    .select("status")
+    .select("status, entrada_recibida_at, pago_confirmado_at")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -75,24 +84,65 @@ export async function PATCH(
     );
   }
 
-  const from = current.status as Status;
-  if (!canTransition(from, to)) {
-    return NextResponse.json(
-      { error: `Transición no permitida: ${from} → ${to}` },
-      { status: 409 }
-    );
+  const cancelada = current.status === "cancelada";
+  let patch: Record<string, unknown>;
+
+  switch (action.action) {
+    case "entrada":
+    case "pago": {
+      if (cancelada) {
+        return NextResponse.json(
+          { error: "La operación está cancelada; reabrila para editar hitos" },
+          { status: 409 }
+        );
+      }
+      const col =
+        action.action === "entrada" ? "entrada_recibida_at" : "pago_confirmado_at";
+      patch = { [col]: action.done ? new Date().toISOString() : null };
+      break;
+    }
+    case "cancelar": {
+      if (cancelada) {
+        return NextResponse.json(
+          { error: "La operación ya está cancelada" },
+          { status: 409 }
+        );
+      }
+      patch = { status: "cancelada" };
+      break;
+    }
+    case "reabrir": {
+      if (!cancelada) {
+        return NextResponse.json(
+          { error: "Solo se puede reabrir una operación cancelada" },
+          { status: 409 }
+        );
+      }
+      patch = { status: "esperando_entrada" };
+      break;
+    }
   }
 
   const { data, error } = await admin
     .from("operaciones")
-    .update({ status: to })
+    .update(patch)
     .eq("id", params.id)
-    .select("id, status")
+    .select("id, status, entrada_recibida_at, pago_confirmado_at, updated_at")
     .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ id: data.id, status: data.status });
+  return NextResponse.json(pickResult(data as Operacion));
+}
+
+function pickResult(op: Pick<Operacion, "id" | "status" | "entrada_recibida_at" | "pago_confirmado_at"> & { updated_at?: string }) {
+  return {
+    id: op.id,
+    status: op.status,
+    entrada_recibida_at: op.entrada_recibida_at,
+    pago_confirmado_at: op.pago_confirmado_at,
+    estado: estadoDe(op),
+  };
 }

@@ -1,5 +1,10 @@
-// Lógica de dominio de las operaciones: tipos, máquina de estados,
-// etiquetas para la UI, colores por estado y helpers (code, WhatsApp).
+// Lógica de dominio de las operaciones: tipos, estado derivado, etiquetas
+// para la UI, colores por estado y helpers (code, WhatsApp).
+//
+// Modelo: "entrada recibida" y "pago confirmado" son hitos INDEPENDIENTES
+// (timestamps nullable); cada uno se marca/desmarca por separado. La
+// operación está confirmada cuando están los dos. El enum `status` de la
+// base solo se usa para cancelada / reabrir.
 
 export type Status =
   | "esperando_entrada"
@@ -16,6 +21,8 @@ export type Operacion = {
   monto: number;
   fee: number;
   status: Status;
+  entrada_recibida_at: string | null;
+  pago_confirmado_at: string | null;
   // Entrada del catálogo de la tienda que originó la operación (opcional).
   ticket_id: string | null;
   created_at: string;
@@ -32,89 +39,65 @@ export type OperacionPublica = Pick<
   | "vendedor_alias"
   | "monto"
   | "status"
+  | "entrada_recibida_at"
+  | "pago_confirmado_at"
   | "updated_at"
 >;
 
+// Estado visible, derivado de cancelada + los dos hitos.
+export type Estado =
+  | "esperando"
+  | "entrada_recibida"
+  | "pago_confirmado"
+  | "confirmada"
+  | "cancelada";
+
+type Hitos = Pick<
+  Operacion,
+  "status" | "entrada_recibida_at" | "pago_confirmado_at"
+>;
+
+export function estadoDe(op: Hitos): Estado {
+  if (op.status === "cancelada") return "cancelada";
+  const entrada = !!op.entrada_recibida_at;
+  const pago = !!op.pago_confirmado_at;
+  if (entrada && pago) return "confirmada";
+  if (entrada) return "entrada_recibida";
+  if (pago) return "pago_confirmado";
+  return "esperando";
+}
+
 // Etiquetas para la UI.
-export const STATUS_LABEL: Record<Status, string> = {
-  esperando_entrada: "En espera de entrada",
+export const ESTADO_LABEL: Record<Estado, string> = {
+  esperando: "En espera",
   entrada_recibida: "Entrada recibida",
+  pago_confirmado: "Pago confirmado",
   confirmada: "Confirmada",
   cancelada: "Cancelada",
 };
 
 // Colores por estado (NO semáforo). Se usan tanto en talón como en chips.
-export const STATUS_COLOR: Record<Status, string> = {
-  esperando_entrada: "#5F6577", // pizarra
+export const ESTADO_COLOR: Record<Estado, string> = {
+  esperando: "#5F6577", // pizarra
   entrada_recibida: "#B07A14", // ámbar
+  pago_confirmado: "#6C5BF2", // violeta marca
   confirmada: "#0D9377", // verde-teal
   cancelada: "#D14D68", // rosa
 };
 
-// Máquina de estados.
-// esperando_entrada -> entrada_recibida -> confirmada
-// Desde cualquier estado no terminal se puede cancelar.
-// cancelada se puede reabrir a esperando_entrada.
-export const TERMINAL: Status[] = ["confirmada", "cancelada"];
+// Colores de cada hito individual (botones y pasos).
+export const HITO_COLOR = {
+  entrada: "#B07A14",
+  pago: "#6C5BF2",
+  listo: "#0D9377",
+} as const;
 
-// Siguiente estado del flujo "feliz" (botón de un toque). null si no aplica.
-export function nextStatus(status: Status): Status | null {
-  switch (status) {
-    case "esperando_entrada":
-      return "entrada_recibida";
-    case "entrada_recibida":
-      return "confirmada";
-    default:
-      return null;
-  }
-}
-
-// Label del botón primario de "un toque" en el admin.
-export function nextStatusLabel(status: Status): string | null {
-  switch (status) {
-    case "esperando_entrada":
-      return "Marcar entrada recibida";
-    case "entrada_recibida":
-      return "Confirmar pago";
-    default:
-      return null;
-  }
-}
-
-// Valida si una transición está permitida por la máquina de estados.
-export function canTransition(from: Status, to: Status): boolean {
-  if (from === to) return false;
-
-  // Cancelar: permitido desde cualquier estado no terminal.
-  if (to === "cancelada") {
-    return !TERMINAL.includes(from);
-  }
-
-  // Reabrir: solo desde cancelada, hacia esperando_entrada.
-  if (from === "cancelada") {
-    return to === "esperando_entrada";
-  }
-
-  // Avance del flujo feliz.
-  return nextStatus(from) === to;
-}
-
-// Pasos de la barra de progreso pública: Entrada -> Pago -> Listo.
-// Devuelve el índice (0..3) hasta el que hay que "llenar".
-export function progressStep(status: Status): number {
-  switch (status) {
-    case "esperando_entrada":
-      return 0;
-    case "entrada_recibida":
-      return 1;
-    case "confirmada":
-      return 3;
-    case "cancelada":
-      return 0;
-  }
-}
-
-export const PROGRESS_LABELS = ["Entrada", "Pago", "Listo"] as const;
+// Acciones que acepta la API de estado.
+export type StatusAction =
+  | { action: "entrada"; done: boolean }
+  | { action: "pago"; done: boolean }
+  | { action: "cancelar" }
+  | { action: "reabrir" };
 
 // Genera el code legible para el admin, ej "BX-7F3K9Q2M".
 // Sin caracteres ambiguos (0/O, 1/I).

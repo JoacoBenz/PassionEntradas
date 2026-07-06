@@ -2,7 +2,7 @@
 // Vive en globalThis para sobrevivir al hot-reload del dev server; se
 // resetea al reiniciar el proceso. NO usar en producción.
 
-import { canTransition, generateCode, type Operacion, type OperacionPublica, type Status } from "@/lib/operaciones";
+import { generateCode, type Operacion, type OperacionPublica, type StatusAction } from "@/lib/operaciones";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import { MOCK_TICKETS } from "@/lib/mock-tickets";
 
@@ -34,6 +34,8 @@ function seed(): MockDB {
       monto: 850000,
       fee: 60000,
       status: "entrada_recibida",
+      entrada_recibida_at: iso(90),
+      pago_confirmado_at: null,
       ticket_id: "3001::1",
       created_at: iso(60 * 26),
       updated_at: iso(90),
@@ -47,6 +49,8 @@ function seed(): MockDB {
       monto: 300000,
       fee: 25000,
       status: "esperando_entrada",
+      entrada_recibida_at: null,
+      pago_confirmado_at: null,
       ticket_id: "manual::demo-1",
       created_at: iso(60 * 3),
       updated_at: iso(60 * 3),
@@ -60,6 +64,8 @@ function seed(): MockDB {
       monto: 500000,
       fee: 40000,
       status: "confirmada",
+      entrada_recibida_at: iso(60 * 24 * 3),
+      pago_confirmado_at: iso(60 * 24 * 2),
       ticket_id: null,
       created_at: iso(60 * 24 * 4),
       updated_at: iso(60 * 24 * 2),
@@ -103,8 +109,8 @@ export function mockListOps(limit?: number): Operacion[] {
 export function mockOpPublica(id: string): OperacionPublica | null {
   const op = db().ops.find((o) => o.id === id);
   if (!op) return null;
-  const { code, evento, comprador_alias, vendedor_alias, monto, status, updated_at } = op;
-  return { code, evento, comprador_alias, vendedor_alias, monto, status, updated_at };
+  const { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, updated_at } = op;
+  return { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, updated_at };
 }
 
 export function mockCreateOp(input: {
@@ -121,6 +127,8 @@ export function mockCreateOp(input: {
     code: generateCode(),
     ...input,
     status: "esperando_entrada",
+    entrada_recibida_at: null,
+    pago_confirmado_at: null,
     created_at: now,
     updated_at: now,
   };
@@ -128,16 +136,33 @@ export function mockCreateOp(input: {
   return op;
 }
 
-export function mockSetOpStatus(
+export function mockApplyAction(
   id: string,
-  to: Status
+  action: StatusAction
 ): { ok: true; op: Operacion } | { ok: false; status: number; error: string } {
   const op = db().ops.find((o) => o.id === id);
   if (!op) return { ok: false, status: 404, error: "Operación no encontrada" };
-  if (!canTransition(op.status, to)) {
-    return { ok: false, status: 409, error: `Transición no permitida: ${op.status} → ${to}` };
+  const cancelada = op.status === "cancelada";
+
+  switch (action.action) {
+    case "entrada":
+    case "pago": {
+      if (cancelada) {
+        return { ok: false, status: 409, error: "La operación está cancelada; reabrila para editar hitos" };
+      }
+      const col = action.action === "entrada" ? "entrada_recibida_at" : "pago_confirmado_at";
+      op[col] = action.done ? new Date().toISOString() : null;
+      break;
+    }
+    case "cancelar":
+      if (cancelada) return { ok: false, status: 409, error: "La operación ya está cancelada" };
+      op.status = "cancelada";
+      break;
+    case "reabrir":
+      if (!cancelada) return { ok: false, status: 409, error: "Solo se puede reabrir una operación cancelada" };
+      op.status = "esperando_entrada";
+      break;
   }
-  op.status = to;
   op.updated_at = new Date().toISOString();
   return { ok: true, op };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { nextStatus, type Operacion, type Status } from "@/lib/operaciones";
+import { estadoDe, type Operacion, type StatusAction } from "@/lib/operaciones";
 import OperacionCard from "./OperacionCard";
 import { ToastViewport, useToast } from "./Toast";
 
@@ -20,15 +20,16 @@ const FILTERS: { key: Filter; label: string }[] = [
 ];
 
 function matches(op: Operacion, filter: Filter): boolean {
+  const estado = estadoDe(op);
   switch (filter) {
     case "todas":
       return true;
     case "en_curso":
-      return op.status === "esperando_entrada" || op.status === "entrada_recibida";
+      return estado !== "confirmada" && estado !== "cancelada";
     case "confirmadas":
-      return op.status === "confirmada";
+      return estado === "confirmada";
     case "canceladas":
-      return op.status === "cancelada";
+      return estado === "cancelada";
   }
 }
 
@@ -41,10 +42,11 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
   const { toasts, push } = useToast();
 
   const stats = useMemo(() => {
-    const enCurso = ops.filter(
-      (o) => o.status === "esperando_entrada" || o.status === "entrada_recibida"
+    const estados = ops.map(estadoDe);
+    const enCurso = estados.filter(
+      (e) => e !== "confirmada" && e !== "cancelada"
     ).length;
-    const confirmadas = ops.filter((o) => o.status === "confirmada").length;
+    const confirmadas = estados.filter((e) => e === "confirmada").length;
     return { enCurso, confirmadas, total: ops.length };
   }, [ops]);
 
@@ -53,38 +55,37 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
     [ops, filter]
   );
 
-  function replaceOp(id: string, status: Status) {
-    setOps((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
-  }
-
-  async function changeStatus(op: Operacion, to: Status, okMsg: string) {
+  async function applyAction(op: Operacion, action: StatusAction, okMsg: string) {
     setBusyId(op.id);
     try {
       const res = await fetch(`/api/operaciones/${op.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: to }),
+        body: JSON.stringify(action),
       });
       const data = await res.json();
       if (!res.ok) {
         push("error", data.error ?? "No se pudo actualizar el estado");
         return;
       }
-      replaceOp(op.id, data.status as Status);
+      setOps((prev) =>
+        prev.map((o) =>
+          o.id === op.id
+            ? {
+                ...o,
+                status: data.status,
+                entrada_recibida_at: data.entrada_recibida_at,
+                pago_confirmado_at: data.pago_confirmado_at,
+              }
+            : o
+        )
+      );
       push("success", okMsg);
     } catch {
       push("error", "Error de red al actualizar");
     } finally {
       setBusyId(null);
     }
-  }
-
-  function onAdvance(op: Operacion) {
-    const to = nextStatus(op.status);
-    if (!to) return;
-    const msg =
-      to === "entrada_recibida" ? "Entrada recibida" : "Pago confirmado";
-    changeStatus(op, to, msg);
   }
 
   return (
@@ -138,11 +139,7 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
               op={op}
               baseUrl={baseUrl}
               busy={busyId === op.id}
-              onAdvance={onAdvance}
-              onCancel={(o) => changeStatus(o, "cancelada", "Operación cancelada")}
-              onReopen={(o) =>
-                changeStatus(o, "esperando_entrada", "Operación reabierta")
-              }
+              onAction={applyAction}
               onCopied={(m) => push("success", m)}
             />
           ))

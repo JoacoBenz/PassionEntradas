@@ -1,6 +1,7 @@
 import {
-  STATUS_COLOR,
-  STATUS_LABEL,
+  ESTADO_COLOR,
+  ESTADO_LABEL,
+  estadoDe,
   formatARS,
   type OperacionPublica,
 } from "@/lib/operaciones";
@@ -43,7 +44,8 @@ function Microtext({ dark = false }: { dark?: boolean }) {
 // el suyo y enmascara medio círculo en sus juntas (.punch-*), así el
 // troquelado son agujeros de verdad a través de los que se ve la página.
 export default function StatusStub({ op }: { op: OperacionPublica }) {
-  const color = STATUS_COLOR[op.status];
+  const estado = estadoDe(op);
+  const color = ESTADO_COLOR[estado];
   const actualizado = new Date(op.updated_at).toLocaleString("es-AR", {
     day: "2-digit",
     month: "2-digit",
@@ -94,7 +96,7 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
                 className="mt-0.5 block font-display text-xl font-bold leading-tight tracking-wide sm:text-2xl"
                 style={{ textWrap: "balance" }}
               >
-                {STATUS_LABEL[op.status]}
+                {ESTADO_LABEL[estado]}
               </span>
             </div>
           </div>
@@ -106,7 +108,12 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
         {/* Cuerpo blanco */}
         <div className="punch-b bg-white">
           <div className="space-y-6 px-6 py-7">
-            <ProgressSteps status={op.status} />
+            {/* Los dos hitos, visibles a la vez: son independientes */}
+            <ProgressSteps
+              entrada={!!op.entrada_recibida_at}
+              pago={!!op.pago_confirmado_at}
+              cancelada={estado === "cancelada"}
+            />
 
             <dl className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
               <div className="col-span-2">

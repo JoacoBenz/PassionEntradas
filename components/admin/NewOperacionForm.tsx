@@ -65,6 +65,8 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
         monto: Math.trunc(Number(form.monto || 0)),
         fee: Math.trunc(Number(form.fee || 0)),
         status: "esperando_entrada",
+        entrada_recibida_at: null,
+        pago_confirmado_at: null,
         ticket_id: ticketId,
         created_at: now,
         updated_at: now,

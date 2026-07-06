@@ -1,12 +1,13 @@
 "use client";
 
 import {
-  STATUS_COLOR,
+  ESTADO_COLOR,
+  HITO_COLOR,
+  estadoDe,
   formatARS,
-  nextStatus,
-  nextStatusLabel,
   whatsappMessage,
   type Operacion,
+  type StatusAction,
 } from "@/lib/operaciones";
 import StatusChip from "@/components/StatusChip";
 
@@ -16,29 +17,27 @@ type Props = {
   busy?: boolean;
   // readOnly: modo moderador — sin botones de cambio de estado.
   readOnly?: boolean;
-  onAdvance?: (op: Operacion) => void;
-  onCancel?: (op: Operacion) => void;
-  onReopen?: (op: Operacion) => void;
+  onAction?: (op: Operacion, action: StatusAction, okMsg: string) => void;
   onCopied: (text: string) => void;
 };
 
 // Card de una operación en el panel, con estética de ticket: lomo de color
-// por estado, cuerpo con el botón de "un toque" y una franja de acciones
-// separada por troquelado real (agujeros vía máscara .punch-*).
+// por estado, dos hitos independientes (entrada / pago) que se marcan y
+// desmarcan por separado, y una franja de acciones separada por troquelado.
 export default function OperacionCard({
   op,
   baseUrl,
   busy = false,
   readOnly = false,
-  onAdvance,
-  onCancel,
-  onReopen,
+  onAction,
   onCopied,
 }: Props) {
   const link = `${baseUrl}/op/${op.id}`;
-  const color = STATUS_COLOR[op.status];
-  const advanceLabel = nextStatusLabel(op.status);
-  const next = nextStatus(op.status);
+  const estado = estadoDe(op);
+  const color = ESTADO_COLOR[estado];
+  const cancelada = estado === "cancelada";
+  const entrada = !!op.entrada_recibida_at;
+  const pago = !!op.pago_confirmado_at;
 
   async function copy(text: string, label: string) {
     try {
@@ -67,7 +66,7 @@ export default function OperacionCard({
             <span className="rounded-md bg-canvas px-2 py-0.5 font-mono text-[11px] tracking-wider text-[#6A6E7E]">
               {op.code}
             </span>
-            <StatusChip status={op.status} />
+            <StatusChip estado={estado} />
           </div>
 
           <h3 className="mt-2 truncate font-display text-lg font-semibold tracking-tight">
@@ -98,16 +97,36 @@ export default function OperacionCard({
             </div>
           )}
 
-          {/* Botón primario de un toque */}
-          {!readOnly && next && advanceLabel && (
-            <button
-              onClick={() => onAdvance?.(op)}
-              disabled={busy}
-              className="mt-4 w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-60"
-              style={{ backgroundColor: STATUS_COLOR[next] }}
-            >
-              {advanceLabel} →
-            </button>
+          {/* Hitos independientes: cada uno se marca/desmarca por separado */}
+          {!readOnly && !cancelada && (
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <HitoButton
+                label="Entrada recibida"
+                done={entrada}
+                color={HITO_COLOR.entrada}
+                busy={busy}
+                onClick={() =>
+                  onAction?.(
+                    op,
+                    { action: "entrada", done: !entrada },
+                    !entrada ? "Entrada marcada como recibida" : "Entrada desmarcada"
+                  )
+                }
+              />
+              <HitoButton
+                label="Pago confirmado"
+                done={pago}
+                color={HITO_COLOR.pago}
+                busy={busy}
+                onClick={() =>
+                  onAction?.(
+                    op,
+                    { action: "pago", done: !pago },
+                    !pago ? "Pago marcado como confirmado" : "Pago desmarcado"
+                  )
+                }
+              />
+            </div>
           )}
         </div>
       </div>
@@ -142,18 +161,22 @@ export default function OperacionCard({
           </button>
 
           {!readOnly &&
-            (op.status === "cancelada" ? (
+            (cancelada ? (
               <button
-                onClick={() => onReopen?.(op)}
+                onClick={() =>
+                  onAction?.(op, { action: "reabrir" }, "Operación reabierta")
+                }
                 disabled={busy}
                 className="ml-auto rounded-lg border border-brand px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/5 disabled:opacity-60"
               >
                 Reabrir
               </button>
             ) : (
-              op.status !== "confirmada" && (
+              estado !== "confirmada" && (
                 <button
-                  onClick={() => onCancel?.(op)}
+                  onClick={() =>
+                    onAction?.(op, { action: "cancelar" }, "Operación cancelada")
+                  }
                   disabled={busy}
                   className="ml-auto rounded-lg border border-estado-cancelada px-3 py-1.5 text-xs font-semibold text-estado-cancelada transition-colors hover:bg-estado-cancelada/5 disabled:opacity-60"
                 >
@@ -164,5 +187,48 @@ export default function OperacionCard({
         </div>
       </div>
     </article>
+  );
+}
+
+// Botón de hito con dos estados: pendiente (delineado, "Marcar…") y hecho
+// (relleno con ✓; al tocarlo de nuevo se desmarca, por si hubo un error).
+function HitoButton({
+  label,
+  done,
+  color,
+  busy,
+  onClick,
+}: {
+  label: string;
+  done: boolean;
+  color: string;
+  busy: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={busy}
+      aria-pressed={done}
+      title={done ? "Tocá para desmarcar" : undefined}
+      className="flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-2.5 text-xs font-semibold transition-colors disabled:opacity-60"
+      style={
+        done
+          ? { backgroundColor: color, borderColor: color, color: "#fff" }
+          : { borderColor: `${color}66`, color }
+      }
+    >
+      <span
+        className="flex h-4 w-4 items-center justify-center rounded-full border text-[10px]"
+        style={{
+          borderColor: done ? "rgba(255,255,255,0.7)" : `${color}88`,
+          backgroundColor: done ? "rgba(255,255,255,0.2)" : "transparent",
+        }}
+        aria-hidden
+      >
+        {done ? "✓" : ""}
+      </span>
+      {label}
+    </button>
   );
 }

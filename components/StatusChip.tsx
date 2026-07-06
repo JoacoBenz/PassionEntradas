@@ -1,8 +1,8 @@
-import { STATUS_COLOR, STATUS_LABEL, type Status } from "@/lib/operaciones";
+import { ESTADO_COLOR, ESTADO_LABEL, type Estado } from "@/lib/operaciones";
 
 // Chip de estado con el color correspondiente (fondo suave + texto fuerte).
-export default function StatusChip({ status }: { status: Status }) {
-  const color = STATUS_COLOR[status];
+export default function StatusChip({ estado }: { estado: Estado }) {
+  const color = ESTADO_COLOR[estado];
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
@@ -17,7 +17,7 @@ export default function StatusChip({ status }: { status: Status }) {
         style={{ backgroundColor: color }}
         aria-hidden
       />
-      {STATUS_LABEL[status]}
+      {ESTADO_LABEL[estado]}
     </span>
   );
 }
