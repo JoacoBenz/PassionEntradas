@@ -244,3 +244,20 @@ textarea,
     transform: none;
   }
 }
+
+/* iOS Safari: input[type="date"] usa un tamaño intrínseco propio y desborda
+   su contenedor (se veía salirse de la card en móvil). Se fuerza el sizing
+   de bloque normal; min-height porque sin appearance nativa iOS colapsa la
+   altura cuando el campo está vacío. */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 2.375rem;
+}
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}

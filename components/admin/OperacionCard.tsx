@@ -140,6 +140,13 @@ export default function OperacionCard({
             </div>
           )}
 
+          {op.cuenta_debitar && (
+            <div className="mt-2 text-xs text-[#6A6E7E]">
+              Debita de:{" "}
+              <span className="font-mono font-medium">{op.cuenta_debitar}</span>
+            </div>
+          )}
+
           {/* Notas internas (solo panel; nunca van al link público) */}
           {(op.notas || (!readOnly && onUpdate)) && (
             <div className="mt-3 rounded-xl bg-canvas px-3 py-2.5 text-xs">

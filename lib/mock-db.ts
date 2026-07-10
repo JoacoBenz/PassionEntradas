@@ -39,6 +39,7 @@ function seed(): MockDB {
       cerrada_at: null,
       fecha_evento: "2026-07-18",
       notas: "Vendedor manda el QR el jueves.",
+      cuenta_debitar: "admintickets.mp",
       ticket_id: "3001::1",
       created_at: iso(60 * 26),
       updated_at: iso(90),
@@ -57,6 +58,7 @@ function seed(): MockDB {
       cerrada_at: null,
       fecha_evento: "2026-07-09",
       notas: null,
+      cuenta_debitar: null,
       ticket_id: "manual::demo-1",
       created_at: iso(60 * 3),
       updated_at: iso(60 * 3),
@@ -75,6 +77,7 @@ function seed(): MockDB {
       cerrada_at: null,
       fecha_evento: null,
       notas: null,
+      cuenta_debitar: null,
       ticket_id: null,
       created_at: iso(60 * 24 * 4),
       updated_at: iso(60 * 24 * 2),
@@ -131,6 +134,7 @@ export function mockCreateOp(input: {
   ticket_id: string | null;
   fecha_evento: string | null;
   notas: string | null;
+  cuenta_debitar: string | null;
 }): Operacion {
   const now = new Date().toISOString();
   const op: Operacion = {
