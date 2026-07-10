@@ -14,6 +14,7 @@ const empty = {
   evento: "",
   comprador_alias: "",
   vendedor_alias: "",
+  cuenta_debitar: "",
   monto: "",
   fee: "",
   fecha_evento: "",
@@ -45,6 +46,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
           evento: form.evento,
           comprador_alias: form.comprador_alias || null,
           vendedor_alias: form.vendedor_alias || null,
+          cuenta_debitar: form.cuenta_debitar || null,
           monto: Number(form.monto || 0),
           fee: Number(form.fee || 0),
           ticket_id: ticketId,
@@ -66,6 +68,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
         evento: form.evento.trim(),
         comprador_alias: form.comprador_alias.trim() || null,
         vendedor_alias: form.vendedor_alias.trim() || null,
+        cuenta_debitar: form.cuenta_debitar.trim() || null,
         monto: Math.trunc(Number(form.monto || 0)),
         fee: Math.trunc(Number(form.fee || 0)),
         status: "esperando_entrada",
@@ -145,6 +148,20 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
                 placeholder="vende_lucho"
               />
             </div>
+          </div>
+
+          <div>
+            <label htmlFor="cuenta_debitar" className={labelCls}>
+              Cuenta a debitar
+            </label>
+            <input
+              id="cuenta_debitar"
+              className={`${inputCls} font-mono`}
+              value={form.cuenta_debitar}
+              onChange={(e) => set("cuenta_debitar", e.target.value)}
+              placeholder="alias.mp / CBU"
+              maxLength={200}
+            />
           </div>
 
           <div>
