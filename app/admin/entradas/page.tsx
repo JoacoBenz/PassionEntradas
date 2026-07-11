@@ -56,7 +56,7 @@ export default async function AdminEntradasPage() {
   }
 
   return (
-    <main className="min-h-dvh pb-24 md:pb-10">
+    <main className="min-h-svh pb-24 md:pb-10">
       <AppHeader
         subtitle="Entradas de la tienda"
         email={email}
