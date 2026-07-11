@@ -22,7 +22,7 @@ function Tile({
 }) {
   return (
     <div className={`min-w-0 px-4 py-3.5 ${className}`}>
-      <p className="truncate text-[10px] font-medium uppercase tracking-[0.14em] text-muted">
+      <p className="text-[10px] font-medium uppercase leading-snug tracking-[0.14em] text-muted">
         {label}
       </p>
       <p
@@ -34,7 +34,7 @@ function Tile({
       >
         {value}
       </p>
-      {detail && <p className="truncate text-[11px] text-muted">{detail}</p>}
+      {detail && <p className="text-[11px] leading-snug text-muted">{detail}</p>}
     </div>
   );
 }
@@ -52,23 +52,25 @@ export default function MetricsBoard({ metrics }: { metrics: Metrics }) {
         <div className="grid grid-cols-2 md:grid-cols-3">
           <Tile
             big
-            label="Plata movida"
+            label="Volumen operado"
             value={formatARS(metrics.plataMovida)}
-            detail="pagos confirmados"
+            detail="total con pago confirmado"
             accent="#0D9377"
             className="col-span-2 border-b border-dashed border-line md:col-span-1 md:border-b-0 md:border-r"
           />
           <Tile
             big
-            label="Comisión ganada"
+            label="Comisiones acumuladas"
             value={formatARS(metrics.comisionGanada)}
+            detail="sobre ventas confirmadas"
             accent="#6C5BF2"
             className="border-r border-dashed border-line"
           />
           <Tile
             big
-            label="Entradas vendidas"
+            label="Ventas concretadas"
             value={String(metrics.entradasVendidas).padStart(2, "0")}
+            detail="operaciones cobradas"
             accent="#B07A14"
           />
         </div>
@@ -76,18 +78,20 @@ export default function MetricsBoard({ metrics }: { metrics: Metrics }) {
         {/* Fila secundaria: lo operativo */}
         <div className="grid grid-cols-2">
           <Tile
-            label="En juego ahora"
+            label="Capital comprometido"
             value={formatARS(metrics.enJuegoMonto)}
-            detail={`${metrics.enJuegoOps} ${
-              metrics.enJuegoOps === 1 ? "operación abierta" : "operaciones abiertas"
+            detail={`en ${metrics.enJuegoOps} ${
+              metrics.enJuegoOps === 1
+                ? "operación en curso sin cobrar"
+                : "operaciones en curso sin cobrar"
             }`}
             accent="#5F6577"
             className="border-r border-dashed border-line"
           />
           <Tile
-            label="Ticket promedio"
+            label="Valor promedio"
             value={formatARS(metrics.ticketPromedio)}
-            detail="por venta confirmada"
+            detail="por operación concretada"
             accent="#5F6577"
           />
         </div>
