@@ -511,6 +511,26 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
     return out;
   }, [events, state]);
 
+  // Paginación client-side: la cartelera crece con cada sync y una lista
+  // infinita se vuelve inmanejable en móvil.
+  const PAGE_SIZE = 12;
+  const [page, setPage] = useState(1);
+  // Al cambiar cualquier filtro se vuelve a la primera página.
+  useEffect(() => {
+    setPage(1);
+  }, [state.cat, state.lugar, state.mes, state.q]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const pageStart = (pageSafe - 1) * PAGE_SIZE;
+  const visible = filtered.slice(pageStart, pageStart + PAGE_SIZE);
+
+  function goToPage(p: number) {
+    setPage(p);
+    // La cartelera puede ser larga: al paginar volvemos al inicio de la lista.
+    document.querySelector(".result-line")?.scrollIntoView({ behavior: "smooth" });
+  }
+
   const catOpts = [
     { value: "*", label: "Todas las categorías" },
     ...uniqueOptions(events, (e) => ({ key: e.comp, label: e.comp }), true),
@@ -601,6 +621,11 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
 
       <div className="result-line">
         <b>{filtered.length}</b> {filtered.length === 1 ? "evento" : "eventos"}
+        {totalPages > 1 && (
+          <span className="range">
+            {" "}· mostrando {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, filtered.length)}
+          </span>
+        )}
         {filtrando && (
           <button
             className="clear"
@@ -613,7 +638,7 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
 
       <main className="feed">
         {filtered.length ? (
-          filtered.map((ev, i) => <TicketCard key={ev.comp + ev.evento} ev={ev} i={i} cur={cur} />)
+          visible.map((ev, i) => <TicketCard key={ev.comp + ev.evento} ev={ev} i={i} cur={cur} />)
         ) : (
           <p className="empty">
             Ningún evento coincide con estos filtros.
@@ -629,6 +654,28 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
           </p>
         )}
       </main>
+
+      {totalPages > 1 && (
+        <nav className="pager" aria-label="Paginación de eventos">
+          <button
+            className="pager-btn"
+            disabled={pageSafe <= 1}
+            onClick={() => goToPage(pageSafe - 1)}
+          >
+            ← Anterior
+          </button>
+          <span className="pager-info">
+            Página {pageSafe} de {totalPages}
+          </span>
+          <button
+            className="pager-btn"
+            disabled={pageSafe >= totalPages}
+            onClick={() => goToPage(pageSafe + 1)}
+          >
+            Siguiente →
+          </button>
+        </nav>
+      )}
 
       <Foot />
       <WaFloat />
