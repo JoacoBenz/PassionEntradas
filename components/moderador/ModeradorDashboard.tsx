@@ -4,17 +4,25 @@ import { useState } from "react";
 import { whatsappMessage, type Operacion } from "@/lib/operaciones";
 import NewOperacionForm from "@/components/admin/NewOperacionForm";
 import OperacionCard from "@/components/admin/OperacionCard";
+import MetricsBoard from "@/components/moderador/MetricsBoard";
 import { ToastViewport, useToast } from "@/components/admin/Toast";
+import type { Metrics } from "@/lib/metrics";
 
 type Props = {
   initial: Operacion[];
+  metrics: Metrics;
   baseUrl: string;
   prefill?: { evento?: string; ticketId?: string };
 };
 
 // Módulo del moderador: carga la entrada a vender con los datos de
 // comprador y vendedor, y comparte el link. Los estados los maneja el admin.
-export default function ModeradorDashboard({ initial, baseUrl, prefill }: Props) {
+export default function ModeradorDashboard({
+  initial,
+  metrics,
+  baseUrl,
+  prefill,
+}: Props) {
   const [ops, setOps] = useState<Operacion[]>(initial);
   const [lastCreated, setLastCreated] = useState<Operacion | null>(null);
   const { toasts, push } = useToast();
@@ -30,6 +38,8 @@ export default function ModeradorDashboard({ initial, baseUrl, prefill }: Props)
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
+      <MetricsBoard metrics={metrics} />
+
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[minmax(0,380px)_1fr]">
         {/* Columna izquierda: carga */}
         <div className="min-w-0 md:sticky md:top-6 md:self-start">

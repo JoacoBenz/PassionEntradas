@@ -6,6 +6,7 @@ import ModeradorDashboard from "@/components/moderador/ModeradorDashboard";
 import AppHeader from "@/components/AppHeader";
 import BottomNav from "@/components/BottomNav";
 import type { Operacion } from "@/lib/operaciones";
+import { computeMetrics, type Metrics } from "@/lib/metrics";
 import { isMock, MOCK_USER, mockListOps } from "@/lib/mock-db";
 
 export const dynamic = "force-dynamic";
@@ -30,11 +31,13 @@ export default async function ModeradorPage({
   let email: string | null | undefined;
   let esAdmin: boolean;
   let ops: Operacion[];
+  let metrics: Metrics;
 
   if (isMock()) {
     email = MOCK_USER.email;
     esAdmin = true;
     ops = mockListOps(10);
+    metrics = computeMetrics(mockListOps());
   } else {
     const supabase = createServerSupabase();
     const {
@@ -50,12 +53,23 @@ export default async function ModeradorPage({
     // Últimas operaciones cargadas, para referencia y para copiar links.
     // Con service role: la tabla está en RLS deny-all y la sesión del
     // usuario no ve filas (la sesión solo se usa para validar quién es).
-    const { data } = await createAdminSupabase()
-      .from("operaciones")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(10);
-    ops = (data ?? []) as Operacion[];
+    const admin = createAdminSupabase();
+    const [recentes, todas] = await Promise.all([
+      admin
+        .from("operaciones")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(10),
+      // Solo las columnas que necesitan las métricas, de TODAS las
+      // operaciones (la lista de arriba está limitada a 10).
+      admin
+        .from("operaciones")
+        .select("monto, fee, status, pago_confirmado_at, cerrada_at"),
+    ]);
+    ops = (recentes.data ?? []) as Operacion[];
+    metrics = computeMetrics(
+      (todas.data ?? []) as Parameters<typeof computeMetrics>[0]
+    );
   }
 
   return (
@@ -64,6 +78,7 @@ export default async function ModeradorPage({
       <AppHeader subtitle="Carga de operaciones" email={email} nav={esAdmin} />
       <ModeradorDashboard
         initial={ops}
+        metrics={metrics}
         baseUrl={getBaseUrl()}
         prefill={
           searchParams?.evento || searchParams?.ticket
