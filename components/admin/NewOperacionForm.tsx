@@ -14,7 +14,6 @@ const empty = {
   evento: "",
   comprador_alias: "",
   vendedor_alias: "",
-  cuenta_debitar: "",
   monto: "",
   fee: "",
   fecha_evento: "",
@@ -46,7 +45,6 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
           evento: form.evento,
           comprador_alias: form.comprador_alias || null,
           vendedor_alias: form.vendedor_alias || null,
-          cuenta_debitar: form.cuenta_debitar || null,
           monto: Number(form.monto || 0),
           fee: Number(form.fee || 0),
           ticket_id: ticketId,
@@ -68,7 +66,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
         evento: form.evento.trim(),
         comprador_alias: form.comprador_alias.trim() || null,
         vendedor_alias: form.vendedor_alias.trim() || null,
-        cuenta_debitar: form.cuenta_debitar.trim() || null,
+        cuenta_debitar: null,
         monto: Math.trunc(Number(form.monto || 0)),
         fee: Math.trunc(Number(form.fee || 0)),
         status: "esperando_entrada",
@@ -150,33 +148,17 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
             </div>
           </div>
 
-          {/* En desktop comparten fila: menos tira vertical. */}
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div>
-              <label htmlFor="cuenta_debitar" className={labelCls}>
-                Cuenta a debitar
-              </label>
-              <input
-                id="cuenta_debitar"
-                className={`${inputCls} font-mono`}
-                value={form.cuenta_debitar}
-                onChange={(e) => set("cuenta_debitar", e.target.value)}
-                placeholder="alias.mp / CBU"
-                maxLength={200}
-              />
-            </div>
-            <div>
-              <label htmlFor="fecha_evento" className={labelCls}>
-                Fecha del evento
-              </label>
-              <input
-                id="fecha_evento"
-                type="date"
-                className={inputCls}
-                value={form.fecha_evento}
-                onChange={(e) => set("fecha_evento", e.target.value)}
-              />
-            </div>
+          <div>
+            <label htmlFor="fecha_evento" className={labelCls}>
+              Fecha del evento
+            </label>
+            <input
+              id="fecha_evento"
+              type="date"
+              className={inputCls}
+              value={form.fecha_evento}
+              onChange={(e) => set("fecha_evento", e.target.value)}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
