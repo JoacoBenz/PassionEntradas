@@ -4,6 +4,7 @@ import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server
 import { getRol } from "@/lib/auth";
 import ModeradorDashboard from "@/components/moderador/ModeradorDashboard";
 import AppHeader from "@/components/AppHeader";
+import BottomNav from "@/components/BottomNav";
 import type { Operacion } from "@/lib/operaciones";
 import { isMock, MOCK_USER, mockListOps } from "@/lib/mock-db";
 
@@ -58,12 +59,9 @@ export default async function ModeradorPage({
   }
 
   return (
-    <main className="min-h-dvh">
-      <AppHeader
-        subtitle="Carga de operaciones"
-        email={email}
-        actions={esAdmin ? [{ href: "/admin", label: "Ir al panel" }] : undefined}
-      />
+    // El moderador puro tiene una sola sección: sin BottomNav ni padding.
+    <main className={`min-h-dvh ${esAdmin ? "pb-24" : ""}`}>
+      <AppHeader subtitle="Carga de operaciones" email={email} />
       <ModeradorDashboard
         initial={ops}
         baseUrl={getBaseUrl()}
@@ -73,6 +71,7 @@ export default async function ModeradorPage({
             : undefined
         }
       />
+      {esAdmin && <BottomNav />}
     </main>
   );
 }
