@@ -169,6 +169,12 @@ export function mockApplyAction(
       if (op.cerrada_at) {
         return { ok: false, status: 409, error: "La operación está cerrada; reabrí el cierre para editar hitos" };
       }
+      if (action.action === "pago" && action.done && !op.entrada_recibida_at) {
+        return { ok: false, status: 409, error: "Primero marcá la entrada recibida: el pago se autoriza después de verificar las entradas" };
+      }
+      if (action.action === "entrada" && !action.done && op.pago_confirmado_at) {
+        return { ok: false, status: 409, error: "Hay un pago confirmado sobre esta entrada; desmarcá el pago primero" };
+      }
       const col = action.action === "entrada" ? "entrada_recibida_at" : "pago_confirmado_at";
       op[col] = action.done ? new Date().toISOString() : null;
       break;

@@ -85,17 +85,18 @@ export const ESTADO_LABEL: Record<Estado, string> = {
   esperando: "En espera",
   entrada_recibida: "Entrada recibida",
   pago_confirmado: "Pago confirmado",
-  lista_para_cerrar: "Lista para cerrar",
-  cerrada: "Cerrada",
+  lista_para_cerrar: "Lista para entregar",
+  cerrada: "Entregada",
   cancelada: "Cancelada",
 };
 
-// Etiquetas del link público: "lista para cerrar" es jerga interna; para
-// las partes, con entrada y pago listos la operación está confirmada.
+// Etiquetas del link público, siguiendo la secuencia del proceso: con
+// entrada y pago listos, el administrador está entregando las entradas
+// al comprador; el cierre es la entrega hecha.
 export const ESTADO_LABEL_PUBLICO: Record<Estado, string> = {
   ...ESTADO_LABEL,
-  lista_para_cerrar: "Confirmada",
-  cerrada: "Completada",
+  lista_para_cerrar: "En entrega",
+  cerrada: "Entradas entregadas",
 };
 
 // Colores por estado (NO semáforo). Se usan tanto en talón como en chips.

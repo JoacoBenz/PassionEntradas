@@ -20,8 +20,8 @@ type Filter = "todas" | "en_curso" | "para_cerrar" | "cerradas" | "canceladas";
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "todas", label: "Todas" },
   { key: "en_curso", label: "En curso" },
-  { key: "para_cerrar", label: "Para cerrar" },
-  { key: "cerradas", label: "Cerradas" },
+  { key: "para_cerrar", label: "Para entregar" },
+  { key: "cerradas", label: "Entregadas" },
   { key: "canceladas", label: "Canceladas" },
 ];
 
@@ -170,8 +170,8 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
       <section className="card-shadow mb-5 overflow-hidden rounded-2xl bg-white">
         <div className="grid grid-cols-3 divide-x divide-dashed divide-line">
           <Stat label="En curso" value={stats.enCurso} accent="#B07A14" />
-          <Stat label="Para cerrar" value={stats.paraCerrar} accent="#0D9377" />
-          <Stat label="Cerradas" value={stats.cerradas} accent="#6C5BF2" />
+          <Stat label="Para entregar" value={stats.paraCerrar} accent="#0D9377" />
+          <Stat label="Entregadas" value={stats.cerradas} accent="#6C5BF2" />
         </div>
       </section>
 

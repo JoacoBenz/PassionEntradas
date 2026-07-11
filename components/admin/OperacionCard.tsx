@@ -217,7 +217,8 @@ export default function OperacionCard({
             </div>
           )}
 
-          {/* Hitos independientes: cada uno se marca/desmarca por separado */}
+          {/* Hitos en orden estricto (fiel al proceso): primero se reciben y
+              verifican las entradas; recién ahí se autoriza el pago. */}
           {!readOnly && !cancelada && !cerrada && (
             <div className="mt-4 grid grid-cols-2 gap-2">
               <HitoButton
@@ -225,6 +226,8 @@ export default function OperacionCard({
                 done={entrada}
                 color={HITO_COLOR.entrada}
                 busy={busy}
+                locked={pago}
+                lockedHint="Hay un pago confirmado: desmarcá el pago primero"
                 onClick={() =>
                   onAction?.(
                     op,
@@ -238,6 +241,8 @@ export default function OperacionCard({
                 done={pago}
                 color={HITO_COLOR.pago}
                 busy={busy}
+                locked={!entrada}
+                lockedHint="Primero marcá la entrada recibida: el pago se autoriza después de verificar"
                 onClick={() =>
                   onAction?.(
                     op,
@@ -253,13 +258,13 @@ export default function OperacionCard({
           {!readOnly && estado === "lista_para_cerrar" && (
             <button
               onClick={() =>
-                onAction?.(op, { action: "cerrar", done: true }, "Operación cerrada")
+                onAction?.(op, { action: "cerrar", done: true }, "Entrega registrada — operación cerrada")
               }
               disabled={busy}
               className="mt-2 w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-60"
               style={{ backgroundColor: HITO_COLOR.listo }}
             >
-              ✓ Cerrar operación
+              ✓ Entradas entregadas — cerrar
             </button>
           )}
 
@@ -358,20 +363,24 @@ function HitoButton({
   done,
   color,
   busy,
+  locked,
+  lockedHint,
   onClick,
 }: {
   label: string;
   done: boolean;
   color: string;
   busy: boolean;
+  locked?: boolean;
+  lockedHint?: string;
   onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
-      disabled={busy}
+      disabled={busy || locked}
       aria-pressed={done}
-      title={done ? "Tocá para desmarcar" : undefined}
+      title={locked ? lockedHint : done ? "Tocá para desmarcar" : undefined}
       className="flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-2.5 text-xs font-semibold transition-colors disabled:opacity-60"
       style={
         done
