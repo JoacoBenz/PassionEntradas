@@ -1,4 +1,4 @@
-// Dominio del catálogo de entradas (ex PassionEntradas / TickerMirror).
+// Dominio del catálogo de entradas (ex PassionEntradas / TicketMirror).
 // Tipos de la tabla `tickets`, agrupado por evento, precios multi-moneda
 // y links de WhatsApp con mensaje pre-armado.
 

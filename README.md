@@ -1,9 +1,9 @@
-# Passion Unified — TickerMirror + AdminTickets
+# Passion Unified — TicketMirror + AdminTickets
 
 Proyecto unificado que junta los dos sistemas del cliente en una sola app
 Next.js con un solo proyecto de Supabase:
 
-1. **Tienda pública (TickerMirror)** — catálogo de entradas con stock y precios
+1. **Tienda pública (TicketMirror)** — catálogo de entradas con stock y precios
    reales, venta por WhatsApp. Antes vivía en `PassionEntradas/web` (Vite).
 2. **CRM de custodia (AdminTickets)** — operaciones de compra-venta con
    intermediario, link público de seguimiento por operación. Antes era el

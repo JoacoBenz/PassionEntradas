@@ -182,16 +182,6 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
               </div>
             )}
 
-            <div className="rounded-xl bg-canvas px-4 py-3">
-              <p className="flex items-center gap-2 text-sm text-[#4A4E5E]">
-                <span className="relative flex h-2 w-2" aria-hidden>
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-60" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-brand" />
-                </span>
-                Esta página se actualiza sola. No hace falta que preguntes.
-              </p>
-            </div>
-
             <p className="text-center text-xs text-muted">
               Última actualización: {actualizado}
             </p>

@@ -1,6 +1,6 @@
 "use client";
 
-// Tienda pública (TickerMirror) portada del front Vite de PassionEntradas.
+// Tienda pública (TicketMirror) portada del front Vite de PassionEntradas.
 // Un solo componente cliente con las dos vistas (home y catálogo); la data
 // llega ya cargada desde el server component.
 
@@ -55,7 +55,7 @@ function CurrencyTabs({ cur, onChange }: { cur: Currency; onChange: (c: Currency
 function Wordmark() {
   return (
     <Link className="wm" href="/">
-      <span className="ticketmark">▚</span> TICKER<em>MIRROR</em>
+      <span className="ticketmark">▚</span> TICKET<em>MIRROR</em>
     </Link>
   );
 }
@@ -86,7 +86,7 @@ function WaFloat() {
 function Foot() {
   return (
     <footer className="foot">
-      <span>TickerMirror</span>
+      <span>TicketMirror</span>
       <span>
         Stock y precios sincronizados desde la fuente ·{" "}
         <Link href="/admin/login">Acceso equipo</Link>
@@ -152,7 +152,7 @@ function TicketCard({ ev, i, cur }: { ev: EventoAgrupado; i: number; cur: Curren
 
   async function share() {
     const url = location.origin + "/buscar";
-    const data = { title: "TickerMirror", text: `Mirá las entradas para ${title} en TickerMirror`, url };
+    const data = { title: "TicketMirror", text: `Mirá las entradas para ${title} en TicketMirror`, url };
     try {
       if (navigator.share) await navigator.share(data);
       else {
@@ -407,7 +407,7 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
       <section className="block">
         <div className="section-h">
           <span className="sh-eyebrow">Confianza</span>
-          <h2>Por qué TickerMirror</h2>
+          <h2>Por qué TicketMirror</h2>
         </div>
         <div className="cards3">
           {PORQUE.map(([t, d]) => (
