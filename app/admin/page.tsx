@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AppHeader from "@/components/AppHeader";
@@ -44,7 +44,10 @@ export default async function AdminPage() {
     }
     email = user.email;
 
-    const { data } = await supabase
+    // Lectura con service role: la tabla quedó en RLS deny-all (sin policy
+    // de select para authenticated), así que la sesión del usuario no ve
+    // filas. El rol ya fue validado arriba.
+    const { data } = await createAdminSupabase()
       .from("operaciones")
       .select("*")
       .order("created_at", { ascending: false });

@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import ModeradorDashboard from "@/components/moderador/ModeradorDashboard";
 import AppHeader from "@/components/AppHeader";
@@ -47,7 +47,9 @@ export default async function ModeradorPage({
     esAdmin = getRol(user) === "administrador";
 
     // Últimas operaciones cargadas, para referencia y para copiar links.
-    const { data } = await supabase
+    // Con service role: la tabla está en RLS deny-all y la sesión del
+    // usuario no ve filas (la sesión solo se usa para validar quién es).
+    const { data } = await createAdminSupabase()
       .from("operaciones")
       .select("*")
       .order("created_at", { ascending: false })
