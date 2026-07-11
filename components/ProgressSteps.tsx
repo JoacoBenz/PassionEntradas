@@ -14,7 +14,7 @@ export default function ProgressSteps({ entrada, pago, cerrada, cancelada = fals
   const items = [
     { label: "Entrada", done: entrada && !cancelada, color: HITO_COLOR.entrada },
     { label: "Pago", done: pago && !cancelada, color: HITO_COLOR.pago },
-    { label: "Listo", done: cerrada && !cancelada, color: HITO_COLOR.listo },
+    { label: "Entrega", done: cerrada && !cancelada, color: HITO_COLOR.listo },
   ];
 
   return (

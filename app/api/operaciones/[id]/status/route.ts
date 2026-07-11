@@ -102,6 +102,21 @@ export async function PATCH(
           { status: 409 }
         );
       }
+      // Secuencia del proceso: el pago se autoriza recién después de
+      // verificar las entradas; y la entrada no se desmarca con un pago
+      // confirmado encima (romperia el orden).
+      if (action.action === "pago" && action.done && !current.entrada_recibida_at) {
+        return NextResponse.json(
+          { error: "Primero marcá la entrada recibida: el pago se autoriza después de verificar las entradas" },
+          { status: 409 }
+        );
+      }
+      if (action.action === "entrada" && !action.done && current.pago_confirmado_at) {
+        return NextResponse.json(
+          { error: "Hay un pago confirmado sobre esta entrada; desmarcá el pago primero" },
+          { status: 409 }
+        );
+      }
       const col =
         action.action === "entrada" ? "entrada_recibida_at" : "pago_confirmado_at";
       patch = { [col]: action.done ? new Date().toISOString() : null };

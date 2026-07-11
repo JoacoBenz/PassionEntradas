@@ -47,6 +47,20 @@ function Microtext({ dark = false }: { dark?: boolean }) {
 export default function StatusStub({ op }: { op: OperacionPublica }) {
   const estado = estadoDe(op);
   const color = ESTADO_COLOR[estado];
+  // Aviso según la etapa del proceso: la página le dice a cada parte qué
+  // puede hacer ahora, igual que lo haría el administrador en el grupo.
+  const aviso =
+    estado === "entrada_recibida"
+      ? {
+          icon: "✅",
+          text: "Entradas verificadas y en custodia del administrador. El comprador ya puede realizar el pago al vendedor.",
+        }
+      : estado === "lista_para_cerrar"
+        ? {
+            icon: "💸",
+            text: "El vendedor confirmó el pago. El administrador está transfiriendo las entradas al comprador.",
+          }
+        : null;
   // Hora de Argentina explícita: esto se renderiza en el server (UTC en
   // Vercel) y sin timeZone mostraría la hora corrida 3 horas.
   const actualizado = new Date(op.updated_at).toLocaleString("es-AR", {
@@ -118,7 +132,7 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
         {/* Cuerpo blanco */}
         <div className="punch-b bg-white">
           <div className="space-y-6 px-6 py-7">
-            {/* Los dos hitos, visibles a la vez: son independientes */}
+            {/* Los tres pasos del proceso: entrada → pago → entrega */}
             <ProgressSteps
               entrada={!!op.entrada_recibida_at}
               pago={!!op.pago_confirmado_at}
@@ -152,6 +166,21 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
                 </div>
               )}
             </dl>
+
+            {aviso && (
+              <div
+                className="rounded-xl border px-4 py-3"
+                style={{
+                  borderColor: `${color}44`,
+                  backgroundColor: `${color}0f`,
+                }}
+              >
+                <p className="flex gap-2 text-sm font-medium text-ink">
+                  <span aria-hidden>{aviso.icon}</span>
+                  <span>{aviso.text}</span>
+                </p>
+              </div>
+            )}
 
             <div className="rounded-xl bg-canvas px-4 py-3">
               <p className="flex items-center gap-2 text-sm text-[#4A4E5E]">
