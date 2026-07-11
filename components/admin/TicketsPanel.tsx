@@ -114,11 +114,13 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
         </div>
       </section>
 
-      <div className="grid gap-6 md:grid-cols-[minmax(0,340px)_1fr]">
+      {/* minmax(0,1fr) también en móvil: sin eso, el form impone su ancho
+          mínimo intrínseco (inputs con size por defecto) y desborda. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[minmax(0,340px)_1fr]">
         {/* Formulario de carga manual */}
         <form
           onSubmit={onSubmit}
-          className="card-shadow overflow-hidden rounded-2xl md:sticky md:top-6 md:self-start"
+          className="card-shadow min-w-0 overflow-hidden rounded-2xl md:sticky md:top-6 md:self-start"
         >
           <div className="surface-ink punch-b px-5 py-4 text-white">
             <p className="text-[10px] font-medium uppercase tracking-[0.25em] text-white/50">

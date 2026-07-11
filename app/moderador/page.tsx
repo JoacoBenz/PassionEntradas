@@ -60,7 +60,7 @@ export default async function ModeradorPage({
 
   return (
     // El moderador puro tiene una sola sección: sin navegación ni padding.
-    <main className={`min-h-svh ${esAdmin ? "pb-24 md:pb-10" : ""}`}>
+    <main className={`min-h-svh ${esAdmin ? "pb-16 md:pb-10" : ""}`}>
       <AppHeader subtitle="Carga de operaciones" email={email} nav={esAdmin} />
       <ModeradorDashboard
         initial={ops}
