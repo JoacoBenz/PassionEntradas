@@ -261,3 +261,14 @@ input[type="date"] {
 input[type="date"]::-webkit-date-and-time-value {
   text-align: left;
 }
+
+/* Elementos fixed en iOS Safari: se les da capa de composición propia.
+   Sin esto, Safari re-rasteriza la barra durante el scroll (sobre todo al
+   colapsar su toolbar o con el rebote) y se ve parpadeo/jitter. Va junto
+   con un fondo SÓLIDO: los gradientes complejos en fixed son los que más
+   glitchean. */
+.nav-fixed {
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}

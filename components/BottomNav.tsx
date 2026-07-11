@@ -14,7 +14,10 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Secciones"
-      className="surface-ink fixed inset-x-0 bottom-0 z-40 border-t border-white/10 pb-[env(safe-area-inset-bottom)] md:hidden"
+      // bg-ink sólido (no surface-ink): los gradientes complejos en un
+      // elemento fixed parpadean al scrollear en iOS Safari. nav-fixed le
+      // da capa de composición propia.
+      className="nav-fixed fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-ink pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       <div className="mx-auto flex w-full max-w-5xl items-stretch gap-1 px-3 py-1.5">
         {NAV_ITEMS.map((item) => {
