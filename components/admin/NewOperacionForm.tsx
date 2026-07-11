@@ -150,31 +150,33 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
             </div>
           </div>
 
-          <div>
-            <label htmlFor="cuenta_debitar" className={labelCls}>
-              Cuenta a debitar
-            </label>
-            <input
-              id="cuenta_debitar"
-              className={`${inputCls} font-mono`}
-              value={form.cuenta_debitar}
-              onChange={(e) => set("cuenta_debitar", e.target.value)}
-              placeholder="alias.mp / CBU"
-              maxLength={200}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="fecha_evento" className={labelCls}>
-              Fecha del evento (opcional)
-            </label>
-            <input
-              id="fecha_evento"
-              type="date"
-              className={inputCls}
-              value={form.fecha_evento}
-              onChange={(e) => set("fecha_evento", e.target.value)}
-            />
+          {/* En desktop comparten fila: menos tira vertical. */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div>
+              <label htmlFor="cuenta_debitar" className={labelCls}>
+                Cuenta a debitar
+              </label>
+              <input
+                id="cuenta_debitar"
+                className={`${inputCls} font-mono`}
+                value={form.cuenta_debitar}
+                onChange={(e) => set("cuenta_debitar", e.target.value)}
+                placeholder="alias.mp / CBU"
+                maxLength={200}
+              />
+            </div>
+            <div>
+              <label htmlFor="fecha_evento" className={labelCls}>
+                Fecha del evento
+              </label>
+              <input
+                id="fecha_evento"
+                type="date"
+                className={inputCls}
+                value={form.fecha_evento}
+                onChange={(e) => set("fecha_evento", e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

@@ -116,7 +116,7 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
 
       {/* minmax(0,1fr) también en móvil: sin eso, el form impone su ancho
           mínimo intrínseco (inputs con size por defecto) y desborda. */}
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[minmax(0,340px)_1fr]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[minmax(0,380px)_1fr]">
         {/* Formulario de carga manual */}
         <form
           onSubmit={onSubmit}
@@ -142,14 +142,26 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
                   placeholder="River vs Boca — Superclásico"
                 />
               </div>
-              <div>
-                <label className={labelCls}>Categoría / competición</label>
-                <input
-                  className={inputCls}
-                  value={form.competicion}
-                  onChange={(e) => set("competicion", e.target.value)}
-                  placeholder="Primera División"
-                />
+              {/* En desktop comparten fila: menos tira vertical. */}
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className={labelCls}>Categoría / competición</label>
+                  <input
+                    className={inputCls}
+                    value={form.competicion}
+                    onChange={(e) => set("competicion", e.target.value)}
+                    placeholder="Primera División"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Lugar / sede</label>
+                  <input
+                    className={inputCls}
+                    value={form.ciudad}
+                    onChange={(e) => set("ciudad", e.target.value)}
+                    placeholder="Estadio Monumental, BA"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -171,15 +183,7 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
                   />
                 </div>
               </div>
-              <div>
-                <label className={labelCls}>Lugar / sede</label>
-                <input
-                  className={inputCls}
-                  value={form.ciudad}
-                  onChange={(e) => set("ciudad", e.target.value)}
-                  placeholder="Estadio Monumental, Buenos Aires (ARG)"
-                />
-              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Precio (EUR)</label>

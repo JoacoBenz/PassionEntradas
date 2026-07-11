@@ -30,7 +30,7 @@ export default function ModeradorDashboard({ initial, baseUrl, prefill }: Props)
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[minmax(0,340px)_1fr]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[minmax(0,380px)_1fr]">
         {/* Columna izquierda: carga */}
         <div className="min-w-0 md:sticky md:top-6 md:self-start">
           <NewOperacionForm
