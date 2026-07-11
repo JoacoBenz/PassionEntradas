@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { generateCode } from "@/lib/operaciones";
+import { getRol, esStaff } from "@/lib/auth";
 import { isMock, mockCreateOp } from "@/lib/mock-db";
 
 // POST /api/operaciones — crea una operación.
-// Requiere admin logueado. La escritura va con service role.
+// Solo staff (admin/moderador): los usuarios de la comunidad compran y venden
+// únicamente vía solicitudes, que media el administrador.
 export async function POST(request: Request) {
   if (!isMock()) {
     const supabase = createServerSupabase();
@@ -14,6 +16,12 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+    if (!esStaff(getRol(user))) {
+      return NextResponse.json(
+        { error: "Solo el equipo puede crear operaciones" },
+        { status: 403 }
+      );
     }
   }
 

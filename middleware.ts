@@ -9,9 +9,16 @@ import { getRol } from "@/lib/auth";
 export async function middleware(request: NextRequest) {
   // Modo demo sin Supabase: todo el mundo es admin, el login se saltea.
   if (process.env.MOCK_DATA === "1") {
-    if (request.nextUrl.pathname === "/admin/login") {
+    const p = request.nextUrl.pathname;
+    if (p === "/admin/login") {
       const url = request.nextUrl.clone();
       url.pathname = "/admin";
+      return NextResponse.redirect(url);
+    }
+    // En demo no hay Auth real: registro/login van directo al feed.
+    if (p === "/ingresar" || p === "/registro") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/feed";
       return NextResponse.redirect(url);
     }
     return NextResponse.next();
@@ -47,8 +54,12 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isLogin = path === "/admin/login";
-  const needsAuth = path.startsWith("/admin") || path.startsWith("/moderador");
+  const isLogin =
+    path === "/admin/login" || path === "/ingresar" || path === "/registro";
+  const needsAuth =
+    path.startsWith("/admin") ||
+    path.startsWith("/moderador") ||
+    path.startsWith("/feed");
 
   function redirectTo(pathname: string) {
     const url = request.nextUrl.clone();
@@ -56,22 +67,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Sin sesión en una ruta protegida (que no sea el login) -> al login.
+  // Sin sesión en una ruta protegida (que no sea un login) -> al login que toca.
   if (!user && needsAuth && !isLogin) {
-    return redirectTo("/admin/login");
+    return redirectTo(path.startsWith("/feed") ? "/ingresar" : "/admin/login");
   }
 
   if (user) {
     const rol = getRol(user);
+    const home =
+      rol === "administrador" ? "/admin" : rol === "moderador" ? "/moderador" : "/feed";
 
-    // Ya logueado y entrando al login -> a su módulo.
+    // Ya logueado y entrando a un login o al registro -> a su módulo.
     if (isLogin) {
-      return redirectTo(rol === "moderador" ? "/moderador" : "/admin");
+      return redirectTo(home);
     }
 
-    // Moderador intentando entrar al panel de administración -> a su módulo.
+    // Cada rol en su módulo: el staff no pierde nada (también puede ver el
+    // feed), pero un usuario común jamás entra al panel ni a la carga.
     if (rol === "moderador" && path.startsWith("/admin")) {
       return redirectTo("/moderador");
+    }
+    if (rol === "usuario" && (path.startsWith("/admin") || path.startsWith("/moderador"))) {
+      return redirectTo("/feed");
     }
   }
 
@@ -79,5 +96,11 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/moderador/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/moderador/:path*",
+    "/feed/:path*",
+    "/ingresar",
+    "/registro",
+  ],
 };
