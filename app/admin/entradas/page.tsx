@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import AppHeader from "@/components/AppHeader";
+import BottomNav from "@/components/BottomNav";
 import TicketsPanel from "@/components/admin/TicketsPanel";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import { isMock, MOCK_USER, mockListManual, mockPortalCount, mockSyncRuns } from "@/lib/mock-db";
@@ -55,16 +56,14 @@ export default async function AdminEntradasPage() {
   }
 
   return (
-    <main className="min-h-dvh">
+    <main className="min-h-dvh pb-24">
       <AppHeader
         subtitle="Entradas de la tienda"
         email={email}
-        actions={[
-          { href: "/admin", label: "Operaciones" },
-          { href: "/", label: "Ver tienda" },
-        ]}
+        action={{ href: "/", label: "Ver tienda ↗" }}
       />
       <TicketsPanel initial={manual} syncRuns={syncRuns} portalCount={portalCount} />
+      <BottomNav />
     </main>
   );
 }

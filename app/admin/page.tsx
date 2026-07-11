@@ -5,6 +5,7 @@ import { getRol } from "@/lib/auth";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AppHeader from "@/components/AppHeader";
 import AutoRefresh from "@/components/AutoRefresh";
+import BottomNav from "@/components/BottomNav";
 import type { Operacion } from "@/lib/operaciones";
 import { isMock, MOCK_USER, mockListOps } from "@/lib/mock-db";
 
@@ -55,19 +56,14 @@ export default async function AdminPage() {
   }
 
   return (
-    <main className="min-h-dvh">
-      <AppHeader
-        subtitle="Administración"
-        email={email}
-        actions={[
-          { href: "/moderador", label: "＋ Cargar operación" },
-          { href: "/admin/entradas", label: "Entradas" },
-        ]}
-      />
+    // pb-24: aire para que la BottomNav fija no tape la última card.
+    <main className="min-h-dvh pb-24">
+      <AppHeader subtitle="Administración" email={email} />
       {/* Lista viva: refresca el server component en intervalo; el dashboard
           sincroniza su estado local cuando cambia `initial`. */}
       <AutoRefresh intervalMs={15000} />
       <AdminDashboard initial={ops} baseUrl={getBaseUrl()} />
+      <BottomNav />
     </main>
   );
 }
