@@ -45,7 +45,7 @@ export default function AppHeader({ subtitle, email, nav = false, action }: Prop
           {action && (
             <Link
               href={action.href}
-              className="whitespace-nowrap text-xs font-medium text-white/60 underline-offset-2 transition-colors hover:text-white hover:underline"
+              className="whitespace-nowrap rounded-lg border border-white/25 px-3 py-1.5 text-xs font-medium text-white/85 transition-colors hover:bg-white/10"
             >
               {action.label}
             </Link>

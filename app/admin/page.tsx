@@ -57,7 +57,7 @@ export default async function AdminPage() {
 
   return (
     // pb-24 solo en móvil: aire para que la BottomNav no tape la última card.
-    <main className="min-h-svh pb-24 md:pb-10">
+    <main className="min-h-svh pb-16 md:pb-10">
       <AppHeader subtitle="Administración" email={email} nav />
       {/* Lista viva: refresca el server component en intervalo; el dashboard
           sincroniza su estado local cuando cambia `initial`. */}
