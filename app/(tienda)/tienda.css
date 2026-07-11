@@ -1,4 +1,4 @@
-﻿/* Estilos de la tienda pública (TickerMirror), portados desde PassionEntradas.
+﻿/* Estilos de la tienda pública (TicketMirror), portados desde PassionEntradas.
    Los globales quedan scopeados bajo .tienda para no pisar el panel (Tailwind). */
 .tienda {
   --paper: #e7e6df;      /* concreto de estadio */
