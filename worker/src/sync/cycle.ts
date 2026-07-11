@@ -7,6 +7,7 @@ import { RawTicketSchema } from "../portal/types.js";
 import type { TicketRepository } from "../db/repository.js";
 import type { SyncSummary, TicketRow } from "../types.js";
 import { decidePublish } from "./partial-guard.js";
+import { isPastEvent } from "./past-filter.js";
 
 export interface CycleDeps {
   cfg: Config;
@@ -46,10 +47,17 @@ export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
   const opts = pricingOptions(cfg);
   const rows: TicketRow[] = [];
   let discarded = 0;
+  let pastFiltered = 0;
   for (const item of raw) {
     const parsed = RawTicketSchema.safeParse(item);
     if (!parsed.success) {
       discarded++;
+      continue;
+    }
+    // Eventos ya pasados: fuera del catálogo (los que estaban en la DB
+    // quedan disponible=false vía "marcar ausentes" al fin del ciclo).
+    if (isPastEvent(parsed.data.fecha, startMs)) {
+      pastFiltered++;
       continue;
     }
     try {
@@ -64,6 +72,10 @@ export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
       discarded++;
       log.warn({ err, id: item.id }, "ticket descartado en pricing");
     }
+  }
+
+  if (pastFiltered > 0) {
+    log.info({ pastFiltered }, "eventos pasados filtrados del catálogo");
   }
 
   // 3. Guard anti-borrado: baseline = ítems válidos del último sync exitoso.
