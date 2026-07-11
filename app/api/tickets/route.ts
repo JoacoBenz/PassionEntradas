@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
@@ -70,5 +71,11 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  // La tienda pública es ISR (revalidate 60): sin esto, la entrada nueva
+  // tarda hasta un minuto en aparecer en la home y la búsqueda.
+  revalidatePath("/");
+  revalidatePath("/buscar");
+
   return NextResponse.json({ ok: true, row: data }, { status: 201 });
 }

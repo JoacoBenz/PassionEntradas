@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import { isMock, mockDeleteManual } from "@/lib/mock-db";
@@ -37,5 +38,11 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  // La tienda pública es ISR (revalidate 60): sin esto, la entrada borrada
+  // sigue apareciendo hasta un minuto en la home y la búsqueda.
+  revalidatePath("/");
+  revalidatePath("/buscar");
+
   return NextResponse.json({ ok: true });
 }
