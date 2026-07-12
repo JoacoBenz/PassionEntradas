@@ -156,9 +156,11 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
                   placeholder="River vs Boca — Superclásico"
                 />
               </div>
-              {/* En desktop comparten fila: menos tira vertical. */}
+              {/* En desktop comparten fila. flex-col + justify-between: si un
+                  label envuelve a dos líneas, los inputs quedan igual anclados
+                  abajo y alineados entre sí. */}
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div>
+                <div className="flex flex-col justify-between">
                   <label className={labelCls}>Categoría / competición</label>
                   <input
                     className={inputCls}
@@ -167,7 +169,7 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
                     placeholder="Primera División"
                   />
                 </div>
-                <div>
+                <div className="flex flex-col justify-between">
                   <label className={labelCls}>Lugar / sede</label>
                   <input
                     className={inputCls}
