@@ -35,21 +35,21 @@ export class TicketRepository {
   }
 
   /**
-   * Reglas de margen del panel (por categoría; categoria=null es el general).
+   * Reglas de margen del panel (por evento/competición; null es el general).
    * Si la tabla no existe o falla la lectura, devuelve [] y el ciclo cae al
    * PRICE_MARKUP de config: nunca frena el sync por esto.
    */
-  async fetchMargenes(): Promise<{ categoria: string | null; porcentaje: number }[]> {
+  async fetchMargenes(): Promise<{ competicion: string | null; porcentaje: number }[]> {
     const { data, error } = await this.db
       .from(MARGENES_TABLE)
-      .select("categoria, porcentaje")
+      .select("competicion, porcentaje")
       .eq("source", "portal");
     if (error) {
       this.log.warn({ error: error.message }, "no se pudieron leer los márgenes; uso el de config");
       return [];
     }
     return (data ?? []).map((m) => ({
-      categoria: m.categoria as string | null,
+      competicion: m.competicion as string | null,
       porcentaje: Number(m.porcentaje),
     }));
   }
