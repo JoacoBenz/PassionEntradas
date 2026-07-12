@@ -5,7 +5,7 @@
 :root {
   --ink: #0c0e16;
   --ink-soft: #171b2b;
-  --canvas: #eff0f5;
+  --canvas: #eceae3;
   --brand: #6c5bf2;
 }
 
@@ -19,7 +19,7 @@ html {
 body {
   background-color: var(--canvas);
   /* Trama de puntos sutil, papel de seguridad */
-  background-image: radial-gradient(rgba(108, 91, 242, 0.08) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(23, 22, 16, 0.05) 1px, transparent 1px);
   background-size: 24px 24px;
   color: #1a1d2b;
   font-family: var(--font-body);
