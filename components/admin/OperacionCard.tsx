@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   ESTADO_COLOR,
+  ESTADO_LABEL,
   HITO_COLOR,
   diasHastaEvento,
   estadoDe,
@@ -20,6 +21,8 @@ type Props = {
   busy?: boolean;
   // readOnly: modo moderador — sin botones de cambio de estado.
   readOnly?: boolean;
+  // Arranca desplegada (ej: recién creada en el módulo de carga).
+  defaultOpen?: boolean;
   onAction?: (op: Operacion, action: StatusAction, okMsg: string) => void;
   onUpdate?: (
     op: Operacion,
@@ -50,14 +53,23 @@ function UrgenciaChip({ dias }: { dias: number }) {
   );
 }
 
-// Card de una operación en el panel, con estética de ticket: lomo de color
-// por estado, dos hitos independientes (entrada / pago) que se marcan y
-// desmarcan por separado, y una franja de acciones separada por troquelado.
+// Fecha corta para la línea colapsada ("18 JUL").
+function fechaCorta(fecha: string): string {
+  const [, m, d] = fecha.split("-");
+  const meses = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+  const mes = meses[Number(m) - 1] ?? "";
+  return `${d} ${mes}`;
+}
+
+// Operación como fila compacta que se expande al tocar (como las entradas
+// de la tienda): colapsada muestra estado, evento, code y monto; desplegada
+// trae los hitos, las notas y las acciones.
 export default function OperacionCard({
   op,
   baseUrl,
   busy = false,
   readOnly = false,
+  defaultOpen = false,
   onAction,
   onUpdate,
   onCopied,
@@ -72,6 +84,7 @@ export default function OperacionCard({
   const dias = diasHastaEvento(op.fecha_evento);
   const enCurso = !cerrada && !cancelada;
 
+  const [open, setOpen] = useState(defaultOpen);
   const [editingNotas, setEditingNotas] = useState(false);
   const [notasDraft, setNotasDraft] = useState(op.notas ?? "");
 
@@ -88,270 +101,275 @@ export default function OperacionCard({
     "rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-[#4A4E5E] transition-colors hover:border-[#C5C9D6] hover:bg-canvas";
 
   return (
-    <article className="card-shadow card-lift relative overflow-hidden rounded-2xl">
-      {/* Cuerpo principal */}
-      <div className="punch-b relative bg-white">
-        {/* Lomo de color según estado */}
+    <article className="card-shadow overflow-hidden rounded-2xl bg-white">
+      {/* Fila colapsada: toda la fila es el toggle */}
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-canvas/40"
+      >
         <span
-          className="absolute inset-y-0 left-0 w-1.5"
+          className="h-2 w-2 shrink-0 rounded-full"
           style={{ backgroundColor: color }}
           aria-hidden
         />
-        <div className="p-4 pl-6">
-          <div className="flex items-start justify-between gap-3">
-            <span className="rounded-md bg-canvas px-2 py-0.5 font-mono text-[11px] tracking-wider text-[#6A6E7E]">
-              {op.code}
-            </span>
-            <StatusChip estado={estado} />
-          </div>
-
-          <h3 className="mt-2 truncate font-display text-lg font-semibold tracking-tight">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-display text-[15px] font-semibold leading-tight tracking-tight">
             {op.evento}
-          </h3>
+          </span>
+          <span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-wider text-muted">
+            {op.code} · {ESTADO_LABEL[estado]}
+            {op.fecha_evento ? ` · ${fechaCorta(op.fecha_evento)}` : ""}
+          </span>
+        </span>
+        <span className="whitespace-nowrap font-display text-sm font-bold tabular-nums">
+          {formatARS(op.monto)}
+        </span>
+        <svg
+          className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
 
-          {(op.fecha_evento || (enCurso && dias != null)) && (
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#6A6E7E]">
-              {op.fecha_evento && <span>📅 {formatFecha(op.fecha_evento)}</span>}
+      {/* Cuerpo desplegado, separado por el troquel punteado de siempre */}
+      {open && (
+        <div className="border-t border-dashed border-[#C5C9D6]">
+          <div className="p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusChip estado={estado} />
               {enCurso && dias != null && dias <= 14 && <UrgenciaChip dias={dias} />}
             </div>
-          )}
 
-          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
-            <span className="font-display text-base font-bold tabular-nums">
-              {formatARS(op.monto)}
-            </span>
-            <span className="text-muted">+ {formatARS(op.fee)} comisión</span>
-          </div>
-
-          {(op.comprador_alias || op.vendedor_alias) && (
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#6A6E7E]">
+            <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#6A6E7E]">
+              {op.fecha_evento && <span>📅 {formatFecha(op.fecha_evento)}</span>}
+              <span>
+                Comisión{" "}
+                <span className="font-semibold text-body">{formatARS(op.fee)}</span>
+              </span>
               {op.comprador_alias && (
                 <span>
-                  Comprador:{" "}
-                  <span className="font-medium">{op.comprador_alias}</span>
+                  Comprador <span className="font-medium text-body">{op.comprador_alias}</span>
                 </span>
               )}
               {op.vendedor_alias && (
                 <span>
-                  Vendedor:{" "}
-                  <span className="font-medium">{op.vendedor_alias}</span>
+                  Vendedor <span className="font-medium text-body">{op.vendedor_alias}</span>
+                </span>
+              )}
+              {op.cuenta_debitar && (
+                <span>
+                  Debita de{" "}
+                  <span className="font-mono font-medium text-body">{op.cuenta_debitar}</span>
                 </span>
               )}
             </div>
-          )}
 
-          {op.cuenta_debitar && (
-            <div className="mt-2 text-xs text-[#6A6E7E]">
-              Debita de:{" "}
-              <span className="font-mono font-medium">{op.cuenta_debitar}</span>
-            </div>
-          )}
-
-          {/* Notas internas (solo panel; nunca van al link público) */}
-          {(op.notas || (!readOnly && onUpdate)) && (
-            <div className="mt-3 rounded-xl bg-canvas px-3 py-2.5 text-xs">
-              {editingNotas ? (
-                <div className="space-y-2">
-                  <textarea
-                    rows={3}
-                    maxLength={2000}
-                    autoFocus
-                    value={notasDraft}
-                    onChange={(e) => setNotasDraft(e.target.value)}
-                    className="w-full resize-y rounded-lg border border-line bg-white px-2.5 py-2 text-xs outline-none focus:border-brand"
-                    placeholder="Notas internas de la operación…"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        onUpdate?.(
-                          op,
-                          { notas: notasDraft.trim() || null },
-                          "Notas guardadas"
-                        );
-                        setEditingNotas(false);
-                      }}
-                      disabled={busy}
-                      className="rounded-lg bg-ink px-3 py-1.5 font-semibold text-white disabled:opacity-60"
-                    >
-                      Guardar notas
-                    </button>
-                    <button
-                      onClick={() => {
-                        setNotasDraft(op.notas ?? "");
-                        setEditingNotas(false);
-                      }}
-                      className="rounded-lg px-3 py-1.5 font-medium text-[#6A6E7E] hover:bg-white"
-                    >
-                      Cancelar
-                    </button>
+            {/* Notas internas (solo panel; nunca van al link público) */}
+            {(op.notas || (!readOnly && onUpdate)) && (
+              <div className="mt-3 rounded-xl bg-canvas px-3 py-2.5 text-xs">
+                {editingNotas ? (
+                  <div className="space-y-2">
+                    <textarea
+                      rows={3}
+                      maxLength={2000}
+                      autoFocus
+                      value={notasDraft}
+                      onChange={(e) => setNotasDraft(e.target.value)}
+                      className="w-full resize-y rounded-lg border border-line bg-white px-2.5 py-2 text-xs outline-none focus:border-brand"
+                      placeholder="Notas internas de la operación…"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          onUpdate?.(
+                            op,
+                            { notas: notasDraft.trim() || null },
+                            "Notas guardadas"
+                          );
+                          setEditingNotas(false);
+                        }}
+                        disabled={busy}
+                        className="rounded-lg bg-ink px-3 py-1.5 font-semibold text-white disabled:opacity-60"
+                      >
+                        Guardar notas
+                      </button>
+                      <button
+                        onClick={() => {
+                          setNotasDraft(op.notas ?? "");
+                          setEditingNotas(false);
+                        }}
+                        className="rounded-lg px-3 py-1.5 font-medium text-[#6A6E7E] hover:bg-white"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="flex items-start justify-between gap-3">
-                  <p className="whitespace-pre-wrap text-[#4A4E5E]">
-                    {op.notas ? (
-                      <>
-                        <span className="mr-1 font-semibold uppercase tracking-wide text-muted">
-                          Nota:
-                        </span>
-                        {op.notas}
-                      </>
-                    ) : (
-                      <span className="text-muted">Sin notas internas.</span>
+                ) : (
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="whitespace-pre-wrap text-[#4A4E5E]">
+                      {op.notas ? (
+                        <>
+                          <span className="mr-1 font-semibold uppercase tracking-wide text-muted">
+                            Nota:
+                          </span>
+                          {op.notas}
+                        </>
+                      ) : (
+                        <span className="text-muted">Sin notas internas.</span>
+                      )}
+                    </p>
+                    {!readOnly && onUpdate && (
+                      <button
+                        onClick={() => {
+                          setNotasDraft(op.notas ?? "");
+                          setEditingNotas(true);
+                        }}
+                        className="shrink-0 rounded-lg border border-line bg-white px-2.5 py-1 font-medium text-[#4A4E5E] transition-colors hover:bg-white/60"
+                      >
+                        {op.notas ? "Editar" : "Agregar nota"}
+                      </button>
                     )}
-                  </p>
-                  {!readOnly && onUpdate && (
-                    <button
-                      onClick={() => {
-                        setNotasDraft(op.notas ?? "");
-                        setEditingNotas(true);
-                      }}
-                      className="shrink-0 rounded-lg border border-line bg-white px-2.5 py-1 font-medium text-[#4A4E5E] transition-colors hover:bg-white/60"
-                    >
-                      {op.notas ? "Editar" : "Agregar nota"}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Hitos en orden estricto (fiel al proceso): primero se reciben y
-              verifican las entradas; recién ahí se autoriza el pago. */}
-          {!readOnly && !cancelada && !cerrada && (
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <HitoButton
-                label="Entrada recibida"
-                done={entrada}
-                color={HITO_COLOR.entrada}
-                busy={busy}
-                locked={pago}
-                lockedHint="Hay un pago confirmado: desmarcá el pago primero"
-                onClick={() =>
-                  onAction?.(
-                    op,
-                    { action: "entrada", done: !entrada },
-                    !entrada ? "Entrada marcada como recibida" : "Entrada desmarcada"
-                  )
-                }
-              />
-              <HitoButton
-                label="Pago confirmado"
-                done={pago}
-                color={HITO_COLOR.pago}
-                busy={busy}
-                locked={!entrada}
-                lockedHint="Primero marcá la entrada recibida: el pago se autoriza después de verificar"
-                onClick={() =>
-                  onAction?.(
-                    op,
-                    { action: "pago", done: !pago },
-                    !pago ? "Pago marcado como confirmado" : "Pago desmarcado"
-                  )
-                }
-              />
-            </div>
-          )}
-
-          {/* Tercer paso accionable: con entrada y pago listos, se cierra */}
-          {!readOnly && estado === "lista_para_cerrar" && (
-            <button
-              onClick={() =>
-                onAction?.(op, { action: "cerrar", done: true }, "Entrega registrada — operación cerrada")
-              }
-              disabled={busy}
-              className="mt-2 w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-60"
-              style={{ backgroundColor: HITO_COLOR.listo }}
-            >
-              ✓ Entradas entregadas — cerrar
-            </button>
-          )}
-
-          {/* Cerrada: resumen con opción de reabrir el cierre */}
-          {!readOnly && cerrada && (
-            <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-ink px-4 py-3 text-white">
-              <span className="text-sm font-semibold">
-                ✓ Operación cerrada
-                {op.cerrada_at && (
-                  <span className="ml-2 font-normal text-white/60">
-                    {new Date(op.cerrada_at).toLocaleDateString("es-AR", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      timeZone: "America/Argentina/Buenos_Aires",
-                    })}
-                  </span>
+                  </div>
                 )}
-              </span>
+              </div>
+            )}
+
+            {/* Hitos en orden estricto (fiel al proceso): primero se reciben y
+                verifican las entradas; recién ahí se autoriza el pago. */}
+            {!readOnly && !cancelada && !cerrada && (
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <HitoButton
+                  label="Entrada recibida"
+                  done={entrada}
+                  color={HITO_COLOR.entrada}
+                  busy={busy}
+                  locked={pago}
+                  lockedHint="Hay un pago confirmado: desmarcá el pago primero"
+                  onClick={() =>
+                    onAction?.(
+                      op,
+                      { action: "entrada", done: !entrada },
+                      !entrada ? "Entrada marcada como recibida" : "Entrada desmarcada"
+                    )
+                  }
+                />
+                <HitoButton
+                  label="Pago confirmado"
+                  done={pago}
+                  color={HITO_COLOR.pago}
+                  busy={busy}
+                  locked={!entrada}
+                  lockedHint="Primero marcá la entrada recibida: el pago se autoriza después de verificar"
+                  onClick={() =>
+                    onAction?.(
+                      op,
+                      { action: "pago", done: !pago },
+                      !pago ? "Pago marcado como confirmado" : "Pago desmarcado"
+                    )
+                  }
+                />
+              </div>
+            )}
+
+            {/* Tercer paso accionable: con entrada y pago listos, se cierra */}
+            {!readOnly && estado === "lista_para_cerrar" && (
               <button
                 onClick={() =>
-                  onAction?.(op, { action: "cerrar", done: false }, "Cierre reabierto")
+                  onAction?.(op, { action: "cerrar", done: true }, "Entrega registrada — operación cerrada")
                 }
                 disabled={busy}
-                className="rounded-lg border border-white/25 px-3 py-1.5 text-xs font-medium text-white/85 transition-colors hover:bg-white/10 disabled:opacity-60"
+                className="mt-2 w-full rounded-xl bg-cobalt px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-cobalt-deep disabled:opacity-60"
               >
-                Reabrir
+                ✓ Entradas entregadas — cerrar
               </button>
-            </div>
-          )}
-        </div>
-      </div>
+            )}
 
-      {/* Franja de acciones, separada por troquel real */}
-      <div className="punch-t relative bg-white">
-        <span
-          className="absolute inset-y-0 left-0 w-1.5"
-          style={{ backgroundColor: color }}
-          aria-hidden
-        />
-        <div className="perf-line-light mx-4 ml-6" />
-        <div className="flex flex-wrap gap-2 p-3 pl-6">
-          <a
-            href={link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={secondaryBtn}
-          >
-            Ver
-          </a>
-          <button onClick={() => copy(link, "Link copiado")} className={secondaryBtn}>
-            Copiar link
-          </button>
-          <button
-            onClick={() =>
-              copy(whatsappMessage(op.evento, link), "Mensaje de WhatsApp copiado")
-            }
-            className={secondaryBtn}
-          >
-            Copiar WhatsApp
-          </button>
-
-          {!readOnly &&
-            (cancelada ? (
-              <button
-                onClick={() =>
-                  onAction?.(op, { action: "reabrir" }, "Operación reabierta")
-                }
-                disabled={busy}
-                className="ml-auto rounded-lg border border-brand px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/5 disabled:opacity-60"
-              >
-                Reabrir
-              </button>
-            ) : (
-              !cerrada && (
+            {/* Cerrada: resumen con opción de reabrir el cierre */}
+            {!readOnly && cerrada && (
+              <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-ink px-4 py-3 text-white">
+                <span className="text-sm font-semibold">
+                  ✓ Operación cerrada
+                  {op.cerrada_at && (
+                    <span className="ml-2 font-normal text-white/60">
+                      {new Date(op.cerrada_at).toLocaleDateString("es-AR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        timeZone: "America/Argentina/Buenos_Aires",
+                      })}
+                    </span>
+                  )}
+                </span>
                 <button
                   onClick={() =>
-                    onAction?.(op, { action: "cancelar" }, "Operación cancelada")
+                    onAction?.(op, { action: "cerrar", done: false }, "Cierre reabierto")
                   }
                   disabled={busy}
-                  className="ml-auto rounded-lg border border-estado-cancelada px-3 py-1.5 text-xs font-semibold text-estado-cancelada transition-colors hover:bg-estado-cancelada/5 disabled:opacity-60"
+                  className="rounded-lg border border-white/25 px-3 py-1.5 text-xs font-medium text-white/85 transition-colors hover:bg-white/10 disabled:opacity-60"
                 >
-                  Cancelar
+                  Reabrir
                 </button>
-              )
-            ))}
+              </div>
+            )}
+          </div>
+
+          {/* Acciones, separadas por la línea troquelada */}
+          <div className="perf-line-light mx-4" />
+          <div className="flex flex-wrap gap-2 p-3 px-4">
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={secondaryBtn}
+            >
+              Ver
+            </a>
+            <button onClick={() => copy(link, "Link copiado")} className={secondaryBtn}>
+              Copiar link
+            </button>
+            <button
+              onClick={() =>
+                copy(whatsappMessage(op.evento, link), "Mensaje de WhatsApp copiado")
+              }
+              className={secondaryBtn}
+            >
+              Copiar WhatsApp
+            </button>
+
+            {!readOnly &&
+              (cancelada ? (
+                <button
+                  onClick={() =>
+                    onAction?.(op, { action: "reabrir" }, "Operación reabierta")
+                  }
+                  disabled={busy}
+                  className="ml-auto rounded-lg border border-brand px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/5 disabled:opacity-60"
+                >
+                  Reabrir
+                </button>
+              ) : (
+                !cerrada && (
+                  <button
+                    onClick={() =>
+                      onAction?.(op, { action: "cancelar" }, "Operación cancelada")
+                    }
+                    disabled={busy}
+                    className="ml-auto rounded-lg border border-estado-cancelada px-3 py-1.5 text-xs font-semibold text-estado-cancelada transition-colors hover:bg-estado-cancelada/5 disabled:opacity-60"
+                  >
+                    Cancelar
+                  </button>
+                )
+              ))}
+          </div>
         </div>
-      </div>
+      )}
     </article>
   );
 }

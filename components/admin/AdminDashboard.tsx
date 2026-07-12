@@ -240,7 +240,7 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
         })}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {visible.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[#C5C9D6] bg-white/50 px-4 py-10 text-center text-sm text-muted">
             {ops.length === 0

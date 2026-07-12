@@ -21,7 +21,7 @@ export default function TopNav() {
             aria-current={isActive ? "page" : undefined}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
               isActive
-                ? "bg-brand text-white"
+                ? "bg-cobalt text-white"
                 : "text-white/50 hover:bg-white/10 hover:text-white/85"
             }`}
           >
