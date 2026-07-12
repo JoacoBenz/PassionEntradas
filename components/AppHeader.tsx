@@ -23,14 +23,18 @@ export default function AppHeader({ subtitle, email, nav = false, action }: Prop
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2.5 md:gap-6">
           <div className="flex items-center gap-2.5">
+            {/* Marca TicketMirror (la de la tienda): ▚ flare + MIRROR en cobalto
+                aclarado para que contraste sobre la tinta del header. */}
             <span
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand font-display text-sm font-bold"
+              className="shrink-0 text-base text-[#FF3B2E] [letter-spacing:-0.2em]"
               aria-hidden
             >
-              A
+              ▚
             </span>
-            <span className="whitespace-nowrap font-display text-lg font-bold tracking-tight">
-              AdminTickets
+            {/* Misma fuente que el logo de la tienda: Archivo 900, 14px,
+                tracking .14em (el .wm de tienda.css). */}
+            <span className="whitespace-nowrap font-body text-sm font-black uppercase tracking-[0.14em]">
+              Ticket<span className="text-[#7B8CFF]">Mirror</span>
             </span>
             {/* Con tabs en desktop, el subtítulo sobra ahí (la tab activa ya
                 dice dónde estás); se muestra solo en el rango sm–md. */}
