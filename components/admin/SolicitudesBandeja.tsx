@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { estadoDe, ESTADO_LABEL, ESTADO_COLOR, formatARS, formatFecha } from "@/lib/operaciones";
+import { estadoDe, ESTADO_LABEL, ESTADO_COLOR, formatUSD, formatFecha } from "@/lib/operaciones";
 import {
   SOLICITUD_COLOR,
   SOLICITUD_LABEL,
@@ -191,7 +191,7 @@ export default function SolicitudesBandeja({ initial }: Props) {
                         Monto
                       </dt>
                       <dd className="font-display font-bold tabular-nums">
-                        {formatARS(sol.publicacion.precio)}
+                        {formatUSD(sol.publicacion.precio)}
                       </dd>
                     </div>
                   </dl>

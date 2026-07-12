@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { formatARS, formatFecha } from "@/lib/operaciones";
+import { formatUSD, formatFecha } from "@/lib/operaciones";
 import {
   PUBLICACION_COLOR,
   PUBLICACION_LABEL,
@@ -369,7 +369,7 @@ export default function Feed({ alias, staff, mock }: Props) {
 
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                       <p className="font-display text-2xl font-bold tabular-nums tracking-tight">
-                        {formatARS(pub.precio)}
+                        {formatUSD(pub.precio)}
                       </p>
 
                       {esMia ? (
