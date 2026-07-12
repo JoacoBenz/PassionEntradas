@@ -9,11 +9,11 @@ import {
   mockDeleteMargen,
 } from "@/lib/mock-db";
 
-// Márgenes de precio por proveedor + categoría (hoy: portal).
-// GET    -> reglas vigentes + categorías existentes en el catálogo.
-// PUT    -> crea/edita una regla { categoria|null, porcentaje } y recalcula
+// Márgenes de precio por proveedor + evento/competición (hoy: portal).
+// GET    -> reglas vigentes + competiciones existentes en el catálogo.
+// PUT    -> crea/edita una regla { competicion|null, porcentaje } y recalcula
 //           los precios ya publicados.
-// DELETE -> borra una regla por categoría (el margen general no se borra).
+// DELETE -> borra una regla por competición (el margen general no se borra).
 // Solo administrador; escrituras con service role.
 
 async function requireAdmin(): Promise<NextResponse | null> {
@@ -41,7 +41,12 @@ export async function GET() {
   if (isMock()) {
     return NextResponse.json({
       margenes: mockListMargenes(),
-      categorias: ["VIP", "A+", "WC Cat 1 Short", "WC Cat 2"],
+      competiciones: [
+        "World Cup 2026 Canada / Mexico / USA",
+        "Spanish Primera Division",
+        "English Premier League",
+        "Euro 2028",
+      ],
     });
   }
 
@@ -49,22 +54,22 @@ export async function GET() {
   const [margenes, cats] = await Promise.all([
     admin
       .from("margenes")
-      .select("id, source, categoria, porcentaje")
-      .order("categoria", { ascending: true, nullsFirst: true }),
+      .select("id, source, competicion, porcentaje")
+      .order("competicion", { ascending: true, nullsFirst: true }),
     admin
       .from("tickets")
-      .select("categoria")
+      .select("competicion")
       .eq("source", "portal")
-      .not("categoria", "is", null)
-      .order("categoria"),
+      .not("competicion", "is", null)
+      .order("competicion"),
   ]);
   if (margenes.error) {
     return NextResponse.json({ error: margenes.error.message }, { status: 500 });
   }
-  const categorias = Array.from(
-    new Set((cats.data ?? []).map((c) => c.categoria as string))
+  const competiciones = Array.from(
+    new Set((cats.data ?? []).map((c) => c.competicion as string))
   );
-  return NextResponse.json({ margenes: margenes.data, categorias });
+  return NextResponse.json({ margenes: margenes.data, competiciones });
 }
 
 function parsePorcentaje(v: unknown): number | null {
@@ -84,7 +89,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const categoria = body.categoria ? String(body.categoria).trim().slice(0, 200) : null;
+  const competicion = body.competicion ? String(body.competicion).trim().slice(0, 200) : null;
   const porcentaje = parsePorcentaje(body.porcentaje);
   if (porcentaje == null) {
     return NextResponse.json(
@@ -94,23 +99,23 @@ export async function PUT(request: Request) {
   }
 
   if (isMock()) {
-    const margen = mockUpsertMargen(categoria, porcentaje);
+    const margen = mockUpsertMargen(competicion, porcentaje);
     return NextResponse.json({ margen, recalculadas: 370 });
   }
 
   const admin = createAdminSupabase();
   // Upsert manual (la unicidad es por índice de expresión, onConflict no aplica).
   const buscar = admin.from("margenes").select("id").eq("source", "portal");
-  const { data: existente } = await (categoria === null
-    ? buscar.is("categoria", null)
-    : buscar.eq("categoria", categoria)
+  const { data: existente } = await (competicion === null
+    ? buscar.is("competicion", null)
+    : buscar.eq("competicion", competicion)
   ).maybeSingle();
 
   const write = existente
     ? admin.from("margenes").update({ porcentaje }).eq("id", existente.id).select("*").single()
     : admin
         .from("margenes")
-        .insert({ source: "portal", categoria, porcentaje })
+        .insert({ source: "portal", competicion, porcentaje })
         .select("*")
         .single();
   const { data: margen, error } = await write;
@@ -143,8 +148,8 @@ export async function DELETE(request: Request) {
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
-  const categoria = body.categoria ? String(body.categoria).trim() : null;
-  if (categoria === null) {
+  const competicion = body.competicion ? String(body.competicion).trim() : null;
+  if (competicion === null) {
     return NextResponse.json(
       { error: "El margen general no se borra: editá su porcentaje" },
       { status: 409 }
@@ -152,7 +157,7 @@ export async function DELETE(request: Request) {
   }
 
   if (isMock()) {
-    if (!mockDeleteMargen(categoria)) {
+    if (!mockDeleteMargen(competicion)) {
       return NextResponse.json({ error: "Regla no encontrada" }, { status: 404 });
     }
     return NextResponse.json({ ok: true, recalculadas: 370 });
@@ -163,7 +168,7 @@ export async function DELETE(request: Request) {
     .from("margenes")
     .delete()
     .eq("source", "portal")
-    .eq("categoria", categoria);
+    .eq("competicion", competicion);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

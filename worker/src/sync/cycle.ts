@@ -65,7 +65,7 @@ export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
       continue;
     }
     try {
-      const markup = margenPara(reglas, parsed.data.categoria ?? null, cfg.PRICE_MARKUP);
+      const markup = margenPara(reglas, parsed.data.competicion ?? null, cfg.PRICE_MARKUP);
       const { precioFinal, monedaFinal } = priceTicket(parsed.data.precio_origen, {
         ...opts,
         markup,

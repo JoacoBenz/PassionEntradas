@@ -5,17 +5,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 type Margen = {
   id: string;
   source: string;
-  categoria: string | null;
+  competicion: string | null;
   porcentaje: number;
 };
 
 // Márgenes de precio del portal: el % que se le suma al precio de origen.
-// El margen general aplica a toda categoría sin regla propia; al guardar se
-// recalculan los precios ya publicados y el worker usa las reglas en cada
-// corrida.
+// Las reglas van por EVENTO/COMPETICIÓN (ej: el Mundial entero); el margen
+// general cubre lo que no tenga regla. Al guardar se recalculan los precios
+// ya publicados y el worker usa las reglas en cada corrida.
 export default function MargenesPanel() {
   const [margenes, setMargenes] = useState<Margen[]>([]);
-  const [categorias, setCategorias] = useState<string[]>([]);
+  const [competiciones, setCompeticiones] = useState<string[]>([]);
   const [cargando, setCargando] = useState(true);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [nuevaCat, setNuevaCat] = useState("");
@@ -31,7 +31,7 @@ export default function MargenesPanel() {
       .then((data) => {
         if (!vivo) return;
         setMargenes(data.margenes ?? []);
-        setCategorias(data.categorias ?? []);
+        setCompeticiones(data.competiciones ?? []);
       })
       .catch(() => vivo && setAviso({ tipo: "error", msg: "No se pudieron cargar los márgenes" }))
       .finally(() => vivo && setCargando(false));
@@ -45,7 +45,7 @@ export default function MargenesPanel() {
     setTimeout(() => setAviso(null), 4500);
   }
 
-  async function guardar(categoria: string | null, valor: string) {
+  async function guardar(competicion: string | null, valor: string) {
     if (enviando.current) return;
     const pct = Number(valor);
     if (!Number.isFinite(pct) || pct < 0 || pct > 500) {
@@ -58,7 +58,7 @@ export default function MargenesPanel() {
       const res = await fetch("/api/margenes", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoria, porcentaje: pct }),
+        body: JSON.stringify({ competicion, porcentaje: pct }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -66,11 +66,11 @@ export default function MargenesPanel() {
         return;
       }
       setMargenes((prev) => {
-        const sin = prev.filter((m) => m.categoria !== categoria);
+        const sin = prev.filter((m) => m.competicion !== competicion);
         return [...sin, data.margen];
       });
       setDrafts((d) => {
-        const { [keyDe(categoria)]: _, ...resto } = d;
+        const { [keyDe(competicion)]: _, ...resto } = d;
         return resto;
       });
       setNuevaCat("");
@@ -84,7 +84,7 @@ export default function MargenesPanel() {
     }
   }
 
-  async function borrar(categoria: string) {
+  async function borrar(competicion: string) {
     if (enviando.current) return;
     enviando.current = true;
     setBusy(true);
@@ -92,14 +92,14 @@ export default function MargenesPanel() {
       const res = await fetch("/api/margenes", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoria }),
+        body: JSON.stringify({ competicion }),
       });
       const data = await res.json();
       if (!res.ok) {
         avisar("error", data.error ?? "No se pudo borrar");
         return;
       }
-      setMargenes((prev) => prev.filter((m) => m.categoria !== categoria));
+      setMargenes((prev) => prev.filter((m) => m.competicion !== competicion));
       avisar("ok", `Regla borrada — ${data.recalculadas} precios recalculados con el margen general`);
     } catch {
       avisar("error", "Error de red al borrar");
@@ -109,18 +109,18 @@ export default function MargenesPanel() {
     }
   }
 
-  const keyDe = (categoria: string | null) => categoria ?? "__general__";
-  const general = margenes.find((m) => m.categoria === null);
+  const keyDe = (competicion: string | null) => competicion ?? "__general__";
+  const general = margenes.find((m) => m.competicion === null);
   const reglas = useMemo(
     () =>
       margenes
-        .filter((m) => m.categoria !== null)
-        .sort((a, b) => (a.categoria as string).localeCompare(b.categoria as string)),
+        .filter((m) => m.competicion !== null)
+        .sort((a, b) => (a.competicion as string).localeCompare(b.competicion as string)),
     [margenes]
   );
   const sinRegla = useMemo(
-    () => categorias.filter((c) => !margenes.some((m) => m.categoria === c)),
-    [categorias, margenes]
+    () => competiciones.filter((c) => !margenes.some((m) => m.competicion === c)),
+    [competiciones, margenes]
   );
 
   const inputPctCls =
@@ -135,7 +135,7 @@ export default function MargenesPanel() {
           Precios del portal
         </p>
         <h2 className="mt-0.5 font-display text-lg font-bold tracking-tight">
-          Margen por categoría
+          Margen por evento
         </h2>
       </div>
 
@@ -143,9 +143,10 @@ export default function MargenesPanel() {
         <div className="perf-line-light mx-5" />
         <div className="space-y-4 p-5">
           <p className="text-sm text-[#4A4E5E]">
-            El porcentaje que se le suma al precio de origen. Al guardar se
-            recalculan los precios ya publicados y el worker usa estas reglas
-            en cada sincronización.
+            El porcentaje que se le suma al precio de origen, por evento o
+            competición (una regla para el Mundial cubre todos sus partidos).
+            Al guardar se recalculan los precios ya publicados y el worker usa
+            estas reglas en cada sincronización.
           </p>
 
           {aviso && (
@@ -168,7 +169,7 @@ export default function MargenesPanel() {
                 <div>
                   <p className="text-sm font-semibold">Margen general</p>
                   <p className="text-xs text-muted">
-                    Toda categoría sin regla propia
+                    Todo evento sin regla propia
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -194,37 +195,39 @@ export default function MargenesPanel() {
                 </div>
               </div>
 
-              {/* Reglas por categoría */}
+              {/* Reglas por evento/competición */}
               {reglas.map((m) => (
                 <div
                   key={m.id}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3 py-2.5"
                 >
-                  <p className="min-w-0 flex-1 truncate text-sm font-medium">
-                    {m.categoria}
+                  {/* En móvil el nombre del torneo ocupa su línea completa;
+                      los controles bajan. En sm+ comparten fila. */}
+                  <p className="w-full min-w-0 break-words text-sm font-medium sm:w-auto sm:flex-1 sm:truncate">
+                    {m.competicion}
                   </p>
                   <div className="flex items-center gap-2">
                     <input
-                      aria-label={`Porcentaje de ${m.categoria}`}
+                      aria-label={`Porcentaje de ${m.competicion}`}
                       className={inputPctCls}
                       inputMode="decimal"
-                      value={drafts[keyDe(m.categoria)] ?? String(m.porcentaje)}
+                      value={drafts[keyDe(m.competicion)] ?? String(m.porcentaje)}
                       onChange={(e) =>
-                        setDrafts((d) => ({ ...d, [keyDe(m.categoria)]: e.target.value }))
+                        setDrafts((d) => ({ ...d, [keyDe(m.competicion)]: e.target.value }))
                       }
                     />
                     <span className="text-sm text-muted">%</span>
                     <button
                       onClick={() =>
-                        guardar(m.categoria, drafts[keyDe(m.categoria)] ?? String(m.porcentaje))
+                        guardar(m.competicion, drafts[keyDe(m.competicion)] ?? String(m.porcentaje))
                       }
-                      disabled={busy || drafts[keyDe(m.categoria)] === undefined}
+                      disabled={busy || drafts[keyDe(m.competicion)] === undefined}
                       className={btnCls}
                     >
                       Guardar
                     </button>
                     <button
-                      onClick={() => borrar(m.categoria as string)}
+                      onClick={() => borrar(m.competicion as string)}
                       disabled={busy}
                       className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
                     >
@@ -237,12 +240,12 @@ export default function MargenesPanel() {
               {/* Agregar regla */}
               <div className="flex flex-wrap items-center gap-2 border-t border-dashed border-line pt-4">
                 <select
-                  aria-label="Categoría para la nueva regla"
+                  aria-label="Evento para la nueva regla"
                   value={nuevaCat}
                   onChange={(e) => setNuevaCat(e.target.value)}
                   className="min-w-0 flex-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm outline-none focus:border-brand"
                 >
-                  <option value="">Elegir categoría…</option>
+                  <option value="">Elegir evento…</option>
                   {sinRegla.map((c) => (
                     <option key={c} value={c}>
                       {c}

@@ -16,7 +16,7 @@ export const MOCK_USER = {
 export type MockMargen = {
   id: string;
   source: string;
-  categoria: string | null;
+  competicion: string | null;
   porcentaje: number;
 };
 
@@ -112,8 +112,8 @@ function seed(): MockDB {
   ];
 
   const margenes: MockMargen[] = [
-    { id: "m-default", source: "portal", categoria: null, porcentaje: 20 },
-    { id: "m-vip", source: "portal", categoria: "VIP", porcentaje: 35 },
+    { id: "m-default", source: "portal", competicion: null, porcentaje: 20 },
+    { id: "m-mundial", source: "portal", competicion: "World Cup 2026 Canada / Mexico / USA", porcentaje: 35 },
   ];
 
   return { ops, manual, syncRuns, margenes };
@@ -253,25 +253,25 @@ export function mockPortalCount(): number {
 // ---- margenes ---------------------------------------------------------------------
 export function mockListMargenes(): MockMargen[] {
   return [...db().margenes].sort((a, b) =>
-    (a.categoria ?? "").localeCompare(b.categoria ?? "")
+    (a.competicion ?? "").localeCompare(b.competicion ?? "")
   );
 }
 
-export function mockUpsertMargen(categoria: string | null, porcentaje: number): MockMargen {
+export function mockUpsertMargen(competicion: string | null, porcentaje: number): MockMargen {
   const d = db();
-  const existente = d.margenes.find((m) => m.categoria === categoria);
+  const existente = d.margenes.find((m) => m.competicion === competicion);
   if (existente) {
     existente.porcentaje = porcentaje;
     return existente;
   }
-  const nuevo: MockMargen = { id: crypto.randomUUID(), source: "portal", categoria, porcentaje };
+  const nuevo: MockMargen = { id: crypto.randomUUID(), source: "portal", competicion, porcentaje };
   d.margenes.push(nuevo);
   return nuevo;
 }
 
-export function mockDeleteMargen(categoria: string): boolean {
+export function mockDeleteMargen(competicion: string): boolean {
   const d = db();
   const antes = d.margenes.length;
-  d.margenes = d.margenes.filter((m) => m.categoria !== categoria);
+  d.margenes = d.margenes.filter((m) => m.competicion !== competicion);
   return d.margenes.length < antes;
 }
