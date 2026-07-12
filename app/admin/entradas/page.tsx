@@ -4,6 +4,7 @@ import { getRol } from "@/lib/auth";
 import AppHeader from "@/components/AppHeader";
 import BottomNav from "@/components/BottomNav";
 import TicketsPanel from "@/components/admin/TicketsPanel";
+import MargenesPanel from "@/components/admin/MargenesPanel";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import { isMock, MOCK_USER, mockListManual, mockPortalCount, mockSyncRuns } from "@/lib/mock-db";
 
@@ -65,6 +66,9 @@ export default async function AdminEntradasPage() {
         action={{ href: "/", label: "Ver tienda ↗" }}
       />
       <TicketsPanel initial={manual} syncRuns={syncRuns} portalCount={portalCount} />
+      <div className="mx-auto w-full max-w-3xl px-4 pb-6">
+        <MargenesPanel />
+      </div>
       <BottomNav />
     </main>
   );

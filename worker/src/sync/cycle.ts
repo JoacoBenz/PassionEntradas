@@ -8,6 +8,7 @@ import type { TicketRepository } from "../db/repository.js";
 import type { SyncSummary, TicketRow } from "../types.js";
 import { decidePublish } from "./partial-guard.js";
 import { isPastEvent } from "./past-filter.js";
+import { margenPara } from "../pricing/margenes.js";
 
 export interface CycleDeps {
   cfg: Config;
@@ -44,7 +45,10 @@ export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
   const { rows: raw, complete } = await scrapeRawTickets({ cfg, log, session, signal });
 
   // 2. Validar con zod + aplicar markup. Descartar inválidos y contar.
+  // El margen sale de la tabla `margenes` (editable desde el panel), con
+  // PRICE_MARKUP de config como fallback si no hay reglas.
   const opts = pricingOptions(cfg);
+  const reglas = await repo.fetchMargenes();
   const rows: TicketRow[] = [];
   let discarded = 0;
   let pastFiltered = 0;
@@ -61,7 +65,11 @@ export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
       continue;
     }
     try {
-      const { precioFinal, monedaFinal } = priceTicket(parsed.data.precio_origen, opts);
+      const markup = margenPara(reglas, parsed.data.categoria ?? null, cfg.PRICE_MARKUP);
+      const { precioFinal, monedaFinal } = priceTicket(parsed.data.precio_origen, {
+        ...opts,
+        markup,
+      });
       rows.push({
         ...parsed.data,
         precio_final: precioFinal,
