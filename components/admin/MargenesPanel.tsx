@@ -13,6 +13,8 @@ type Margen = {
 // Las reglas van por EVENTO/COMPETICIÓN (ej: el Mundial entero); el margen
 // general cubre lo que no tenga regla. Al guardar se recalculan los precios
 // ya publicados y el worker usa las reglas en cada corrida.
+// También vive acá la cotización EUR->USD: el portal cotiza en euros y la
+// tienda muestra todo en dólares.
 export default function MargenesPanel() {
   const [margenes, setMargenes] = useState<Margen[]>([]);
   const [competiciones, setCompeticiones] = useState<string[]>([]);
@@ -20,20 +22,25 @@ export default function MargenesPanel() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [nuevaCat, setNuevaCat] = useState("");
   const [nuevoPct, setNuevoPct] = useState("");
+  const [eurUsd, setEurUsd] = useState<number | null>(null);
+  const [eurUsdDraft, setEurUsdDraft] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "ok" | "error"; msg: string } | null>(null);
   const enviando = useRef(false);
 
   useEffect(() => {
     let vivo = true;
-    fetch("/api/margenes")
-      .then((r) => r.json())
-      .then((data) => {
+    Promise.all([
+      fetch("/api/margenes").then((r) => r.json()),
+      fetch("/api/cotizacion").then((r) => r.json()),
+    ])
+      .then(([data, cot]) => {
         if (!vivo) return;
         setMargenes(data.margenes ?? []);
         setCompeticiones(data.competiciones ?? []);
+        if (typeof cot.eurUsd === "number") setEurUsd(cot.eurUsd);
       })
-      .catch(() => vivo && setAviso({ tipo: "error", msg: "No se pudieron cargar los márgenes" }))
+      .catch(() => vivo && setAviso({ tipo: "error", msg: "No se pudieron cargar los precios" }))
       .finally(() => vivo && setCargando(false));
     return () => {
       vivo = false;
@@ -109,6 +116,37 @@ export default function MargenesPanel() {
     }
   }
 
+  async function guardarCotizacion() {
+    if (enviando.current) return;
+    const v = Number(eurUsdDraft);
+    if (!Number.isFinite(v) || v < 0.5 || v > 3) {
+      avisar("error", "Cotización inválida: cuántos dólares vale 1 euro (entre 0.5 y 3)");
+      return;
+    }
+    enviando.current = true;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/cotizacion", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eurUsd: v }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        avisar("error", data.error ?? "No se pudo guardar la cotización");
+        return;
+      }
+      setEurUsd(data.eurUsd);
+      setEurUsdDraft(null);
+      avisar("ok", `Cotización guardada: 1 € = ${data.eurUsd} US$`);
+    } catch {
+      avisar("error", "Error de red al guardar");
+    } finally {
+      enviando.current = false;
+      setBusy(false);
+    }
+  }
+
   const keyDe = (competicion: string | null) => competicion ?? "__general__";
   const general = margenes.find((m) => m.competicion === null);
   const reglas = useMemo(
@@ -143,10 +181,11 @@ export default function MargenesPanel() {
         <div className="perf-line-light mx-5" />
         <div className="space-y-4 p-5">
           <p className="text-sm text-[#4A4E5E]">
-            El porcentaje que se le suma al precio de origen, por evento o
-            competición (una regla para el Mundial cubre todos sus partidos).
-            Al guardar se recalculan los precios ya publicados y el worker usa
-            estas reglas en cada sincronización.
+            El portal cotiza en euros y la tienda muestra todo en dólares. Acá
+            se maneja la cotización y el porcentaje que se le suma al precio de
+            origen, por evento o competición (una regla para el Mundial cubre
+            todos sus partidos). Al guardar se recalculan los precios ya
+            publicados y el worker usa estas reglas en cada sincronización.
           </p>
 
           {aviso && (
@@ -164,6 +203,34 @@ export default function MargenesPanel() {
             <p className="py-4 text-center text-sm text-muted">Cargando…</p>
           ) : (
             <>
+              {/* Cotización EUR -> USD */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-canvas px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-semibold">Cotización dólar-euro</p>
+                  <p className="text-xs text-muted">
+                    Cuántos dólares vale 1 euro
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted">1 € =</span>
+                  <input
+                    aria-label="Cotización EUR a USD"
+                    className={inputPctCls}
+                    inputMode="decimal"
+                    value={eurUsdDraft ?? String(eurUsd ?? "")}
+                    onChange={(e) => setEurUsdDraft(e.target.value)}
+                  />
+                  <span className="text-sm text-muted">US$</span>
+                  <button
+                    onClick={guardarCotizacion}
+                    disabled={busy || eurUsdDraft === null}
+                    className={btnCls}
+                  >
+                    Guardar
+                  </button>
+                </div>
+              </div>
+
               {/* Margen general */}
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-canvas px-3 py-2.5">
                 <div>

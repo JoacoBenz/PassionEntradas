@@ -7,7 +7,7 @@ import {
   HITO_COLOR,
   diasHastaEvento,
   estadoDe,
-  formatARS,
+  formatUSD,
   formatFecha,
   whatsappMessage,
   type Operacion,
@@ -123,7 +123,7 @@ export default function OperacionCard({
           </span>
         </span>
         <span className="whitespace-nowrap font-display text-sm font-bold tabular-nums">
-          {formatARS(op.monto)}
+          {formatUSD(op.monto)}
         </span>
         <svg
           className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
@@ -152,7 +152,7 @@ export default function OperacionCard({
               {op.fecha_evento && <span>📅 {formatFecha(op.fecha_evento)}</span>}
               <span>
                 Comisión{" "}
-                <span className="font-semibold text-body">{formatARS(op.fee)}</span>
+                <span className="font-semibold text-body">{formatUSD(op.fee)}</span>
               </span>
               {op.comprador_alias && (
                 <span>
