@@ -31,7 +31,9 @@ export default function AppHeader({ subtitle, email, nav = false, action }: Prop
             >
               ▚
             </span>
-            <span className="whitespace-nowrap font-display text-lg font-black uppercase tracking-[0.08em]">
+            {/* Misma fuente que el logo de la tienda: Archivo 900, 14px,
+                tracking .14em (el .wm de tienda.css). */}
+            <span className="whitespace-nowrap font-body text-sm font-black uppercase tracking-[0.14em]">
               Ticket<span className="text-[#7B8CFF]">Mirror</span>
             </span>
             {/* Con tabs en desktop, el subtítulo sobra ahí (la tab activa ya
