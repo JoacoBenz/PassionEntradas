@@ -35,7 +35,7 @@ export default function BottomNav() {
             >
               <span
                 className={`flex h-6 w-11 items-center justify-center rounded-full transition-colors ${
-                  isActive ? "bg-brand" : "bg-transparent"
+                  isActive ? "bg-cobalt" : "bg-transparent"
                 }`}
               >
                 {item.icon}
