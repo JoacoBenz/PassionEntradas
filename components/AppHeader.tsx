@@ -58,6 +58,17 @@ export default function AppHeader({ subtitle, email, nav = false, action }: Prop
               {email}
             </span>
           )}
+          <Link
+            href="/admin/cuenta"
+            title="Cambiar contraseña"
+            aria-label="Cambiar contraseña"
+            className="rounded-lg border border-white/25 px-2.5 py-1.5 text-white/85 transition-colors hover:bg-white/10"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="7.5" cy="15.5" r="4.5" />
+              <path d="M10.7 12.3 21 2m-4.5 4.5 3 3M13 6l3 3" />
+            </svg>
+          </Link>
           <LogoutButton />
         </div>
       </div>
