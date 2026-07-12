@@ -51,8 +51,9 @@ cp .env.example .env.local   # completar credenciales
 npm run dev
 ```
 
-Variables (`.env.local`): Supabase URL/anon/service-role, `NEXT_PUBLIC_SITE_URL`,
-`NEXT_PUBLIC_WHATSAPP` y las tasas `NEXT_PUBLIC_USD_RATE` / `NEXT_PUBLIC_ARS_RATE`.
+Variables (`.env.local`): Supabase URL/anon/service-role, `NEXT_PUBLIC_SITE_URL`
+y `NEXT_PUBLIC_WHATSAPP`. Los precios de la tienda se muestran en USD; la
+cotización EUR->USD se edita desde el panel (Entradas -> Precios del portal).
 
 Deploy: Vercel (un solo proyecto para tienda + panel).
 

@@ -131,9 +131,10 @@ export async function PUT(request: Request) {
     );
   }
 
-  // La tienda es ISR: sin esto los precios viejos siguen hasta un minuto.
-  revalidatePath("/");
-  revalidatePath("/buscar");
+  // La tienda es ISR: sin esto los precios viejos siguen hasta la revalidación
+  // de fondo. "layout" porque revalidatePath("/") a secas no invalida la
+  // página raíz (quirk de Next 14 con route groups).
+  revalidatePath("/(tienda)", "layout");
 
   return NextResponse.json({ margen, recalculadas });
 }
@@ -179,7 +180,6 @@ export async function DELETE(request: Request) {
       { status: 500 }
     );
   }
-  revalidatePath("/");
-  revalidatePath("/buscar");
+  revalidatePath("/(tienda)", "layout");
   return NextResponse.json({ ok: true, recalculadas });
 }

@@ -158,11 +158,12 @@ export function generateCode(): string {
   return `BX-${body}`;
 }
 
-// Formato de moneda ARS sin decimales.
-export function formatARS(n: number): string {
+// Formato de moneda USD sin decimales ("US$ 1.234"): las operaciones se
+// manejan en dólares.
+export function formatUSD(n: number): string {
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
-    currency: "ARS",
+    currency: "USD",
     maximumFractionDigits: 0,
   }).format(n);
 }

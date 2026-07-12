@@ -1,4 +1,4 @@
-import { formatARS } from "@/lib/operaciones";
+import { formatUSD } from "@/lib/operaciones";
 import type { Metrics } from "@/lib/metrics";
 
 // Tablero del negocio en el módulo de carga: cuánta plata se movió (pagos
@@ -53,7 +53,7 @@ export default function MetricsBoard({ metrics }: { metrics: Metrics }) {
           <Tile
             big
             label="Volumen operado"
-            value={formatARS(metrics.plataMovida)}
+            value={formatUSD(metrics.plataMovida)}
             detail="total con pago confirmado"
             accent="#0D9377"
             className="col-span-2 border-b border-dashed border-line md:col-span-1 md:border-b-0 md:border-r"
@@ -61,7 +61,7 @@ export default function MetricsBoard({ metrics }: { metrics: Metrics }) {
           <Tile
             big
             label="Comisiones acumuladas"
-            value={formatARS(metrics.comisionGanada)}
+            value={formatUSD(metrics.comisionGanada)}
             detail="sobre ventas confirmadas"
             accent="#6C5BF2"
             className="border-r border-dashed border-line"
@@ -79,7 +79,7 @@ export default function MetricsBoard({ metrics }: { metrics: Metrics }) {
         <div className="grid grid-cols-2">
           <Tile
             label="Capital comprometido"
-            value={formatARS(metrics.enJuegoMonto)}
+            value={formatUSD(metrics.enJuegoMonto)}
             detail={`en ${metrics.enJuegoOps} ${
               metrics.enJuegoOps === 1
                 ? "operación en curso sin cobrar"
@@ -90,7 +90,7 @@ export default function MetricsBoard({ metrics }: { metrics: Metrics }) {
           />
           <Tile
             label="Valor promedio"
-            value={formatARS(metrics.ticketPromedio)}
+            value={formatUSD(metrics.ticketPromedio)}
             detail="por operación concretada"
             accent="#5F6577"
           />

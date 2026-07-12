@@ -8,7 +8,10 @@ import { ToastViewport, useToast } from "./Toast";
 type Props = {
   initial: TicketFull[];
   syncRuns: SyncRun[];
+  // Entradas del portal con evento vigente (las de eventos pasados no cuentan).
   portalCount: number;
+  // De esas, las reservables ahora (con stock y en estado book).
+  portalComprables: number;
 };
 
 const empty = {
@@ -23,7 +26,7 @@ const empty = {
 
 // Panel de catálogo: carga de entradas propias (source=manual) junto a las
 // sincronizadas del portal, y salud de las últimas corridas del worker.
-export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) {
+export default function TicketsPanel({ initial, syncRuns, portalCount, portalComprables }: Props) {
   const [tickets, setTickets] = useState<TicketFull[]>(initial);
   const [form, setForm] = useState(empty);
   const [loading, setLoading] = useState(false);
@@ -108,7 +111,12 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
       {/* Salud del catálogo / worker */}
       <section className="card-shadow mb-5 overflow-hidden rounded-2xl bg-white">
         <div className="grid grid-cols-3 divide-x divide-dashed divide-line">
-          <Stat label="Del portal" value={String(portalCount)} accent="#6C5BF2" />
+          <Stat
+            label="Del portal"
+            value={String(portalCount)}
+            accent="#6C5BF2"
+            sub={`${portalComprables} comprables`}
+          />
           <Stat label="Propias" value={String(tickets.length)} accent="#0D9377" />
           <Stat
             label="Última sync"
