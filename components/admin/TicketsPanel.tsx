@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import { ToastViewport, useToast } from "./Toast";
@@ -29,6 +29,9 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const { toasts, push } = useToast();
+  // Mismo guard que en NewOperacionForm: dos taps en el mismo tick
+  // dispararían dos POST antes de que el disabled llegue a pintarse.
+  const enviando = useRef(false);
 
   function set<K extends keyof typeof empty>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -36,10 +39,12 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (enviando.current) return;
     if (!form.evento.trim()) {
       push("error", "El evento es obligatorio");
       return;
     }
+    enviando.current = true;
     setLoading(true);
     try {
       const res = await fetch("/api/tickets", {
@@ -58,6 +63,7 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
     } catch {
       push("error", "Error de red al publicar");
     } finally {
+      enviando.current = false;
       setLoading(false);
     }
   }

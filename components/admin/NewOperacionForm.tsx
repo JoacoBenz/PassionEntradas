@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Operacion } from "@/lib/operaciones";
 
 type Props = {
@@ -25,6 +25,9 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
   const [form, setForm] = useState({ ...empty, evento: prefill?.evento ?? "" });
   const [ticketId, setTicketId] = useState<string | null>(prefill?.ticketId ?? null);
   const [loading, setLoading] = useState(false);
+  // El disabled de React llega tarde si dos taps caen en el mismo tick:
+  // el ref corta el segundo submit antes de que dispare otro POST.
+  const enviando = useRef(false);
 
   function set<K extends keyof typeof empty>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -32,10 +35,12 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (enviando.current) return;
     if (!form.evento.trim()) {
       onError("El evento es obligatorio");
       return;
     }
+    enviando.current = true;
     setLoading(true);
     try {
       const res = await fetch("/api/operaciones", {
@@ -84,6 +89,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
     } catch {
       onError("Error de red al crear la operación");
     } finally {
+      enviando.current = false;
       setLoading(false);
     }
   }
