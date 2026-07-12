@@ -41,8 +41,7 @@ export async function DELETE(
 
   // La tienda pública es ISR (revalidate 60): sin esto, la entrada borrada
   // sigue apareciendo hasta un minuto en la home y la búsqueda.
-  revalidatePath("/");
-  revalidatePath("/buscar");
+  revalidatePath("/(tienda)", "layout");
 
   return NextResponse.json({ ok: true });
 }

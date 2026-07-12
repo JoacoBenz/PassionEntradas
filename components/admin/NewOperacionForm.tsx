@@ -170,7 +170,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="monto" className={labelCls}>
-                Monto (ARS)
+                Monto (USD)
               </label>
               <input
                 id="monto"
@@ -180,12 +180,12 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
                 className={`${inputCls} font-mono`}
                 value={form.monto}
                 onChange={(e) => set("monto", e.target.value)}
-                placeholder="85000"
+                placeholder="850"
               />
             </div>
             <div>
               <label htmlFor="fee" className={labelCls}>
-                Comisión (ARS)
+                Comisión (USD)
               </label>
               <input
                 id="fee"
@@ -195,7 +195,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
                 className={`${inputCls} font-mono`}
                 value={form.fee}
                 onChange={(e) => set("fee", e.target.value)}
-                placeholder="6000"
+                placeholder="60"
               />
             </div>
           </div>

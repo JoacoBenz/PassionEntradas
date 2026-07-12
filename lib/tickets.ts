@@ -57,29 +57,25 @@ export type EventoAgrupado = {
 };
 
 // ---- moneda -----------------------------------------------------------------
-export type Currency = "EUR" | "USD" | "ARS";
-export const CURRENCIES: Currency[] = ["EUR", "USD", "ARS"];
-const SYM: Record<Currency, string> = { EUR: "€", USD: "US$", ARS: "$" };
+// La tienda muestra TODO en dólares. El precio base del portal está en EUR;
+// se convierte con la cotización EUR->USD editable desde el panel (tabla
+// `config`, clave eur_usd). Este default solo cubre el caso de no poder leerla.
+export const DEFAULT_EUR_USD = 1.08;
 
-export type Rates = Record<Currency, number>;
-
-export function defaultRates(): Rates {
-  return {
-    EUR: 1,
-    USD: Number(process.env.NEXT_PUBLIC_USD_RATE) || 1.08,
-    ARS: Number(process.env.NEXT_PUBLIC_ARS_RATE) || 1700,
-  };
-}
-
-// El dato base está en EUR; se convierte a la moneda elegida.
-export function fmtPrice(eur: number | null, cur: Currency, rates: Rates): string | null {
+export function fmtPrice(eur: number | null, eurUsd: number): string | null {
   if (eur == null) return null;
-  const v = Number(eur) * (rates[cur] || 1);
+  const v = Number(eur) * (eurUsd > 0 ? eurUsd : DEFAULT_EUR_USD);
   return (
-    SYM[cur] +
-    " " +
+    "US$ " +
     new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(Math.round(v))
   );
+}
+
+// Eventos ya pasados (día calendario UTC, mismo criterio que el worker):
+// afuera de la tienda. Los sin fecha y los del día se muestran.
+export function sinEventosPasados<T extends { fecha: string | null }>(rows: T[]): T[] {
+  const hoy = new Date().toISOString().slice(0, 10);
+  return rows.filter((t) => !t.fecha || t.fecha.slice(0, 10) >= hoy);
 }
 
 // ---- fechas / texto -----------------------------------------------------------

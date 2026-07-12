@@ -8,6 +8,12 @@ import MargenesPanel from "@/components/admin/MargenesPanel";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import { isMock, MOCK_USER, mockListManual, mockPortalCount, mockSyncRuns } from "@/lib/mock-db";
 
+// Día calendario (UTC) para separar eventos vigentes de los ya pasados,
+// mismo criterio que el worker y la tienda.
+function hoyUTC(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export const dynamic = "force-dynamic";
 
 // Gestión del catálogo de la tienda: carga manual de entradas propias y
@@ -17,12 +23,14 @@ export default async function AdminEntradasPage() {
   let manual: TicketFull[];
   let syncRuns: SyncRun[];
   let portalCount: number;
+  let portalComprables: number;
 
   if (isMock()) {
     email = MOCK_USER.email;
     manual = mockListManual();
     syncRuns = mockSyncRuns();
     portalCount = mockPortalCount();
+    portalComprables = portalCount;
   } else {
     const supabase = createServerSupabase();
     const {
@@ -33,7 +41,11 @@ export default async function AdminEntradasPage() {
     if (getRol(user) !== "administrador") redirect("/moderador");
     email = user.email;
 
-    const [manualRes, syncRes, countRes] = await Promise.all([
+    // Los conteos del portal excluyen eventos ya pasados: las filas viejas
+    // quedan en la tabla (regla anti-borrado del worker) pero no cuentan
+    // como catálogo. "Comprables" = con stock y reservables ahora.
+    const hoy = hoyUTC();
+    const [manualRes, syncRes, countRes, comprablesRes] = await Promise.all([
       supabase
         .from("tickets")
         .select("*")
@@ -50,11 +62,21 @@ export default async function AdminEntradasPage() {
       supabase
         .from("tickets")
         .select("id", { count: "exact", head: true })
-        .eq("source", "portal"),
+        .eq("source", "portal")
+        .or(`fecha.is.null,fecha.gte.${hoy}`),
+      supabase
+        .from("tickets")
+        .select("id", { count: "exact", head: true })
+        .eq("source", "portal")
+        .eq("estado", "book")
+        .eq("disponible", true)
+        .gt("stock", 0)
+        .or(`fecha.is.null,fecha.gte.${hoy}`),
     ]);
     manual = (manualRes.data ?? []) as TicketFull[];
     syncRuns = (syncRes.data ?? []) as SyncRun[];
     portalCount = countRes.count ?? 0;
+    portalComprables = comprablesRes.count ?? 0;
   }
 
   return (
@@ -65,7 +87,12 @@ export default async function AdminEntradasPage() {
         nav
         action={{ href: "/", label: "Ver tienda ↗" }}
       />
-      <TicketsPanel initial={manual} syncRuns={syncRuns} portalCount={portalCount} />
+      <TicketsPanel
+        initial={manual}
+        syncRuns={syncRuns}
+        portalCount={portalCount}
+        portalComprables={portalComprables}
+      />
       <div className="mx-auto w-full max-w-3xl px-4 pb-6">
         <MargenesPanel />
       </div>

@@ -34,6 +34,7 @@ type MockDB = {
   pubs: Publicacion[];
   solicitudes: Solicitud[];
   margenes: MockMargen[];
+  eurUsd: number;
 };
 
 function iso(minsAgo: number) {
@@ -192,7 +193,7 @@ function seed(): MockDB {
     { id: "m-mundial", source: "portal", competicion: "World Cup 2026 Canada / Mexico / USA", porcentaje: 35 },
   ];
 
-  return { ops, manual, syncRuns, pubs, solicitudes, margenes };
+  return { ops, manual, syncRuns, pubs, solicitudes, margenes, eurUsd: 1.08 };
 }
 
 function db(): MockDB {
@@ -551,4 +552,14 @@ export function mockDeleteMargen(competicion: string): boolean {
   const antes = d.margenes.length;
   d.margenes = d.margenes.filter((m) => m.competicion !== competicion);
   return d.margenes.length < antes;
+}
+
+// ---- cotización EUR->USD ------------------------------------------------------------
+export function mockGetEurUsd(): number {
+  return db().eurUsd;
+}
+
+export function mockSetEurUsd(v: number): number {
+  db().eurUsd = v;
+  return v;
 }

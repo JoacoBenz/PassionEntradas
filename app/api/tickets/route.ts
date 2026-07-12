@@ -74,8 +74,7 @@ export async function POST(request: Request) {
 
   // La tienda pública es ISR (revalidate 60): sin esto, la entrada nueva
   // tarda hasta un minuto en aparecer en la home y la búsqueda.
-  revalidatePath("/");
-  revalidatePath("/buscar");
+  revalidatePath("/(tienda)", "layout");
 
   return NextResponse.json({ ok: true, row: data }, { status: 201 });
 }

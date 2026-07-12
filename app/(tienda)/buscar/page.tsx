@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { fetchTickets } from "@/lib/supabase/public";
+import { fetchEurUsd, fetchTickets } from "@/lib/supabase/public";
 import { StorefrontCatalog } from "@/components/tienda/Storefront";
 
 // Igual que la home: revalidatePath cubre los cambios del panel al instante;
@@ -8,15 +8,16 @@ export const revalidate = 600;
 
 export default async function BuscarPage() {
   let rows: Awaited<ReturnType<typeof fetchTickets>> = [];
+  let eurUsd = 1.08;
   try {
-    rows = await fetchTickets();
+    [rows, eurUsd] = await Promise.all([fetchTickets(), fetchEurUsd()]);
   } catch {
     return <div className="splash err">No pudimos cargar la cartelera.</div>;
   }
   return (
     // useSearchParams exige Suspense en páginas estáticas.
     <Suspense fallback={<div className="splash">Armando la cartelera…</div>}>
-      <StorefrontCatalog rows={rows} />
+      <StorefrontCatalog rows={rows} eurUsd={eurUsd} />
     </Suspense>
   );
 }

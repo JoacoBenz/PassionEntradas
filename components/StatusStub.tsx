@@ -2,7 +2,7 @@ import {
   ESTADO_COLOR,
   ESTADO_LABEL_PUBLICO,
   estadoDe,
-  formatARS,
+  formatUSD,
   formatFecha,
   type OperacionPublica,
 } from "@/lib/operaciones";
@@ -146,7 +146,7 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
                   Monto
                 </dt>
                 <dd className="mt-0.5 font-display text-3xl font-bold tabular-nums tracking-tight">
-                  {formatARS(op.monto)}
+                  {formatUSD(op.monto)}
                 </dd>
               </div>
               {op.comprador_alias && (

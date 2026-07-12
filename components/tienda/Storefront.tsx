@@ -9,48 +9,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   buildEvents,
-  CURRENCIES,
-  defaultRates,
   fmtDate,
   fmtPrice,
   isWC,
   parseTitle,
   waLink,
-  type Currency,
   type EventoAgrupado,
   type Ticket,
 } from "@/lib/tickets";
-
-const RATES = defaultRates();
-
-function useCurrency() {
-  const [cur, setCur] = useState<Currency>("EUR");
-  useEffect(() => {
-    const saved = localStorage.getItem("tm_cur");
-    if (saved === "EUR" || saved === "USD" || saved === "ARS") setCur(saved);
-  }, []);
-  function change(c: Currency) {
-    setCur(c);
-    localStorage.setItem("tm_cur", c);
-  }
-  return [cur, change] as const;
-}
-
-function CurrencyTabs({ cur, onChange }: { cur: Currency; onChange: (c: Currency) => void }) {
-  return (
-    <div className="cur" role="group" aria-label="Moneda">
-      {CURRENCIES.map((c) => (
-        <button
-          key={c}
-          className={`cur-btn ${c === cur ? "active" : ""}`}
-          onClick={() => onChange(c)}
-        >
-          {c}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function Wordmark() {
   return (
@@ -96,9 +62,9 @@ function Foot() {
 }
 
 // ---- fila de sector dentro de la card ----------------------------------------
-function LadderRow({ u, ev, cur }: { u: Ticket; ev: EventoAgrupado; cur: Currency }) {
+function LadderRow({ u, ev, eurUsd }: { u: Ticket; ev: EventoAgrupado; eurUsd: number }) {
   const hasPrice = u.precio_final != null && Number(u.precio_final) > 0;
-  const precio = hasPrice ? fmtPrice(u.precio_final, cur, RATES) : null;
+  const precio = hasPrice ? fmtPrice(u.precio_final, eurUsd) : null;
   const stk = u.stock ?? 0;
   const bookable = stk > 0 && u.estado === "book" && hasPrice;
   const low = stk > 0 && stk <= 2;
@@ -136,7 +102,7 @@ function LadderRow({ u, ev, cur }: { u: Ticket; ev: EventoAgrupado; cur: Currenc
 }
 
 // ---- card de evento (talón) ----------------------------------------------------
-function TicketCard({ ev, i, cur }: { ev: EventoAgrupado; i: number; cur: Currency }) {
+function TicketCard({ ev, i, eurUsd }: { ev: EventoAgrupado; i: number; eurUsd: number }) {
   const [open, setOpen] = useState(false);
   const [shared, setShared] = useState(false);
   const rollRef = useRef<HTMLDivElement>(null);
@@ -202,7 +168,7 @@ function TicketCard({ ev, i, cur }: { ev: EventoAgrupado; i: number; cur: Curren
           <span className="scroll-rod" aria-hidden />
           <ul className="ladder">
             {ev.ubicaciones.map((u) => (
-              <LadderRow key={u.id} u={u} ev={ev} cur={cur} />
+              <LadderRow key={u.id} u={u} ev={ev} eurUsd={eurUsd} />
             ))}
           </ul>
           <span className="scroll-curl" aria-hidden />
@@ -211,7 +177,7 @@ function TicketCard({ ev, i, cur }: { ev: EventoAgrupado; i: number; cur: Curren
       <aside className="ticket-stub">
         <span className="stub-label">{ev.minPrice != null ? "desde" : "precio"}</span>
         <span className={`stub-price ${ev.minPrice == null ? "is-consult" : ""}`}>
-          {ev.minPrice != null ? fmtPrice(ev.minPrice, cur, RATES) : "Consultar"}
+          {ev.minPrice != null ? fmtPrice(ev.minPrice, eurUsd) : "Consultar"}
         </span>
         <span className="stub-meta">
           {n} ubicaciones{ev.bookable ? ` · ${ev.bookable} con stock` : ""}
@@ -231,13 +197,13 @@ const PASOS: [string, string][] = [
 ];
 const PORQUE: [string, string][] = [
   ["Stock real", "Sincronizamos disponibilidad y precios cada pocos minutos: lo que ves es lo que hay."],
-  ["Precio claro", "Sin sorpresas. Podés ver el valor en euros, dólares o pesos."],
+  ["Precio claro", "Sin sorpresas: todos los precios están en dólares (USD)."],
   ["Atención directa", "Hablás con una persona por WhatsApp, no con un bot."],
 ];
 const FAQS: [string, string][] = [
   [
     "¿En qué moneda están los precios?",
-    "El valor base es en euros; con el selector de arriba podés verlo en dólares o pesos como referencia. El monto final lo confirmamos al cerrar.",
+    "Todos los precios están en dólares estadounidenses (USD). El monto final lo confirmamos al cerrar.",
   ],
   [
     "¿Cómo reservo o consulto?",
@@ -253,9 +219,8 @@ const FAQS: [string, string][] = [
   ],
 ];
 
-export function StorefrontHome({ rows }: { rows: Ticket[] }) {
+export function StorefrontHome({ rows, eurUsd }: { rows: Ticket[]; eurUsd: number }) {
   const router = useRouter();
-  const [cur, setCur] = useCurrency();
   const events = useMemo(() => buildEvents(rows), [rows]);
 
   const totalEv = events.length;
@@ -279,7 +244,6 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
       <header className="masthead masthead--home">
         <div className="toprow">
           <Wordmark />
-          <CurrencyTabs cur={cur} onChange={setCur} />
         </div>
         <div className="hero hero--home">
           <h1>
@@ -347,7 +311,7 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
                   </span>
                   <span className="rank-price">
                     {ev.minPrice != null
-                      ? "desde " + fmtPrice(ev.minPrice, cur, RATES)
+                      ? "desde " + fmtPrice(ev.minPrice, eurUsd)
                       : "a consultar"}
                   </span>
                 </div>
@@ -475,10 +439,9 @@ function uniqueOptions(
   return arr.map((a) => ({ value: a.key, label: `${a.label} (${a.n})` }));
 }
 
-export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
+export function StorefrontCatalog({ rows, eurUsd }: { rows: Ticket[]; eurUsd: number }) {
   const router = useRouter();
   const params = useSearchParams();
-  const [cur, setCur] = useCurrency();
   const events = useMemo(() => buildEvents(rows), [rows]);
   const [state, setState] = useState<FilterState>({
     cat: params.get("cat") || "*",
@@ -578,7 +541,6 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
         <div className="toprow">
           <Wordmark />
           <div className="mast-right">
-            <CurrencyTabs cur={cur} onChange={setCur} />
             <button className="back" onClick={() => router.push("/")}>
               ← Inicio
             </button>
@@ -638,7 +600,7 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
 
       <main className="feed">
         {filtered.length ? (
-          visible.map((ev, i) => <TicketCard key={ev.comp + ev.evento} ev={ev} i={i} cur={cur} />)
+          visible.map((ev, i) => <TicketCard key={ev.comp + ev.evento} ev={ev} i={i} eurUsd={eurUsd} />)
         ) : (
           <p className="empty">
             Ningún evento coincide con estos filtros.
