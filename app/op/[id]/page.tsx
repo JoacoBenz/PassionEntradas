@@ -48,7 +48,9 @@ export default async function OperacionPublicaPage({
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-8">
-      <AutoRefresh />
+      {/* Repolea una versión mínima y solo re-baja la página si la operación
+          cambió: este link vive abierto en los grupos, es el tráfico grande. */}
+      <AutoRefresh versionUrl={`/api/op/${params.id}/version`} />
       <StatusStub op={op} />
       <footer className="mt-6 text-center text-xs text-muted">
         AdminTickets · custodia de operaciones

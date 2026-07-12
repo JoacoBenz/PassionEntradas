@@ -51,9 +51,14 @@ export default async function AdminPage() {
     // Tope de 1000: con historial grande el payload de "todo" crece sin
     // límite (el stress test midió ~4,7 MB con 20k filas). Las más viejas
     // que quedan afuera ya están cerradas o canceladas.
+    // Columnas explícitas: lo que consume el panel (el tipo Operacion).
+    // Evita arrastrar columnas internas (created_by) en un payload que se
+    // re-baja entero en cada refresh.
     const { data } = await createAdminSupabase()
       .from("operaciones")
-      .select("*")
+      .select(
+        "id, code, evento, comprador_alias, vendedor_alias, monto, fee, cuenta_debitar, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, notas, ticket_id, created_at, updated_at"
+      )
       .order("created_at", { ascending: false })
       .limit(1000);
     ops = (data ?? []) as Operacion[];
@@ -63,9 +68,10 @@ export default async function AdminPage() {
     // pb-24 solo en móvil: aire para que la BottomNav no tape la última card.
     <main className="min-h-svh pb-16 md:pb-10">
       <AppHeader subtitle="Administración" email={email} nav />
-      {/* Lista viva: refresca el server component en intervalo; el dashboard
-          sincroniza su estado local cuando cambia `initial`. */}
-      <AutoRefresh intervalMs={15000} />
+      {/* Lista viva: consulta la versión en intervalo y solo refresca el
+          server component cuando hubo cambios; el dashboard sincroniza su
+          estado local cuando cambia `initial`. */}
+      <AutoRefresh intervalMs={15000} versionUrl="/api/operaciones/version" />
       <AdminDashboard initial={ops} baseUrl={getBaseUrl()} />
       <BottomNav />
     </main>
