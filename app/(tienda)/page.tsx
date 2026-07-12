@@ -1,8 +1,10 @@
 import { fetchTickets } from "@/lib/supabase/public";
 import { StorefrontHome } from "@/components/tienda/Storefront";
 
-// La tienda se revalida cada minuto (el worker sincroniza cada pocos minutos).
-export const revalidate = 60;
+// Revalidación de fondo cada 10 min como red de seguridad: los cambios desde
+// el panel (alta/baja de entradas, márgenes) ya disparan revalidatePath al
+// instante, así que la página se sirve cacheada casi siempre.
+export const revalidate = 600;
 
 export default async function TiendaHome() {
   let rows: Awaited<ReturnType<typeof fetchTickets>> = [];

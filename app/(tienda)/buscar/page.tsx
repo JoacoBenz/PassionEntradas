@@ -2,7 +2,9 @@ import { Suspense } from "react";
 import { fetchTickets } from "@/lib/supabase/public";
 import { StorefrontCatalog } from "@/components/tienda/Storefront";
 
-export const revalidate = 60;
+// Igual que la home: revalidatePath cubre los cambios del panel al instante;
+// esto es solo la red de seguridad de fondo.
+export const revalidate = 600;
 
 export default async function BuscarPage() {
   let rows: Awaited<ReturnType<typeof fetchTickets>> = [];
