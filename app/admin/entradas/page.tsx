@@ -37,7 +37,8 @@ export default async function AdminEntradasPage() {
         .from("tickets")
         .select("*")
         .eq("source", "manual")
-        .order("fecha", { ascending: true, nullsFirst: false }),
+        .order("fecha", { ascending: true, nullsFirst: false })
+        .limit(1000),
       supabase
         .from("sync_runs")
         .select(
