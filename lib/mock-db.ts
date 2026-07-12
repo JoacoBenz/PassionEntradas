@@ -20,12 +20,20 @@ export const MOCK_FEED_USER = {
   alias: "demo_user",
 };
 
+export type MockMargen = {
+  id: string;
+  source: string;
+  categoria: string | null;
+  porcentaje: number;
+};
+
 type MockDB = {
   ops: Operacion[];
   manual: TicketFull[];
   syncRuns: SyncRun[];
   pubs: Publicacion[];
   solicitudes: Solicitud[];
+  margenes: MockMargen[];
 };
 
 function iso(minsAgo: number) {
@@ -179,7 +187,12 @@ function seed(): MockDB {
     },
   ];
 
-  return { ops, manual, syncRuns, pubs, solicitudes };
+  const margenes: MockMargen[] = [
+    { id: "m-default", source: "portal", categoria: null, porcentaje: 20 },
+    { id: "m-vip", source: "portal", categoria: "VIP", porcentaje: 35 },
+  ];
+
+  return { ops, manual, syncRuns, pubs, solicitudes, margenes };
 }
 
 function db(): MockDB {
@@ -512,4 +525,30 @@ export function mockAccionSolicitud(
     }
   }
   return { ok: true, sol };
+}
+
+// ---- margenes ---------------------------------------------------------------------
+export function mockListMargenes(): MockMargen[] {
+  return [...db().margenes].sort((a, b) =>
+    (a.categoria ?? "").localeCompare(b.categoria ?? "")
+  );
+}
+
+export function mockUpsertMargen(categoria: string | null, porcentaje: number): MockMargen {
+  const d = db();
+  const existente = d.margenes.find((m) => m.categoria === categoria);
+  if (existente) {
+    existente.porcentaje = porcentaje;
+    return existente;
+  }
+  const nuevo: MockMargen = { id: crypto.randomUUID(), source: "portal", categoria, porcentaje };
+  d.margenes.push(nuevo);
+  return nuevo;
+}
+
+export function mockDeleteMargen(categoria: string): boolean {
+  const d = db();
+  const antes = d.margenes.length;
+  d.margenes = d.margenes.filter((m) => m.categoria !== categoria);
+  return d.margenes.length < antes;
 }
