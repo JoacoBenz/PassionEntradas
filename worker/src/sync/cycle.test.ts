@@ -36,6 +36,7 @@ const result = (rows: RawTicketInput[], complete = true) => ({ rows, complete })
 function makeRepo() {
   return {
     getLastSuccessfulScrapedCount: vi.fn().mockResolvedValue(100),
+    fetchMargenes: vi.fn().mockResolvedValue([]),
     upsertBatches: vi.fn().mockResolvedValue(0),
     markAbsentBefore: vi.fn().mockResolvedValue(0),
     recordSyncRun: vi.fn().mockResolvedValue(undefined),
