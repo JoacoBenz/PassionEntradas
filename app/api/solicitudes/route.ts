@@ -28,7 +28,9 @@ export async function GET() {
   const admin = createAdminSupabase();
   const { data, error } = await admin
     .from("solicitudes")
-    .select("*, publicacion:publicaciones(*)")
+    .select(
+      "*, publicacion:publicaciones(*), operacion:operaciones(id,status,entrada_recibida_at,pago_confirmado_at,cerrada_at)"
+    )
     .order("created_at", { ascending: false })
     .limit(200);
 

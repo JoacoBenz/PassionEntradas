@@ -171,6 +171,27 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // V2: si esta operación nació de una solicitud del feed y se cancela,
+  // los dos mundos se mueven juntos: la solicitud queda rechazada y la
+  // publicación vuelve a estar activa. (Reabrir la operación no la
+  // re-enlaza: para retomar hay una solicitud nueva.)
+  if (action.action === "cancelar") {
+    const { data: sol } = await admin
+      .from("solicitudes")
+      .select("id, publicacion_id")
+      .eq("operacion_id", params.id)
+      .eq("estado", "en_proceso")
+      .maybeSingle();
+    if (sol) {
+      await admin.from("solicitudes").update({ estado: "rechazada" }).eq("id", sol.id);
+      await admin
+        .from("publicaciones")
+        .update({ estado: "activa" })
+        .eq("id", sol.publicacion_id)
+        .eq("estado", "en_proceso");
+    }
+  }
+
   return NextResponse.json(pickResult(data as Operacion));
 }
 

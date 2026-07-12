@@ -2,6 +2,8 @@
 // compra. Todo se concreta por medio de los administradores: una solicitud
 // aceptada se convierte en una operación de custodia (ver lib/operaciones).
 
+import type { Status } from "@/lib/operaciones";
+
 export type PublicacionEstado = "activa" | "en_proceso" | "vendida" | "retirada";
 export type SolicitudEstado = "pendiente" | "en_proceso" | "concretada" | "rechazada";
 
@@ -31,8 +33,22 @@ export type Solicitud = {
   updated_at: string;
 };
 
-// Solicitud con su publicación embebida, como la consume el panel admin.
-export type SolicitudConPublicacion = Solicitud & { publicacion: Publicacion };
+// Resumen de la operación enlazada, para pintar el estado real de la
+// custodia en la bandeja sin cargar la operación entera.
+export type OperacionResumen = {
+  id: string;
+  status: Status;
+  entrada_recibida_at: string | null;
+  pago_confirmado_at: string | null;
+  cerrada_at: string | null;
+};
+
+// Solicitud con su publicación embebida (y la operación si existe), como
+// la consume el panel admin.
+export type SolicitudConPublicacion = Solicitud & {
+  publicacion: Publicacion;
+  operacion?: OperacionResumen | null;
+};
 
 export const PUBLICACION_LABEL: Record<PublicacionEstado, string> = {
   activa: "Publicada",

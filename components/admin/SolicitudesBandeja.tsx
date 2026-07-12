@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatARS, formatFecha } from "@/lib/operaciones";
+import { estadoDe, ESTADO_LABEL, ESTADO_COLOR, formatARS, formatFecha } from "@/lib/operaciones";
 import {
   SOLICITUD_COLOR,
   SOLICITUD_LABEL,
@@ -196,6 +196,29 @@ export default function SolicitudesBandeja({ initial }: Props) {
                     </div>
                   </dl>
 
+                  {sol.estado === "en_proceso" && sol.operacion && (() => {
+                    const est = estadoDe(sol.operacion);
+                    const cerro = est === "cerrada";
+                    return (
+                      <p
+                        className="mt-2 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-sm"
+                        style={{ backgroundColor: `${ESTADO_COLOR[est]}14` }}
+                      >
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+                          Custodia:
+                        </span>
+                        <span className="font-semibold" style={{ color: ESTADO_COLOR[est] }}>
+                          {ESTADO_LABEL[est]}
+                        </span>
+                        {cerro && (
+                          <span className="text-[#4A4E5E]">
+                            — la operación terminó, concretá la venta acá abajo.
+                          </span>
+                        )}
+                      </p>
+                    );
+                  })()}
+
                   {sol.mensaje && (
                     <p className="mt-2 rounded-lg bg-canvas px-3 py-2 text-sm text-[#4A4E5E]">
                       <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted">
@@ -208,15 +231,21 @@ export default function SolicitudesBandeja({ initial }: Props) {
                   <div className="mt-3 flex flex-wrap gap-2">
                     {sol.estado === "pendiente" && (
                       <>
-                        <button
-                          onClick={() =>
-                            accion(sol, "iniciar", "Operación de custodia creada")
-                          }
-                          disabled={busy}
-                          className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-deep disabled:opacity-60"
-                        >
-                          Iniciar custodia
-                        </button>
+                        {sol.publicacion.estado === "activa" ? (
+                          <button
+                            onClick={() =>
+                              accion(sol, "iniciar", "Operación de custodia creada")
+                            }
+                            disabled={busy}
+                            className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-deep disabled:opacity-60"
+                          >
+                            Iniciar custodia
+                          </button>
+                        ) : (
+                          <span className="rounded-lg bg-canvas px-3 py-2 text-xs text-muted">
+                            La publicación ya no está activa: solo se puede rechazar.
+                          </span>
+                        )}
                         <button
                           onClick={() => accion(sol, "rechazar", "Solicitud rechazada")}
                           disabled={busy}
@@ -246,11 +275,17 @@ export default function SolicitudesBandeja({ initial }: Props) {
                           ✓ Concretar venta
                         </button>
                         <button
-                          onClick={() => accion(sol, "rechazar", "Solicitud rechazada")}
+                          onClick={() =>
+                            accion(
+                              sol,
+                              "rechazar",
+                              "Custodia cancelada — la publicación volvió al feed"
+                            )
+                          }
                           disabled={busy}
                           className="rounded-xl border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
                         >
-                          Cancelar
+                          Cancelar custodia
                         </button>
                       </>
                     )}

@@ -262,10 +262,24 @@ export function mockApplyAction(
       }
       op.cerrada_at = action.done ? new Date().toISOString() : null;
       break;
-    case "cancelar":
+    case "cancelar": {
       if (cancelada) return { ok: false, status: 409, error: "La operación ya está cancelada" };
       op.status = "cancelada";
+      // V2: solicitud enlazada rechazada y publicación de vuelta al feed.
+      const sol = db().solicitudes.find(
+        (s) => s.operacion_id === op.id && s.estado === "en_proceso"
+      );
+      if (sol) {
+        sol.estado = "rechazada";
+        sol.updated_at = new Date().toISOString();
+        const pub = db().pubs.find((p) => p.id === sol.publicacion_id);
+        if (pub && pub.estado === "en_proceso") {
+          pub.estado = "activa";
+          pub.updated_at = sol.updated_at;
+        }
+      }
       break;
+    }
     case "reabrir":
       if (!cancelada) return { ok: false, status: 409, error: "Solo se puede reabrir una operación cancelada" };
       op.status = "esperando_entrada";
@@ -379,7 +393,10 @@ export function mockCreateSolicitud(input: {
     return { ok: false, status: 409, error: "No podés solicitar tu propia publicación" };
   }
   const dupe = db().solicitudes.find(
-    (s) => s.publicacion_id === input.publicacion_id && s.comprador_id === input.comprador_id
+    (s) =>
+      s.publicacion_id === input.publicacion_id &&
+      s.comprador_id === input.comprador_id &&
+      (s.estado === "pendiente" || s.estado === "en_proceso")
   );
   if (dupe) return { ok: false, status: 409, error: "Ya enviaste una solicitud para esta publicación" };
   const now = new Date().toISOString();
@@ -398,9 +415,20 @@ export function mockCreateSolicitud(input: {
 export function mockListSolicitudes(): SolicitudConPublicacion[] {
   const d = db();
   return d.solicitudes
-    .map((s) => {
+    .map((s): SolicitudConPublicacion | null => {
       const pub = d.pubs.find((p) => p.id === s.publicacion_id);
-      return pub ? { ...s, publicacion: pub } : null;
+      if (!pub) return null;
+      const op = s.operacion_id ? d.ops.find((o) => o.id === s.operacion_id) : null;
+      const operacion = op
+        ? {
+            id: op.id,
+            status: op.status,
+            entrada_recibida_at: op.entrada_recibida_at,
+            pago_confirmado_at: op.pago_confirmado_at,
+            cerrada_at: op.cerrada_at,
+          }
+        : null;
+      return { ...s, publicacion: pub, operacion };
     })
     .filter((s): s is SolicitudConPublicacion => s !== null)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -421,6 +449,9 @@ export function mockAccionSolicitud(
   if (accion === "iniciar") {
     if (sol.estado !== "pendiente") {
       return { ok: false, status: 409, error: "La solicitud ya fue procesada" };
+    }
+    if (pub.estado !== "activa") {
+      return { ok: false, status: 409, error: "La publicación no está activa (ya hay una custodia en curso, se vendió o fue retirada)" };
     }
     const op = mockCreateOp({
       evento: pub.evento,
@@ -446,6 +477,16 @@ export function mockAccionSolicitud(
       return { ok: false, status: 409, error: "La solicitud ya se concretó" };
     }
     const eraEnProceso = sol.estado === "en_proceso";
+    if (eraEnProceso && sol.operacion_id) {
+      const op = d.ops.find((o) => o.id === sol.operacion_id);
+      if (op?.cerrada_at) {
+        return { ok: false, status: 409, error: "La operación de custodia ya se cerró: concretá la venta en lugar de rechazar" };
+      }
+      if (op && op.status !== "cancelada") {
+        op.status = "cancelada";
+        op.updated_at = new Date().toISOString();
+      }
+    }
     sol.estado = "rechazada";
     sol.updated_at = new Date().toISOString();
     if (eraEnProceso && pub.estado === "en_proceso") {
@@ -463,5 +504,12 @@ export function mockAccionSolicitud(
   pub.estado = "vendida";
   sol.updated_at = new Date().toISOString();
   pub.updated_at = sol.updated_at;
+  // Las hermanas pendientes ya no tienen sentido sobre una pub vendida.
+  for (const otra of d.solicitudes) {
+    if (otra.publicacion_id === pub.id && otra.estado === "pendiente") {
+      otra.estado = "rechazada";
+      otra.updated_at = sol.updated_at;
+    }
+  }
   return { ok: true, sol };
 }

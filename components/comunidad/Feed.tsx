@@ -133,9 +133,13 @@ export default function Feed({ alias, staff, mock }: Props) {
     window.location.href = "/ingresar";
   }
 
+  // Una rechazada no bloquea: el usuario puede volver a pedir la entrada.
   const solicitudPor = useMemo(() => {
     const map = new Map<string, Solicitud>();
-    for (const s of misSolicitudes) map.set(s.publicacion_id, s);
+    for (const s of misSolicitudes) {
+      if (s.estado === "rechazada") continue;
+      map.set(s.publicacion_id, s);
+    }
     return map;
   }, [misSolicitudes]);
 

@@ -74,6 +74,14 @@ export async function PATCH(
     if (sol.estado !== "pendiente") {
       return NextResponse.json({ error: "La solicitud ya fue procesada" }, { status: 409 });
     }
+    // Una publicación banca UNA custodia a la vez: si ya está en proceso,
+    // vendida o retirada, no se puede iniciar otra operación sobre ella.
+    if (pub.estado !== "activa") {
+      return NextResponse.json(
+        { error: "La publicación no está activa (ya hay una custodia en curso, se vendió o fue retirada)" },
+        { status: 409 }
+      );
+    }
 
     // Crea la operación de custodia con los datos de la publicación.
     let operacion: { id: string; code: string } | null = null;
@@ -128,6 +136,31 @@ export async function PATCH(
     if (sol.estado === "concretada") {
       return NextResponse.json({ error: "La solicitud ya se concretó" }, { status: 409 });
     }
+    // Con una operación enlazada, los dos mundos se mueven juntos: si la
+    // custodia ya se cerró, lo que corresponde es concretar, no rechazar;
+    // si sigue abierta, se cancela junto con la solicitud.
+    if (sol.estado === "en_proceso" && sol.operacion_id) {
+      const { data: op } = await admin
+        .from("operaciones")
+        .select("status, cerrada_at")
+        .eq("id", sol.operacion_id)
+        .maybeSingle();
+      if (op?.cerrada_at) {
+        return NextResponse.json(
+          { error: "La operación de custodia ya se cerró: concretá la venta en lugar de rechazar" },
+          { status: 409 }
+        );
+      }
+      if (op && op.status !== "cancelada") {
+        const { error: cancelErr } = await admin
+          .from("operaciones")
+          .update({ status: "cancelada" })
+          .eq("id", sol.operacion_id);
+        if (cancelErr) {
+          return NextResponse.json({ error: cancelErr.message }, { status: 500 });
+        }
+      }
+    }
     const { data, error } = await admin
       .from("solicitudes")
       .update({ estado: "rechazada" })
@@ -164,5 +197,12 @@ export async function PATCH(
     const msg = solUpd.error?.message ?? pubUpd.error?.message ?? "Error";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+  // Las otras solicitudes pendientes de esta publicación ya no tienen
+  // sentido: se rechazan solas para que no queden colgadas en la bandeja.
+  await admin
+    .from("solicitudes")
+    .update({ estado: "rechazada" })
+    .eq("publicacion_id", pub.id)
+    .eq("estado", "pendiente");
   return NextResponse.json({ solicitud: solUpd.data, operacion: null });
 }

@@ -46,10 +46,14 @@ create table public.solicitudes (
   estado solicitud_estado not null default 'pendiente',
   operacion_id uuid references public.operaciones (id) on delete set null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  -- un usuario pide una vez por publicación
-  unique (publicacion_id, comprador_id)
+  updated_at timestamptz not null default now()
 );
+
+-- Un usuario tiene UNA solicitud viva por publicación; si se la rechazan
+-- puede volver a pedir (las rechazadas/concretadas no bloquean).
+create unique index solicitudes_unica_activa_idx
+  on public.solicitudes (publicacion_id, comprador_id)
+  where estado in ('pendiente', 'en_proceso');
 
 create index solicitudes_estado_idx on public.solicitudes (estado, created_at desc);
 create index solicitudes_comprador_idx on public.solicitudes (comprador_id);
