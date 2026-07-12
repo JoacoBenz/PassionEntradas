@@ -161,14 +161,14 @@ export default function Feed({ alias, staff, mock }: Props) {
         <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <span
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand font-display text-sm font-bold"
+              className="shrink-0 text-base text-[#FF3B2E] [letter-spacing:-0.2em]"
               aria-hidden
             >
-              A
+              ▚
             </span>
             <div className="min-w-0">
-              <p className="truncate font-display text-base font-bold leading-tight">
-                AdminTickets
+              <p className="truncate whitespace-nowrap font-body text-sm font-black uppercase tracking-[0.14em] leading-tight">
+                Ticket<span className="text-[#7B8CFF]">Mirror</span>
               </p>
               <p className="text-[11px] leading-tight text-white/55">Comunidad</p>
             </div>
