@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { formatARS, formatFecha } from "@/lib/operaciones";
@@ -32,6 +32,9 @@ export default function Feed({ alias, staff, mock }: Props) {
   const [formAbierto, setFormAbierto] = useState(false);
   const [form, setForm] = useState({ evento: "", fecha_evento: "", precio: "", cantidad: "1", descripcion: "" });
   const [solicitando, setSolicitando] = useState<string | null>(null);
+  // Mismo guard que en los forms del panel: dos taps en el mismo tick
+  // dispararían dos POST y duplicarían la publicación.
+  const enviando = useRef(false);
 
   useEffect(() => {
     let vivo = true;
@@ -57,6 +60,8 @@ export default function Feed({ alias, staff, mock }: Props) {
 
   async function publicar(e: React.FormEvent) {
     e.preventDefault();
+    if (enviando.current) return;
+    enviando.current = true;
     setPublicando(true);
     try {
       const res = await fetch("/api/publicaciones", {
@@ -82,6 +87,7 @@ export default function Feed({ alias, staff, mock }: Props) {
     } catch {
       avisar("error", "Error de red al publicar");
     } finally {
+      enviando.current = false;
       setPublicando(false);
     }
   }
