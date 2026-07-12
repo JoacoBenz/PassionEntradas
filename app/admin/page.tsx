@@ -48,10 +48,14 @@ export default async function AdminPage() {
     // Lectura con service role: la tabla quedó en RLS deny-all (sin policy
     // de select para authenticated), así que la sesión del usuario no ve
     // filas. El rol ya fue validado arriba.
+    // Tope de 1000: con historial grande el payload de "todo" crece sin
+    // límite (el stress test midió ~4,7 MB con 20k filas). Las más viejas
+    // que quedan afuera ya están cerradas o canceladas.
     const { data } = await createAdminSupabase()
       .from("operaciones")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(1000);
     ops = (data ?? []) as Operacion[];
   }
 

@@ -53,7 +53,13 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
   const [filter, setFilter] = useState<Filter>("todas");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"recientes" | "urgentes">("recientes");
+  const [page, setPage] = useState(1);
   const { toasts, push } = useToast();
+
+  // Cambiar filtro, búsqueda u orden vuelve a la primera página.
+  useEffect(() => {
+    setPage(1);
+  }, [filter, query, sort]);
 
   // Lista viva: cuando AutoRefresh refresca el server component, `initial`
   // llega con datos nuevos (operaciones cargadas por el moderador, cambios
@@ -96,6 +102,18 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
     }
     return out;
   }, [ops, filter, query, sort]);
+
+  // Paginado en el cliente: con historial grande, renderizar cientos de
+  // cards de una sola vez es lo que pesa (el fetch ya viene topado en 1000).
+  const PAGE_SIZE = 15;
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const pagina = Math.min(page, totalPages);
+  const enPagina = visible.slice((pagina - 1) * PAGE_SIZE, pagina * PAGE_SIZE);
+
+  function irAPagina(n: number) {
+    setPage(Math.min(Math.max(1, n), totalPages));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   async function applyAction(op: Operacion, action: StatusAction, okMsg: string) {
     setBusyId(op.id);
@@ -230,7 +248,7 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
               : "No hay operaciones con este filtro."}
           </div>
         ) : (
-          visible.map((op) => (
+          enPagina.map((op) => (
             <OperacionCard
               key={op.id}
               op={op}
@@ -243,6 +261,31 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
           ))
         )}
       </div>
+
+      {totalPages > 1 && (
+        <nav
+          aria-label="Paginación de operaciones"
+          className="mt-5 flex items-center justify-center gap-3"
+        >
+          <button
+            onClick={() => irAPagina(pagina - 1)}
+            disabled={pagina <= 1}
+            className="rounded-xl border border-line bg-white px-4 py-2 text-xs font-semibold text-[#4A4E5E] shadow-sm transition-colors hover:bg-canvas disabled:opacity-40"
+          >
+            ← Anteriores
+          </button>
+          <span className="text-xs font-medium tabular-nums text-muted">
+            Página {pagina} de {totalPages} · {visible.length} operaciones
+          </span>
+          <button
+            onClick={() => irAPagina(pagina + 1)}
+            disabled={pagina >= totalPages}
+            className="rounded-xl border border-line bg-white px-4 py-2 text-xs font-semibold text-[#4A4E5E] shadow-sm transition-colors hover:bg-canvas disabled:opacity-40"
+          >
+            Siguientes →
+          </button>
+        </nav>
+      )}
 
       <ToastViewport toasts={toasts} />
     </div>
