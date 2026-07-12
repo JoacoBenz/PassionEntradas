@@ -302,12 +302,15 @@ function Stat({
   accent: string;
 }) {
   return (
-    <div className="px-4 py-4 text-center sm:text-left">
+    // flex-col + justify-between: si un label ocupa dos líneas en móvil
+    // ("Para entregar"), el número queda igual anclado abajo, alineado
+    // con los de las otras celdas (la grilla las estira a la misma altura).
+    <div className="flex h-full flex-col justify-between gap-0.5 px-4 py-4 text-center sm:text-left">
       <p className="text-[11px] font-medium uppercase tracking-widest text-muted">
         {label}
       </p>
       <p
-        className="mt-0.5 font-display text-3xl font-bold tabular-nums tracking-tight"
+        className="font-display text-3xl font-bold tabular-nums tracking-tight"
         style={{ color: accent }}
       >
         {String(value).padStart(2, "0")}
