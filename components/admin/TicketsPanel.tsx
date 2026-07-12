@@ -28,7 +28,15 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
   const [form, setForm] = useState(empty);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const { toasts, push } = useToast();
+
+  // Paginado como en el panel: renderizar miles de filas juntas era el
+  // cuello confirmado por el stress test (p50 3,5s con 2500 entradas).
+  const PAGE_SIZE = 20;
+  const totalPages = Math.max(1, Math.ceil(tickets.length / PAGE_SIZE));
+  const pagina = Math.min(page, totalPages);
+  const enPagina = tickets.slice((pagina - 1) * PAGE_SIZE, pagina * PAGE_SIZE);
   // Mismo guard que en NewOperacionForm: dos taps en el mismo tick
   // dispararían dos POST antes de que el disabled llegue a pintarse.
   const enviando = useRef(false);
@@ -239,7 +247,7 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
               portal y la sincronización no las toca.
             </div>
           ) : (
-            tickets.map((t) => (
+            enPagina.map((t) => (
               <div
                 key={t.id}
                 className="card-shadow flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3"
@@ -269,6 +277,31 @@ export default function TicketsPanel({ initial, syncRuns, portalCount }: Props) 
                 </div>
               </div>
             ))
+          )}
+
+          {totalPages > 1 && (
+            <nav
+              aria-label="Paginación de entradas"
+              className="flex items-center justify-center gap-3 pt-1"
+            >
+              <button
+                onClick={() => setPage(Math.max(1, pagina - 1))}
+                disabled={pagina <= 1}
+                className="rounded-xl border border-line bg-white px-4 py-2 text-xs font-semibold text-[#4A4E5E] shadow-sm transition-colors hover:bg-canvas disabled:opacity-40"
+              >
+                ← Anteriores
+              </button>
+              <span className="text-xs font-medium tabular-nums text-muted">
+                Página {pagina} de {totalPages} · {tickets.length} entradas
+              </span>
+              <button
+                onClick={() => setPage(Math.min(totalPages, pagina + 1))}
+                disabled={pagina >= totalPages}
+                className="rounded-xl border border-line bg-white px-4 py-2 text-xs font-semibold text-[#4A4E5E] shadow-sm transition-colors hover:bg-canvas disabled:opacity-40"
+              >
+                Siguientes →
+              </button>
+            </nav>
           )}
 
           {/* Últimas corridas del worker */}
