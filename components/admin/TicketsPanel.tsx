@@ -14,6 +14,8 @@ type Props = {
   portalComprables: number;
   // Interruptor: si las entradas de Passion se muestran en la tienda.
   portalActivo: boolean;
+  // Competiciones existentes (portal + propias) para el dropdown del form.
+  competiciones: string[];
 };
 
 const empty = {
@@ -34,8 +36,12 @@ export default function TicketsPanel({
   portalCount,
   portalComprables,
   portalActivo,
+  competiciones,
 }: Props) {
   const [tickets, setTickets] = useState<TicketFull[]>(initial);
+  // Sugerencias del dropdown de competición. Una nueva se suma al publicar,
+  // así aparece en la próxima carga sin recargar la página.
+  const [comps, setComps] = useState<string[]>(competiciones);
   const [form, setForm] = useState(empty);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -79,6 +85,10 @@ export default function TicketsPanel({
         return;
       }
       setTickets((prev) => [data.row as TicketFull, ...prev]);
+      const nuevaComp = form.competicion.trim();
+      if (nuevaComp && !comps.includes(nuevaComp)) {
+        setComps((prev) => [...prev, nuevaComp].sort());
+      }
       setForm(empty);
       push("success", "Entrada publicada en la tienda");
     } catch {
@@ -238,15 +248,23 @@ export default function TicketsPanel({
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="flex flex-col justify-between">
                   <label className={labelCls}>Categoría / competición</label>
+                  {/* Combobox nativo: elegís una existente del desplegable o
+                      escribís una nueva y queda agregada al publicar. */}
                   <input
                     className={inputCls}
+                    list="competiciones-existentes"
                     value={form.competicion}
                     onChange={(e) => set("competicion", e.target.value)}
-                    placeholder="Primera División"
+                    placeholder="Elegí o escribí una nueva"
                   />
+                  <datalist id="competiciones-existentes">
+                    {comps.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
                 </div>
                 <div className="flex flex-col justify-between">
-                  <label className={labelCls}>Lugar / sede</label>
+                  <label className={labelCls}>Lugar</label>
                   <input
                     className={inputCls}
                     value={form.ciudad}
