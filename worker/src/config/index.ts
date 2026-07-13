@@ -62,6 +62,9 @@ const ConfigSchema = z
     MAX_BACKOFF_MS: z.coerce.number().int().positive().default(300_000),
 
     // Supabase
+    // La tienda a revalidar al terminar cada sync (el worker escribe directo
+    // en la base y la app no se entera; con esto los cambios se ven YA).
+    TIENDA_URL: z.string().url().default("https://tickermirror.vercel.app"),
     SUPABASE_URL: z.string().url(),
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY es obligatorio"),
     SUPABASE_DB_URL: optionalString.pipe(z.string().optional()),
@@ -119,6 +122,7 @@ export function redactedConfigSummary(cfg: Config): Record<string, unknown> {
     SYNC_DROP_ABORT_RATIO: cfg.SYNC_DROP_ABORT_RATIO,
     HEALTH_PORT: cfg.HEALTH_PORT,
     STATE_DIR: cfg.STATE_DIR,
+    TIENDA_URL: cfg.TIENDA_URL,
     SUPABASE_URL: cfg.SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY: "(set, redacted)",
     LOG_LEVEL: cfg.LOG_LEVEL,

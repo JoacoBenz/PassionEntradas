@@ -5,6 +5,7 @@ import { PortalSession } from "./portal/session.js";
 import { createSupabase } from "./db/supabase.js";
 import { TicketRepository } from "./db/repository.js";
 import { runSyncCycle } from "./sync/cycle.js";
+import { avisarTienda } from "./sync/revalidar.js";
 import { BlockedError, LoginFailedError } from "./errors.js";
 import { computeBackoffMs, sleep } from "./util/time.js";
 
@@ -57,6 +58,9 @@ async function main(): Promise<void> {
       // con el catálogo congelado (staleness nunca dispararía).
       if (summary.status === "ok") {
         health.markSuccess();
+        // Refrescar la tienda YA (fail-soft): sin esto, lo publicado tarda
+        // hasta 10 min (revalidación de fondo) en verse.
+        await avisarTienda({ cfg, log });
       }
       waitMs = Math.max(0, cfg.SYNC_INTERVAL_MS - (Date.now() - start));
     } catch (err) {
