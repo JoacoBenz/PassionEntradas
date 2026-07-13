@@ -28,36 +28,70 @@ export async function POST(request: Request) {
   }
 
   const t = body.ticket ?? body ?? {};
-  const precio = t.precio == null || t.precio === "" ? null : Number(t.precio);
-  const stock = t.stock == null || t.stock === "" ? 0 : Math.trunc(Number(t.stock));
+  const evento = String(t.evento ?? "").trim();
+  const competicion = String(t.competicion ?? "").trim();
+  const ciudad = String(t.ciudad ?? "").trim();
+  const categoria = String(t.categoria ?? "").trim();
+  const fecha = String(t.fecha ?? "").trim();
+  const precio = Number(t.precio);
+  const stock = Math.trunc(Number(t.stock));
 
-  if (!t.evento || String(t.evento).trim() === "") {
+  // Una entrada propia se publica completa o no se publica: todos los campos
+  // son obligatorios (mismo criterio que las operaciones — acá también se
+  // habían colado cargas a medias). Validado en el form Y acá.
+  if (!evento) {
     return NextResponse.json({ error: "El evento es obligatorio" }, { status: 400 });
   }
-  if (precio != null && (!Number.isFinite(precio) || precio < 0)) {
-    return NextResponse.json({ error: "Precio inválido" }, { status: 400 });
+  if (!competicion) {
+    return NextResponse.json(
+      { error: "La categoría / competición es obligatoria" },
+      { status: 400 }
+    );
   }
-  if (!Number.isFinite(stock) || stock < 0) {
-    return NextResponse.json({ error: "Stock inválido" }, { status: 400 });
+  if (!ciudad) {
+    return NextResponse.json(
+      { error: "El lugar (ciudad o país) es obligatorio" },
+      { status: 400 }
+    );
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+    return NextResponse.json(
+      { error: "La fecha del evento es obligatoria" },
+      { status: 400 }
+    );
+  }
+  if (!categoria) {
+    return NextResponse.json({ error: "El sector es obligatorio" }, { status: 400 });
+  }
+  if (!Number.isFinite(precio) || precio <= 0) {
+    return NextResponse.json(
+      { error: "El precio debe ser mayor a 0" },
+      { status: 400 }
+    );
+  }
+  if (!Number.isFinite(stock) || stock < 1) {
+    return NextResponse.json(
+      { error: "El stock debe ser al menos 1" },
+      { status: 400 }
+    );
   }
 
-  const hayStock = stock > 0 && precio != null;
   const row = {
     id: `manual::${randomUUID()}`,
-    evento: String(t.evento).trim(),
-    competicion: t.competicion?.trim() || null,
-    fecha: t.fecha || null,
-    ciudad: t.ciudad?.trim() || null,
-    categoria: t.categoria?.trim() || null,
+    evento,
+    competicion,
+    fecha,
+    ciudad,
+    categoria,
     // Las entradas propias se cargan directamente en USD (a diferencia del
     // portal Passion, que cotiza en EUR y el worker convierte).
     precio_origen: precio,
     moneda_origen: "USD",
     precio_final: precio,
-    moneda_final: precio != null ? "USD" : null,
+    moneda_final: "USD",
     stock,
-    disponible: hayStock,
-    estado: hayStock ? "book" : "on_request",
+    disponible: true,
+    estado: "book",
     url_origen: null,
     source: "manual",
     scraped_at: new Date().toISOString(),

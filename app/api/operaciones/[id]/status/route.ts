@@ -27,6 +27,8 @@ export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  // Auditoría: quién ejecuta la acción (queda en <hito>_por al marcar).
+  let quien: string | null = null;
   if (!isMock()) {
     const supabase = createServerSupabase();
     const {
@@ -44,6 +46,7 @@ export async function PATCH(
         { status: 403 }
       );
     }
+    quien = user.email ?? null;
   }
 
   let body: any;
@@ -119,7 +122,13 @@ export async function PATCH(
       }
       const col =
         action.action === "entrada" ? "entrada_recibida_at" : "pago_confirmado_at";
-      patch = { [col]: action.done ? new Date().toISOString() : null };
+      const colPor =
+        action.action === "entrada" ? "entrada_recibida_por" : "pago_confirmado_por";
+      patch = {
+        [col]: action.done ? new Date().toISOString() : null,
+        // Quién lo marcó; al desmarcar se limpia junto con el hito.
+        [colPor]: action.done ? quien : null,
+      };
       break;
     }
     case "cerrar": {
@@ -135,7 +144,10 @@ export async function PATCH(
           { status: 409 }
         );
       }
-      patch = { cerrada_at: action.done ? new Date().toISOString() : null };
+      patch = {
+        cerrada_at: action.done ? new Date().toISOString() : null,
+        cerrada_por: action.done ? quien : null,
+      };
       break;
     }
     case "cancelar": {
@@ -172,7 +184,9 @@ export async function PATCH(
     .from("operaciones")
     .update(patch)
     .eq("id", params.id)
-    .select("id, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, updated_at")
+    .select(
+      "id, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, entrada_recibida_por, pago_confirmado_por, cerrada_por, updated_at"
+    )
     .single();
 
   if (error) {
@@ -211,13 +225,28 @@ export async function PATCH(
   return NextResponse.json(pickResult(data as Operacion));
 }
 
-function pickResult(op: Pick<Operacion, "id" | "status" | "entrada_recibida_at" | "pago_confirmado_at" | "cerrada_at"> & { updated_at?: string }) {
+function pickResult(
+  op: Pick<
+    Operacion,
+    | "id"
+    | "status"
+    | "entrada_recibida_at"
+    | "pago_confirmado_at"
+    | "cerrada_at"
+    | "entrada_recibida_por"
+    | "pago_confirmado_por"
+    | "cerrada_por"
+  > & { updated_at?: string }
+) {
   return {
     id: op.id,
     status: op.status,
     entrada_recibida_at: op.entrada_recibida_at,
     pago_confirmado_at: op.pago_confirmado_at,
     cerrada_at: op.cerrada_at,
+    entrada_recibida_por: op.entrada_recibida_por,
+    pago_confirmado_por: op.pago_confirmado_por,
+    cerrada_por: op.cerrada_por,
     estado: estadoDe(op),
   };
 }
