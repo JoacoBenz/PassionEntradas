@@ -1,9 +1,72 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import { ToastViewport, useToast } from "./Toast";
+
+// Autocompletado propio para la competición: las sugerencias se ven ADENTRO
+// de la página (un desplegable bajo el input), no en la barra del teclado
+// como hacía <datalist> en móvil. A nivel módulo para que React no lo
+// remonte en cada render.
+function CompeticionCombo({
+  value,
+  onChange,
+  opciones,
+  inputCls,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  opciones: string[];
+  inputCls: string;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const sugerencias = useMemo(() => {
+    const q = value.trim().toLowerCase();
+    const base = q ? opciones.filter((c) => c.toLowerCase().includes(q)) : opciones;
+    // Si ya escribió una igual, no la sugerimos de nuevo.
+    return base.filter((c) => c.toLowerCase() !== q).slice(0, 8);
+  }, [value, opciones]);
+
+  return (
+    <div className="relative">
+      <input
+        className={inputCls}
+        value={value}
+        autoComplete="off"
+        aria-label="Categoría o competición"
+        placeholder="Elegí o escribí una nueva"
+        onChange={(e) => {
+          onChange(e.target.value);
+          setAbierto(true);
+        }}
+        onFocus={() => setAbierto(true)}
+        onBlur={() => setAbierto(false)}
+      />
+      {abierto && sugerencias.length > 0 && (
+        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-line bg-white py-1 shadow-lg">
+          {sugerencias.map((c) => (
+            <li key={c}>
+              <button
+                type="button"
+                // onMouseDown (no onClick): dispara ANTES del blur del input,
+                // que si no cerraría la lista sin aplicar la selección.
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(c);
+                  setAbierto(false);
+                }}
+                className="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-canvas"
+              >
+                {c}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 type Props = {
   initial: TicketFull[];
@@ -25,7 +88,7 @@ const empty = {
   ciudad: "",
   categoria: "",
   precio: "",
-  stock: "0",
+  stock: "1",
 };
 
 // Panel de catálogo: carga de entradas propias (source=manual) junto a las
@@ -67,8 +130,36 @@ export default function TicketsPanel({
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (enviando.current) return;
+    // Todos los campos son obligatorios: sin esto se creaban entradas a
+    // medias (mismo problema que hubo con las operaciones vacías).
     if (!form.evento.trim()) {
       push("error", "El evento es obligatorio");
+      return;
+    }
+    if (!form.competicion.trim()) {
+      push("error", "La categoría / competición es obligatoria");
+      return;
+    }
+    if (!form.ciudad.trim()) {
+      push("error", "El lugar (ciudad o país) es obligatorio");
+      return;
+    }
+    if (!form.fecha) {
+      push("error", "La fecha del evento es obligatoria");
+      return;
+    }
+    if (!form.categoria.trim()) {
+      push("error", "El sector es obligatorio");
+      return;
+    }
+    const precioNum = Number(form.precio);
+    if (!form.precio.trim() || !Number.isFinite(precioNum) || precioNum <= 0) {
+      push("error", "El precio debe ser mayor a 0");
+      return;
+    }
+    const stockNum = Math.trunc(Number(form.stock));
+    if (!form.stock.trim() || !Number.isFinite(stockNum) || stockNum < 1) {
+      push("error", "El stock debe ser al menos 1");
       return;
     }
     enviando.current = true;
@@ -247,35 +338,30 @@ export default function TicketsPanel({
                   abajo y alineados entre sí. */}
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="flex flex-col justify-between">
-                  <label className={labelCls}>Categoría / competición</label>
-                  {/* Combobox nativo: elegís una existente del desplegable o
-                      escribís una nueva y queda agregada al publicar. */}
-                  <input
-                    className={inputCls}
-                    list="competiciones-existentes"
+                  <label className={labelCls}>Categoría / competición *</label>
+                  {/* Autocompletado propio: sugerencias en un desplegable
+                      dentro de la página (en móvil, datalist las mandaba a
+                      la barra del teclado). Nueva => se agrega al publicar. */}
+                  <CompeticionCombo
                     value={form.competicion}
-                    onChange={(e) => set("competicion", e.target.value)}
-                    placeholder="Elegí o escribí una nueva"
+                    onChange={(v) => set("competicion", v)}
+                    opciones={comps}
+                    inputCls={inputCls}
                   />
-                  <datalist id="competiciones-existentes">
-                    {comps.map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
                 </div>
                 <div className="flex flex-col justify-between">
-                  <label className={labelCls}>Lugar</label>
+                  <label className={labelCls}>Lugar *</label>
                   <input
                     className={inputCls}
                     value={form.ciudad}
                     onChange={(e) => set("ciudad", e.target.value)}
-                    placeholder="Estadio Monumental, BA"
+                    placeholder="Ciudad o país"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Fecha</label>
+                  <label className={labelCls}>Fecha *</label>
                   <input
                     type="date"
                     className={inputCls}
@@ -284,7 +370,7 @@ export default function TicketsPanel({
                   />
                 </div>
                 <div>
-                  <label className={labelCls}>Sector</label>
+                  <label className={labelCls}>Sector *</label>
                   <input
                     className={inputCls}
                     value={form.categoria}
@@ -296,10 +382,10 @@ export default function TicketsPanel({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Precio (USD)</label>
+                  <label className={labelCls}>Precio (USD) *</label>
                   <input
                     type="number"
-                    min={0}
+                    min={1}
                     step={1}
                     className={`${inputCls} font-mono`}
                     value={form.precio}
@@ -308,10 +394,10 @@ export default function TicketsPanel({
                   />
                 </div>
                 <div>
-                  <label className={labelCls}>Stock</label>
+                  <label className={labelCls}>Stock *</label>
                   <input
                     type="number"
-                    min={0}
+                    min={1}
                     step={1}
                     className={`${inputCls} font-mono`}
                     value={form.stock}
