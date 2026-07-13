@@ -100,6 +100,7 @@ export async function PUT(request: Request) {
 
   if (isMock()) {
     const margen = mockUpsertMargen(competicion, porcentaje);
+    revalidatePath("/(tienda)", "layout"); // flujo local completo
     return NextResponse.json({ margen, recalculadas: 370 });
   }
 
@@ -161,6 +162,7 @@ export async function DELETE(request: Request) {
     if (!mockDeleteMargen(competicion)) {
       return NextResponse.json({ error: "Regla no encontrada" }, { status: 404 });
     }
+    revalidatePath("/(tienda)", "layout"); // flujo local completo
     return NextResponse.json({ ok: true, recalculadas: 370 });
   }
 

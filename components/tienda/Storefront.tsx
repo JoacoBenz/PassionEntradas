@@ -82,6 +82,13 @@ function LadderRow({ u, ev }: { u: Ticket; ev: EventoAgrupado }) {
             <i className={`dot ${low ? "low" : "ok"}`} />
             {low ? `quedan ${stk}` : `${stk} lugares`}
           </>
+        ) : u.stock == null && u.estado === "on_request" ? (
+          // Stock desconocido (a pedido), no agotado: "sin cupo" espantaba
+          // consultas por entradas que sí se pueden conseguir.
+          <>
+            <i className="dot req" />
+            a pedido
+          </>
         ) : (
           <>
             <i className="dot req" />
@@ -109,7 +116,14 @@ function TicketCard({ ev, i, defaultOpen = false }: { ev: EventoAgrupado; i: num
   const { title, context } = parseTitle(ev.evento, ev.comp);
   const date = fmtDate(ev.fecha);
   const n = ev.ubicaciones.length;
-  const code = (ev.ubicaciones[0]?.id || "").split("::")[0].slice(0, 6).padStart(6, "0");
+  // N.º de talón (cosmético): primer segmento del id del portal, o el uuid
+  // para las propias (antes esas mostraban literalmente "N.º manual").
+  const segs = (ev.ubicaciones[0]?.id || "").split("::");
+  const code = (segs[0] === "manual" ? segs[1] ?? "" : segs[0])
+    .replace(/-/g, "")
+    .slice(0, 6)
+    .padStart(6, "0")
+    .toUpperCase();
 
   useEffect(() => {
     const roll = rollRef.current;
@@ -119,8 +133,10 @@ function TicketCard({ ev, i, defaultOpen = false }: { ev: EventoAgrupado; i: num
   async function share() {
     // Link profundo al evento puntual: el catálogo lo abre filtrado y con la
     // card desplegada (antes se compartía /buscar a secas y el que recibía
-    // caía en la cartelera completa sin saber cuál era).
-    const url = `${location.origin}/buscar?ev=${encodeURIComponent(ev.evento)}`;
+    // caía en la cartelera completa sin saber cuál era). Va también la
+    // competición: los eventos se agrupan por (competición, evento) y dos
+    // torneos pueden repetir el mismo nombre de partido.
+    const url = `${location.origin}/buscar?ev=${encodeURIComponent(ev.evento)}&c=${encodeURIComponent(ev.comp)}`;
     const data = { title: "TicketMirror", text: `Mirá las entradas para ${title} en TicketMirror`, url };
     try {
       if (navigator.share) await navigator.share(data);
@@ -426,7 +442,7 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
 // `evento` es el link profundo compartido (?ev=): match exacto de un evento,
 // tiene prioridad sobre el resto de los filtros y se limpia al tocar cualquier
 // filtro. Vacío = navegación normal.
-type FilterState = { cat: string; lugar: string; mes: string; q: string; evento: string };
+type FilterState = { cat: string; lugar: string; mes: string; q: string; evento: string; comp: string };
 
 function uniqueOptions(
   events: EventoAgrupado[],
@@ -445,6 +461,36 @@ function uniqueOptions(
   return arr.map((a) => ({ value: a.key, label: `${a.label} (${a.n})` }));
 }
 
+// A nivel módulo (no adentro del render): definido adentro, React lo veía
+// como un componente NUEVO en cada render y remontaba los <select>,
+// perdiendo el foco mientras se tipeaba en el buscador.
+function Select({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label className="sel">
+      <span>{label}</span>
+      <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -455,12 +501,16 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
     mes: params.get("mes") || "*",
     q: params.get("q") || "",
     evento: params.get("ev") || "",
+    comp: params.get("c") || "",
   });
 
   const filtered = useMemo(() => {
     const out = events.filter((ev) => {
-      // Link compartido: solo ese evento, ignorando el resto de los filtros.
-      if (state.evento) return ev.evento === state.evento;
+      // Link compartido: solo ese evento (y su competición, si vino en el
+      // link: dos torneos pueden repetir nombre de partido).
+      if (state.evento) {
+        return ev.evento === state.evento && (!state.comp || ev.comp === state.comp);
+      }
       if (state.cat !== "*" && ev.comp !== state.cat) return false;
       if (state.lugar !== "*" && ev.lugar !== state.lugar) return false;
       if (state.mes !== "*" && ev.mes !== state.mes) return false;
@@ -530,33 +580,6 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
   const filtrando =
     state.cat !== "*" || state.lugar !== "*" || state.mes !== "*" || !!state.q || !!state.evento;
 
-  function Select({
-    id,
-    label,
-    value,
-    options,
-    onChange,
-  }: {
-    id: string;
-    label: string;
-    value: string;
-    options: { value: string; label: string }[];
-    onChange: (v: string) => void;
-  }) {
-    return (
-      <label className="sel">
-        <span>{label}</span>
-        <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
-    );
-  }
-
   return (
     <>
       <header className="masthead masthead--cat">
@@ -579,21 +602,21 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
             label="Categoría"
             value={state.cat}
             options={catOpts}
-            onChange={(v) => setState((s) => ({ ...s, cat: v, evento: "" }))}
+            onChange={(v) => setState((s) => ({ ...s, cat: v, evento: "", comp: "" }))}
           />
           <Select
             id="f-lugar"
             label="Lugar"
             value={state.lugar}
             options={lugarOpts}
-            onChange={(v) => setState((s) => ({ ...s, lugar: v, evento: "" }))}
+            onChange={(v) => setState((s) => ({ ...s, lugar: v, evento: "", comp: "" }))}
           />
           <Select
             id="f-mes"
             label="Fecha"
             value={state.mes}
             options={mesOpts}
-            onChange={(v) => setState((s) => ({ ...s, mes: v, evento: "" }))}
+            onChange={(v) => setState((s) => ({ ...s, mes: v, evento: "", comp: "" }))}
           />
         </div>
         <input
@@ -601,7 +624,7 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
           type="search"
           placeholder="Buscar equipo, sede o sector"
           value={state.q}
-          onChange={(e) => setState((s) => ({ ...s, q: e.target.value, evento: "" }))}
+          onChange={(e) => setState((s) => ({ ...s, q: e.target.value, evento: "", comp: "" }))}
         />
       </div>
 
@@ -615,7 +638,7 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
         {filtrando && (
           <button
             className="clear"
-            onClick={() => setState({ cat: "*", lugar: "*", mes: "*", q: "", evento: "" })}
+            onClick={() => setState({ cat: "*", lugar: "*", mes: "*", q: "", evento: "", comp: "" })}
           >
             Limpiar filtros
           </button>
@@ -629,7 +652,11 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
               key={ev.comp + ev.evento}
               ev={ev}
               i={i}
-              defaultOpen={!!state.evento && ev.evento === state.evento}
+              defaultOpen={
+                !!state.evento &&
+                ev.evento === state.evento &&
+                (!state.comp || ev.comp === state.comp)
+              }
             />
           ))
         ) : (

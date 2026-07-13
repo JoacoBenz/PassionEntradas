@@ -1,10 +1,12 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getRol } from "@/lib/auth";
+import { esStaff, getRol } from "@/lib/auth";
 
 // Refresca la sesión de Supabase Auth y protege los módulos:
-// - /admin: solo rol administrador (los moderadores van a /moderador)
-// - /moderador: cualquier usuario autenticado
+// - /admin: solo rol administrador (los moderadores van a /moderador),
+//   salvo /admin/cuenta (cambio de contraseña propio): todo el staff.
+// - /moderador: cualquier usuario del staff (rol asignado).
+// - Sesión SIN rol asignado: no es del equipo, no entra a ningún módulo.
 // La página pública /op/[id] queda fuera del matcher (acceso anónimo).
 export async function middleware(request: NextRequest) {
   // Modo demo sin Supabase: todo el mundo es admin, el login se saltea.
@@ -64,13 +66,21 @@ export async function middleware(request: NextRequest) {
   if (user) {
     const rol = getRol(user);
 
+    // Sesión sin rol del panel (cuenta creada por fuera): afuera. Se corta
+    // la sesión para que el login no la recicle en loop.
+    if (!esStaff(rol) && !isLogin) {
+      await supabase.auth.signOut();
+      return redirectTo("/admin/login");
+    }
+
     // Ya logueado y entrando al login -> a su módulo.
-    if (isLogin) {
+    if (isLogin && esStaff(rol)) {
       return redirectTo(rol === "moderador" ? "/moderador" : "/admin");
     }
 
-    // Moderador intentando entrar al panel de administración -> a su módulo.
-    if (rol === "moderador" && path.startsWith("/admin")) {
+    // Moderador en el panel de administración -> a su módulo, con una
+    // excepción: /admin/cuenta (cambiar su propia contraseña) es para todos.
+    if (rol === "moderador" && path.startsWith("/admin") && path !== "/admin/cuenta") {
       return redirectTo("/moderador");
     }
   }

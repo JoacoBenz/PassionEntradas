@@ -31,10 +31,19 @@ export async function fetchTickets(): Promise<Ticket[]> {
     const supabase = createPublicSupabase();
     const { data, error } = await supabase
       .from("tickets")
-      .select("id,evento,competicion,fecha,ciudad,categoria,precio_final,stock,estado,source")
+      .select(
+        "id,evento,competicion,fecha,ciudad,categoria,precio_final,stock,estado,source,disponible"
+      )
       .order("fecha", { ascending: true, nullsFirst: false });
     if (error) throw new Error(error.message);
-    return sinEventosPasados((data ?? []) as Ticket[]);
+    // Entradas "book" que el portal retiró (el worker las marca
+    // disponible=false y stock=0): afuera. Ojo: las on_request vigentes
+    // también vienen con disponible=false por diseño, esas se quedan
+    // (son las de "Consultar").
+    const rows = ((data ?? []) as (Ticket & { disponible: boolean })[]).filter(
+      (t) => !(t.source === "portal" && t.estado === "book" && !t.disponible)
+    );
+    return sinEventosPasados(rows);
   } catch (err) {
     console.warn("[tienda] Supabase no disponible, usando catálogo mock:", err);
     const { MOCK_TICKETS } = await import("@/lib/mock-tickets");

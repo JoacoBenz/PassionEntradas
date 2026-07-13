@@ -203,6 +203,9 @@ export function mockApplyAction(
       break;
     case "cancelar":
       if (cancelada) return { ok: false, status: 409, error: "La operación ya está cancelada" };
+      if (op.cerrada_at) {
+        return { ok: false, status: 409, error: "La operación está cerrada; reabrí el cierre antes de cancelar" };
+      }
       op.status = "cancelada";
       break;
     case "reabrir":

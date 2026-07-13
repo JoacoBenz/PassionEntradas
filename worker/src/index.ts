@@ -51,8 +51,13 @@ async function main(): Promise<void> {
     try {
       await session.ensureSession();
       loginFailures = 0;
-      await runSyncCycle({ cfg, log, session, repo, signal: abort.signal });
-      health.markSuccess();
+      const summary = await runSyncCycle({ cfg, log, session, repo, signal: abort.signal });
+      // Solo un ciclo publicado cuenta como "sano". Si el abort del guard
+      // marcara éxito, un abort permanente dejaría el healthcheck en verde
+      // con el catálogo congelado (staleness nunca dispararía).
+      if (summary.status === "ok") {
+        health.markSuccess();
+      }
       waitMs = Math.max(0, cfg.SYNC_INTERVAL_MS - (Date.now() - start));
     } catch (err) {
       if (err instanceof BlockedError) {
