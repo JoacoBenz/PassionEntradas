@@ -102,8 +102,8 @@ function LadderRow({ u, ev }: { u: Ticket; ev: EventoAgrupado }) {
 }
 
 // ---- card de evento (talón) ----------------------------------------------------
-function TicketCard({ ev, i }: { ev: EventoAgrupado; i: number }) {
-  const [open, setOpen] = useState(false);
+function TicketCard({ ev, i, defaultOpen = false }: { ev: EventoAgrupado; i: number; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [shared, setShared] = useState(false);
   const rollRef = useRef<HTMLDivElement>(null);
   const { title, context } = parseTitle(ev.evento, ev.comp);
@@ -117,7 +117,10 @@ function TicketCard({ ev, i }: { ev: EventoAgrupado; i: number }) {
   }, [open]);
 
   async function share() {
-    const url = location.origin + "/buscar";
+    // Link profundo al evento puntual: el catálogo lo abre filtrado y con la
+    // card desplegada (antes se compartía /buscar a secas y el que recibía
+    // caía en la cartelera completa sin saber cuál era).
+    const url = `${location.origin}/buscar?ev=${encodeURIComponent(ev.evento)}`;
     const data = { title: "TicketMirror", text: `Mirá las entradas para ${title} en TicketMirror`, url };
     try {
       if (navigator.share) await navigator.share(data);
@@ -420,7 +423,10 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
 }
 
 // =============================== CATÁLOGO ======================================
-type FilterState = { cat: string; lugar: string; mes: string; q: string };
+// `evento` es el link profundo compartido (?ev=): match exacto de un evento,
+// tiene prioridad sobre el resto de los filtros y se limpia al tocar cualquier
+// filtro. Vacío = navegación normal.
+type FilterState = { cat: string; lugar: string; mes: string; q: string; evento: string };
 
 function uniqueOptions(
   events: EventoAgrupado[],
@@ -448,10 +454,13 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
     lugar: params.get("lugar") || "*",
     mes: params.get("mes") || "*",
     q: params.get("q") || "",
+    evento: params.get("ev") || "",
   });
 
   const filtered = useMemo(() => {
     const out = events.filter((ev) => {
+      // Link compartido: solo ese evento, ignorando el resto de los filtros.
+      if (state.evento) return ev.evento === state.evento;
       if (state.cat !== "*" && ev.comp !== state.cat) return false;
       if (state.lugar !== "*" && ev.lugar !== state.lugar) return false;
       if (state.mes !== "*" && ev.mes !== state.mes) return false;
@@ -481,7 +490,19 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
   // Al cambiar cualquier filtro se vuelve a la primera página.
   useEffect(() => {
     setPage(1);
-  }, [state.cat, state.lugar, state.mes, state.q]);
+  }, [state.cat, state.lugar, state.mes, state.q, state.evento]);
+
+  // Link compartido: centrar la card del evento apenas se abre la página.
+  // (La card ya viene desplegada por defaultOpen.)
+  useEffect(() => {
+    if (!state.evento) return;
+    const t = setTimeout(() => {
+      document
+        .querySelector(".feed .ticket")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [state.evento]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -506,7 +527,8 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
     { value: "*", label: "Todas las fechas" },
     ...uniqueOptions(events, (e) => ({ key: e.mes, label: e.mesLabel }), false),
   ];
-  const filtrando = state.cat !== "*" || state.lugar !== "*" || state.mes !== "*" || !!state.q;
+  const filtrando =
+    state.cat !== "*" || state.lugar !== "*" || state.mes !== "*" || !!state.q || !!state.evento;
 
   function Select({
     id,
@@ -550,26 +572,28 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
 
       <div className="bar">
         <div className="filters">
+          {/* Tocar un filtro libera el link compartido (evento: "") para
+              volver a la navegación normal. */}
           <Select
             id="f-cat"
             label="Categoría"
             value={state.cat}
             options={catOpts}
-            onChange={(v) => setState((s) => ({ ...s, cat: v }))}
+            onChange={(v) => setState((s) => ({ ...s, cat: v, evento: "" }))}
           />
           <Select
             id="f-lugar"
             label="Lugar"
             value={state.lugar}
             options={lugarOpts}
-            onChange={(v) => setState((s) => ({ ...s, lugar: v }))}
+            onChange={(v) => setState((s) => ({ ...s, lugar: v, evento: "" }))}
           />
           <Select
             id="f-mes"
             label="Fecha"
             value={state.mes}
             options={mesOpts}
-            onChange={(v) => setState((s) => ({ ...s, mes: v }))}
+            onChange={(v) => setState((s) => ({ ...s, mes: v, evento: "" }))}
           />
         </div>
         <input
@@ -577,7 +601,7 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
           type="search"
           placeholder="Buscar equipo, sede o sector"
           value={state.q}
-          onChange={(e) => setState((s) => ({ ...s, q: e.target.value }))}
+          onChange={(e) => setState((s) => ({ ...s, q: e.target.value, evento: "" }))}
         />
       </div>
 
@@ -591,7 +615,7 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
         {filtrando && (
           <button
             className="clear"
-            onClick={() => setState({ cat: "*", lugar: "*", mes: "*", q: "" })}
+            onClick={() => setState({ cat: "*", lugar: "*", mes: "*", q: "", evento: "" })}
           >
             Limpiar filtros
           </button>
@@ -600,7 +624,14 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
 
       <main className="feed">
         {filtered.length ? (
-          visible.map((ev, i) => <TicketCard key={ev.comp + ev.evento} ev={ev} i={i} />)
+          visible.map((ev, i) => (
+            <TicketCard
+              key={ev.comp + ev.evento}
+              ev={ev}
+              i={i}
+              defaultOpen={!!state.evento && ev.evento === state.evento}
+            />
+          ))
         ) : (
           <p className="empty">
             Ningún evento coincide con estos filtros.
