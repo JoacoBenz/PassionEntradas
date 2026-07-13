@@ -137,6 +137,9 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
                 entrada_recibida_at: data.entrada_recibida_at,
                 pago_confirmado_at: data.pago_confirmado_at,
                 cerrada_at: data.cerrada_at,
+                entrada_recibida_por: data.entrada_recibida_por ?? null,
+                pago_confirmado_por: data.pago_confirmado_por ?? null,
+                cerrada_por: data.cerrada_por ?? null,
               }
             : o
         )
