@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { estadoDe, type Operacion, type StatusAction } from "@/lib/operaciones";
-import { getRol } from "@/lib/auth";
+import { getRol, nombreDe } from "@/lib/auth";
 import { isMock, mockApplyAction } from "@/lib/mock-db";
 
 // PATCH /api/operaciones/[id]/status — aplica una acción sobre la operación.
@@ -46,7 +46,8 @@ export async function PATCH(
         { status: 403 }
       );
     }
-    quien = user.email ?? null;
+    // "Nombre Apellido" si cargó sus datos en Mi cuenta; si no, el email.
+    quien = nombreDe(user);
   }
 
   let body: any;
