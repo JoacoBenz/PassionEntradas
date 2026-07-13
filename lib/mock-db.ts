@@ -291,6 +291,11 @@ export function mockApplyAction(
       }
       op.cerrada_at = action.done ? new Date().toISOString() : null;
       op.cerrada_por = action.done ? MOCK_USER.email : null;
+      // Entrada propia vinculada: cerrar descuenta 1 del stock de la tienda;
+      // reabrir el cierre lo repone (misma lógica que la API real).
+      if (op.ticket_id?.startsWith("manual::")) {
+        mockAjustarStockManual(op.ticket_id, action.done ? -1 : 1);
+      }
       break;
     case "cancelar": {
       if (cancelada) return { ok: false, status: 409, error: "La operación ya está cancelada" };
@@ -342,6 +347,26 @@ export function mockListManual(): TicketFull[] {
 export function mockCreateManual(row: TicketFull): TicketFull {
   db().manual.unshift(row);
   return row;
+}
+
+export function mockUpdateManual(
+  id: string,
+  patch: Partial<TicketFull>
+): TicketFull | null {
+  const t = db().manual.find((x) => x.id === id);
+  if (!t) return null;
+  Object.assign(t, patch, { updated_at: new Date().toISOString() });
+  return t;
+}
+
+// Descuento/reposición de stock de una entrada propia (operación vinculada
+// cerrada/reabierta). Clampa en 0.
+export function mockAjustarStockManual(ticketId: string, delta: number): void {
+  const t = db().manual.find((x) => x.id === ticketId);
+  if (!t) return;
+  t.stock = Math.max(0, (t.stock ?? 0) + delta);
+  t.disponible = (t.stock ?? 0) > 0;
+  t.updated_at = new Date().toISOString();
 }
 
 export function mockDeleteManual(id: string): boolean {
