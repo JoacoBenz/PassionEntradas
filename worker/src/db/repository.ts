@@ -21,13 +21,17 @@ export class TicketRepository {
 
   /**
    * Baseline para el guard anti-borrado: cantidad de ítems válidos del ÚLTIMO
-   * sync exitoso (no el total de la tabla, que crece con los marcados ausentes).
+   * sync exitoso Y COMPLETO (no el total de la tabla, que crece con los
+   * marcados ausentes). Los parciales ("ok_incomplete") no cuentan: si el
+   * baseline bajara con cada scrape cortado a la mitad, unos pocos ciclos
+   * malos seguidos lo dejarían tan bajo que el guard dejaría de proteger.
    */
   async getLastSuccessfulScrapedCount(): Promise<number> {
     const { data, error } = await this.db
       .from(RUNS_TABLE)
       .select("scraped_valid")
       .eq("status", "ok")
+      .eq("complete", true)
       .order("created_at", { ascending: false })
       .limit(1);
     if (error) throw new Error(`getLastSuccessfulScrapedCount: ${error.message}`);

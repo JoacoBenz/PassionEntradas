@@ -1,4 +1,5 @@
 import type { Config } from "../config/index.js";
+import { BlockedError, SessionExpiredError } from "../errors.js";
 import type { Logger } from "../logger.js";
 import { fetchPortalHtml } from "./client.js";
 import { buildOnRequestRow, classifyDetail, parseEventDetail, parseEventList } from "./parser.js";
@@ -94,7 +95,15 @@ export async function scrapeRawTickets(deps: {
         }
       }
     } catch (err) {
-      // Un detalle que falla no tumba el ciclo, pero lo marca incompleto.
+      // Bloqueo (captcha/MFA) o sesión caída: cortar el ciclo YA. Seguir
+      // iterando martillaría el portal contra la página de bloqueo una vez
+      // por detalle — lo contrario del diseño "no se evade, se enfría".
+      // El loop principal ya sabe tratar estos errores (cooldown/re-login).
+      if (err instanceof BlockedError || err instanceof SessionExpiredError) {
+        throw err;
+      }
+      // Cualquier otro fallo de un detalle no tumba el ciclo, pero lo marca
+      // incompleto.
       log.warn({ err, eventId: e.eventId }, "fallo al traer/parsear detalle, continúo");
       complete = false;
     }

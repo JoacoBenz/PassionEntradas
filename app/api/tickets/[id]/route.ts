@@ -27,20 +27,20 @@ export async function DELETE(
     if (!mockDeleteManual(id)) {
       return NextResponse.json({ error: "No encontrada" }, { status: 404 });
     }
-    return NextResponse.json({ ok: true });
-  }
-  const admin = createAdminSupabase();
-  const { error } = await admin
-    .from("tickets")
-    .delete()
-    .eq("id", id)
-    .eq("source", "manual");
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  } else {
+    const admin = createAdminSupabase();
+    const { error } = await admin
+      .from("tickets")
+      .delete()
+      .eq("id", id)
+      .eq("source", "manual");
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
   }
 
-  // La tienda pública es ISR (revalidate 60): sin esto, la entrada borrada
-  // sigue apareciendo hasta un minuto en la home y la búsqueda.
+  // La tienda pública es ISR: sin esto, la entrada borrada sigue apareciendo
+  // hasta la revalidación de fondo. También en mock (flujo local completo).
   revalidatePath("/(tienda)", "layout");
 
   return NextResponse.json({ ok: true });

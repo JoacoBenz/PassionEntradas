@@ -5,7 +5,7 @@ import AppHeader from "@/components/AppHeader";
 import BottomNav from "@/components/BottomNav";
 import TicketsPanel from "@/components/admin/TicketsPanel";
 import MargenesPanel from "@/components/admin/MargenesPanel";
-import type { SyncRun, TicketFull } from "@/lib/tickets";
+import { hoyArgentina, type SyncRun, type TicketFull } from "@/lib/tickets";
 import {
   isMock,
   MOCK_USER,
@@ -14,12 +14,6 @@ import {
   mockPortalCount,
   mockSyncRuns,
 } from "@/lib/mock-db";
-
-// Día calendario (UTC) para separar eventos vigentes de los ya pasados,
-// mismo criterio que el worker y la tienda.
-function hoyUTC(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +47,8 @@ export default async function AdminEntradasPage() {
     // Los conteos del portal excluyen eventos ya pasados: las filas viejas
     // quedan en la tabla (regla anti-borrado del worker) pero no cuentan
     // como catálogo. "Comprables" = con stock y reservables ahora.
-    const hoy = hoyUTC();
+    // Mismo día de corte que la tienda (hora argentina).
+    const hoy = hoyArgentina();
     const [manualRes, syncRes, countRes, comprablesRes, portalRes] = await Promise.all([
       supabase
         .from("tickets")

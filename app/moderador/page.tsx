@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
-import { getRol } from "@/lib/auth";
+import { esStaff, getRol } from "@/lib/auth";
 import ModeradorDashboard from "@/components/moderador/ModeradorDashboard";
 import AppHeader from "@/components/AppHeader";
 import BottomNav from "@/components/BottomNav";
@@ -47,17 +47,26 @@ export default async function ModeradorPage({
     if (!user) {
       redirect("/admin/login");
     }
+    const rol = getRol(user);
+    // Refuerzo del middleware: sin rol del panel no hay módulo de carga.
+    if (!esStaff(rol)) {
+      redirect("/admin/login");
+    }
     email = user.email;
-    esAdmin = getRol(user) === "administrador";
+    esAdmin = rol === "administrador";
 
     // Últimas operaciones cargadas, para referencia y para copiar links.
     // Con service role: la tabla está en RLS deny-all y la sesión del
     // usuario no ve filas (la sesión solo se usa para validar quién es).
+    // Columnas explícitas: notas y cuenta_debitar son datos internos del
+    // panel de administración, el módulo del moderador no los necesita.
     const admin = createAdminSupabase();
     const [recentes, todas] = await Promise.all([
       admin
         .from("operaciones")
-        .select("*")
+        .select(
+          "id, code, evento, comprador_alias, vendedor_alias, monto, fee, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, ticket_id, created_at, updated_at"
+        )
         .order("created_at", { ascending: false })
         .limit(10),
       // Solo las columnas que necesitan las métricas, de TODAS las
@@ -66,7 +75,11 @@ export default async function ModeradorPage({
         .from("operaciones")
         .select("monto, fee, status, pago_confirmado_at, cerrada_at"),
     ]);
-    ops = (recentes.data ?? []) as Operacion[];
+    ops = (recentes.data ?? []).map((o) => ({
+      ...o,
+      notas: null,
+      cuenta_debitar: null,
+    })) as Operacion[];
     metrics = computeMetrics(
       (todas.data ?? []) as Parameters<typeof computeMetrics>[0]
     );
