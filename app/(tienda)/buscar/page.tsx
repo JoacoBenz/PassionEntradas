@@ -13,13 +13,13 @@ export default async function BuscarPage() {
   try {
     [rows, cfg] = await Promise.all([fetchTickets(), fetchConfigTienda()]);
   } catch {
-    return <div className="splash err">No pudimos cargar la cartelera.</div>;
+    return <div className="splash err">We could not load the listings.</div>;
   }
   // Interruptor del panel: con Passion apagado quedan solo las propias.
   if (!cfg.portalActivo) rows = rows.filter((t) => t.source !== "portal");
   return (
     // useSearchParams exige Suspense en páginas estáticas.
-    <Suspense fallback={<div className="splash">Armando la cartelera…</div>}>
+    <Suspense fallback={<div className="splash">Loading the listings…</div>}>
       {/* Todo a USD antes de renderizar: la tienda no vuelve a convertir. */}
       <StorefrontCatalog rows={normalizarPreciosUsd(rows, cfg.eurUsd)} />
     </Suspense>

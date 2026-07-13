@@ -2,6 +2,8 @@
 // Tipos de la tabla `tickets`, agrupado por evento, precios multi-moneda
 // y links de WhatsApp con mensaje pre-armado.
 
+import { LOCALE, TX, type Lang } from "@/lib/tienda-i18n";
+
 export type TicketEstado = "book" | "on_request";
 export type TicketSource = "portal" | "manual";
 
@@ -68,11 +70,12 @@ export type EventoAgrupado = {
 export const DEFAULT_EUR_USD = 1.08;
 
 // Formatea un monto que YA está en USD (ver normalizarPreciosUsd).
-export function fmtPrice(usd: number | null): string | null {
+// El agrupado de miles sigue el idioma de la tienda (en: 1,234 / es: 1.234).
+export function fmtPrice(usd: number | null, lang: Lang = "en"): string | null {
   if (usd == null) return null;
   return (
     "US$ " +
-    new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(Math.round(usd))
+    new Intl.NumberFormat(LOCALE[lang], { maximumFractionDigits: 0 }).format(Math.round(usd))
   );
 }
 
@@ -108,9 +111,10 @@ export function sinEventosPasados<T extends { fecha: string | null }>(rows: T[])
 }
 
 // ---- fechas / texto -----------------------------------------------------------
-export function fmtDate(iso: string | null) {
-  if (!iso) return { d: "—", m: "", y: "", full: "Fecha a confirmar" };
+export function fmtDate(iso: string | null, lang: Lang = "en") {
+  if (!iso) return { d: "—", m: "", y: "", full: TX[lang].fechaTBC };
   const dt = new Date(iso);
+  const locale = LOCALE[lang];
   // SIEMPRE en UTC: la columna es timestamptz y el día del evento viene
   // codificado como día UTC (el worker guarda mediodía UTC; las entradas
   // propias, medianoche UTC del date elegido). Formatear en hora argentina
@@ -119,12 +123,12 @@ export function fmtDate(iso: string | null) {
   // ya agrupaba en UTC.
   const timeZone = "UTC";
   return {
-    d: dt.toLocaleDateString("es-AR", { day: "2-digit", timeZone }),
-    m: dt.toLocaleDateString("es-AR", { month: "short", timeZone }).replace(".", "").toUpperCase(),
-    y: dt.toLocaleDateString("es-AR", { year: "numeric", timeZone }),
+    d: dt.toLocaleDateString(locale, { day: "2-digit", timeZone }),
+    m: dt.toLocaleDateString(locale, { month: "short", timeZone }).replace(".", "").toUpperCase(),
+    y: dt.toLocaleDateString(locale, { year: "numeric", timeZone }),
     // Primera letra en mayúscula: es-AR devuelve "sábado, 18 de julio…".
     full: capitalizar(
-      dt.toLocaleDateString("es-AR", {
+      dt.toLocaleDateString(locale, {
         weekday: "long",
         day: "2-digit",
         month: "long",
