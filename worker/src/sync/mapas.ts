@@ -6,8 +6,10 @@ import type { PortalSession } from "../portal/session.js";
 import type { TicketRepository } from "../db/repository.js";
 import { sleep } from "../util/time.js";
 
-/** Tope de mapas NUEVOS por ciclo: reparte la carga y no alarga el sync. */
-const MAX_NUEVOS_POR_CICLO = 10;
+/** Tope de mapas NUEVOS por ciclo: reparte la carga y no alarga el sync.
+ * 40 con throttle: el backlog inicial (~150 eventos recuperados de golpe)
+ * se drena en unos pocos ciclos sin castigar al portal. */
+const MAX_NUEVOS_POR_CICLO = 40;
 
 /**
  * Resuelve los mapas de sectores del ciclo: para cada evento con imagen
