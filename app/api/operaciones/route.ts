@@ -51,14 +51,32 @@ export async function POST(request: Request) {
   if (fecha_evento && !/^\d{4}-\d{2}-\d{2}$/.test(fecha_evento)) {
     return NextResponse.json({ error: "Fecha inválida" }, { status: 400 });
   }
+  // Datos mínimos de una operación de custodia: qué se opera, entre quiénes y
+  // por cuánto. Se validan también acá (además del form) para que nunca entre
+  // una operación con datos vacíos a la base.
   if (!evento) {
     return NextResponse.json(
       { error: "El evento es obligatorio" },
       { status: 400 }
     );
   }
-  if (!Number.isFinite(monto) || monto < 0) {
-    return NextResponse.json({ error: "Monto inválido" }, { status: 400 });
+  if (!comprador_alias) {
+    return NextResponse.json(
+      { error: "El alias del comprador es obligatorio" },
+      { status: 400 }
+    );
+  }
+  if (!vendedor_alias) {
+    return NextResponse.json(
+      { error: "El alias del vendedor es obligatorio" },
+      { status: 400 }
+    );
+  }
+  if (!Number.isFinite(monto) || monto <= 0) {
+    return NextResponse.json(
+      { error: "El monto debe ser mayor a 0" },
+      { status: 400 }
+    );
   }
   if (!Number.isFinite(fee) || fee < 0) {
     return NextResponse.json({ error: "Comisión inválida" }, { status: 400 });
