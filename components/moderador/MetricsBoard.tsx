@@ -71,38 +71,43 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
     }
   }
 
-  const inputCls =
-    "rounded-lg border border-line bg-white px-2 py-1 text-xs outline-none transition-colors focus:border-brand";
+  // Inputs "desnudos" adentro de una píldora blanca única: los dos date
+  // pickers comparten un solo borde (nada de cajitas sueltas desalineadas).
+  const dateCls =
+    "w-[7.4rem] min-w-0 border-0 bg-transparent p-0 font-mono text-xs text-body outline-none [appearance:none] [&::-webkit-calendar-picker-indicator]:opacity-50";
 
   return (
     <section aria-label="Resumen del negocio" className="mb-6">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h2 className="text-xs font-medium uppercase tracking-widest text-muted">
-          Resumen{filtrado ? " · rango elegido" : " · histórico"}
+          Resumen{filtrado ? " · Rango elegido" : ""}
           {cargando ? "…" : ""}
         </h2>
-        {/* Rango por fecha de pago confirmado */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <label className="text-[11px] text-muted" htmlFor="m-desde">
-            Desde
-          </label>
+        {/* Rango por fecha de pago confirmado. En móvil ocupa su propia
+            línea completa; en desktop queda a la derecha del título. */}
+        <div className="flex w-full items-center gap-2 rounded-xl border border-line bg-white px-3 py-1.5 shadow-sm sm:w-auto">
+          <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted">
+            Pagos
+          </span>
           <input
             id="m-desde"
             type="date"
-            className={inputCls}
+            aria-label="Desde"
+            className={dateCls}
             value={desde}
             onChange={(e) => {
               setDesde(e.target.value);
               void aplicarRango(e.target.value, hasta);
             }}
           />
-          <label className="text-[11px] text-muted" htmlFor="m-hasta">
-            Hasta
-          </label>
+          <span className="shrink-0 text-xs text-muted" aria-hidden>
+            –
+          </span>
           <input
             id="m-hasta"
             type="date"
-            className={inputCls}
+            aria-label="Hasta"
+            className={dateCls}
             value={hasta}
             onChange={(e) => {
               setHasta(e.target.value);
@@ -116,9 +121,10 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
                 setHasta("");
                 void aplicarRango("", "");
               }}
-              className="rounded-lg border border-line bg-white px-2 py-1 text-[11px] font-medium text-[#4A4E5E] transition-colors hover:bg-canvas"
+              title="Ver todo el histórico"
+              className="ml-auto shrink-0 rounded-md px-1.5 py-0.5 text-xs font-semibold text-muted transition-colors hover:bg-canvas hover:text-body"
             >
-              Todo
+              ✕
             </button>
           )}
         </div>

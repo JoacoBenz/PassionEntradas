@@ -354,6 +354,17 @@
 .toprow { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
 .mast-right { display: flex; align-items: center; gap: 10px; }
 
+/* Toggle de idioma EN/ES (mismo lenguaje visual que el viejo selector). */
+.lang { display: inline-flex; flex-shrink: 0; border: 1px solid var(--ink); }
+.lang-btn {
+  background: var(--field); border: none; border-right: 1px solid var(--ink); cursor: pointer;
+  font-family: var(--font-mono), monospace; font-size: 11px; font-weight: 700; padding: 7px 11px; color: var(--mute);
+  transition: .12s;
+}
+.lang-btn:last-child { border-right: none; }
+.lang-btn.active { background: var(--cobalt); color: #fff; }
+.lang-btn:hover:not(.active) { background: var(--ink); color: var(--field); }
+
 /* ============ botones / CTA ============ */
 .btn-ghost {
   font-family: var(--font-body), sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: .02em;

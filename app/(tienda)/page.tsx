@@ -13,7 +13,7 @@ export default async function TiendaHome() {
   try {
     [rows, cfg] = await Promise.all([fetchTickets(), fetchConfigTienda()]);
   } catch {
-    return <div className="splash err">No pudimos cargar la cartelera.</div>;
+    return <div className="splash err">We could not load the listings.</div>;
   }
   // Interruptor del panel: con Passion apagado quedan solo las propias.
   if (!cfg.portalActivo) rows = rows.filter((t) => t.source !== "portal");
