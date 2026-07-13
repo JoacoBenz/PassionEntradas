@@ -44,9 +44,17 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // getSession lee la sesión de la COOKIE (sin viaje a Supabase Auth) y solo
+  // refresca contra el server cuando el token venció. Antes se usaba
+  // getUser(), que valida contra Auth en CADA navegación del panel:
+  // ~100-300ms de latencia fija por click, duplicada porque cada página
+  // vuelve a validar. Acá el middleware solo RUTEA; la autorización real la
+  // hace cada página y cada API con getUser() + rol (defensa en profundidad
+  // ya existente), así que una cookie adulterada rebota igual en la página.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   const path = request.nextUrl.pathname;
   const isLogin = path === "/admin/login";

@@ -61,7 +61,7 @@ export default async function ModeradorPage({
     // Columnas explícitas: notas y cuenta_debitar son datos internos del
     // panel de administración, el módulo del moderador no los necesita.
     const admin = createAdminSupabase();
-    const [recentes, todas] = await Promise.all([
+    const [recentes, agregados] = await Promise.all([
       admin
         .from("operaciones")
         .select(
@@ -69,20 +69,28 @@ export default async function ModeradorPage({
         )
         .order("created_at", { ascending: false })
         .limit(10),
-      // Solo las columnas que necesitan las métricas, de TODAS las
-      // operaciones (la lista de arriba está limitada a 10).
-      admin
-        .from("operaciones")
-        .select("monto, fee, status, pago_confirmado_at, cerrada_at"),
+      // Métricas agregadas en la base (RPC): antes se bajaban TODAS las
+      // filas históricas para sumar en JS — la única query sin tope del
+      // panel, y crecía para siempre.
+      admin.rpc("metricas_operaciones").single(),
     ]);
     ops = (recentes.data ?? []).map((o) => ({
       ...o,
       notas: null,
       cuenta_debitar: null,
     })) as Operacion[];
-    metrics = computeMetrics(
-      (todas.data ?? []) as Parameters<typeof computeMetrics>[0]
-    );
+    const m = (agregados.data ?? {}) as Record<string, number | null>;
+    const plataMovida = Number(m.plata_movida ?? 0);
+    const entradasVendidas = Number(m.entradas_vendidas ?? 0);
+    metrics = {
+      plataMovida,
+      comisionGanada: Number(m.comision_ganada ?? 0),
+      entradasVendidas,
+      enJuegoMonto: Number(m.en_juego_monto ?? 0),
+      enJuegoOps: Number(m.en_juego_ops ?? 0),
+      ticketPromedio:
+        entradasVendidas > 0 ? Math.round(plataMovida / entradasVendidas) : 0,
+    };
   }
 
   return (
