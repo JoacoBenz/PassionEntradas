@@ -1,9 +1,9 @@
-import type { Config } from "../config/index.js";
+﻿import type { Config } from "../config/index.js";
 import { BlockedError, SessionExpiredError } from "../errors.js";
 import type { Logger } from "../logger.js";
 import { fetchPortalHtml } from "./client.js";
 import { extraerMapaUrl } from "./imagen.js";
-import { buildOnRequestRow, classifyDetail, parseEventDetail, parseEventList } from "./parser.js";
+import { buildOnRequestRow, classifyDetail, parseEventDetail, parseEventList, parseListPagination } from "./parser.js";
 import type { PortalSession } from "./session.js";
 import type { PortalEvent, RawTicketInput } from "./types.js";
 import { sleep } from "../util/time.js";
@@ -50,10 +50,23 @@ export async function scrapeRawTickets(deps: {
   const listHtml = await fetchPortalHtml({ url: listUrl, cookieHeader, cfg, log, signal });
 
   let events = parseEventList(listHtml, cfg.PE_BASE_URL);
+
+  // La lista pagina de a 100 ("?first=101&total=235"): hay que recorrer las
+  // páginas restantes o el catálogo queda clavado en los primeros 100
+  // eventos. Tope de 20 páginas como red de seguridad ante HTML inesperado.
+  const paginas = parseListPagination(listHtml, cfg.PE_BASE_URL).slice(0, 20);
+  for (const url of paginas) {
+    if (cfg.PE_DETAIL_THROTTLE_MS > 0) await sleep(cfg.PE_DETAIL_THROTTLE_MS, signal);
+    const html = await fetchPortalHtml({ url, cookieHeader, cfg, log, signal });
+    events = events.concat(parseEventList(html, cfg.PE_BASE_URL));
+  }
+  // Next/Last apuntan a páginas ya vistas: dedup por eventId (último gana).
+  events = [...new Map(events.map((e) => [e.eventId, e])).values()];
+
   const totalEvents = events.length;
   events = events.filter((e) => matchesCategories(e, cfg.PE_SYNC_CATEGORIES));
   log.info(
-    { totalEvents, tras_filtro: events.length, categorias: cfg.PE_SYNC_CATEGORIES },
+    { totalEvents, paginas: 1 + paginas.length, tras_filtro: events.length, categorias: cfg.PE_SYNC_CATEGORIES },
     "eventos listados",
   );
 

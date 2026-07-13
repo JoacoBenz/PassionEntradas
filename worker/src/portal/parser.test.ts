@@ -5,6 +5,7 @@ import {
   buildOnRequestRow,
   parseEventDetail,
   parseEventList,
+  parseListPagination,
   parsePortalDate,
 } from "./parser.js";
 import { RawTicketSchema, type PortalEvent } from "./types.js";
@@ -101,5 +102,23 @@ describe("buildOnRequestRow", () => {
 
   it("pasa la validación zod (precio null permitido)", () => {
     expect(RawTicketSchema.safeParse(row).success).toBe(true);
+  });
+});
+
+describe("parseListPagination (event_list.php paginado)", () => {
+  // Markup real del portal: lista de a 100 con links 2/3/Next/Last.
+  const paginado = `
+    <div><a href="https://passioneventsonline.eu/admin/event_list.php?first=101&amp;total=235">2</a><a href="https://passioneventsonline.eu/admin/event_list.php?first=201&amp;total=235">3</a><a href="https://passioneventsonline.eu/admin/event_list.php?first=101&amp;total=235">Next</a><a href="https://passioneventsonline.eu/admin/event_list.php?first=201&amp;total=235">Last</a></div>`;
+
+  it("devuelve las páginas restantes únicas (Next/Last no duplican)", () => {
+    const urls = parseListPagination(paginado, BASE);
+    expect(urls).toEqual([
+      "https://passioneventsonline.eu/admin/event_list.php?first=101&total=235",
+      "https://passioneventsonline.eu/admin/event_list.php?first=201&total=235",
+    ]);
+  });
+
+  it("sin paginación (una sola página) devuelve vacío", () => {
+    expect(parseListPagination(fixture("event_list.html"), BASE)).toEqual([]);
   });
 });
