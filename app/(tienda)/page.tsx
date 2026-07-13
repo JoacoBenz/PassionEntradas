@@ -1,4 +1,4 @@
-import { fetchEurUsd, fetchTickets } from "@/lib/supabase/public";
+import { fetchConfigTienda, fetchTickets } from "@/lib/supabase/public";
 import { normalizarPreciosUsd } from "@/lib/tickets";
 import { StorefrontHome } from "@/components/tienda/Storefront";
 
@@ -9,12 +9,14 @@ export const revalidate = 600;
 
 export default async function TiendaHome() {
   let rows: Awaited<ReturnType<typeof fetchTickets>> = [];
-  let eurUsd = 1.08;
+  let cfg = { eurUsd: 1.08, portalActivo: true };
   try {
-    [rows, eurUsd] = await Promise.all([fetchTickets(), fetchEurUsd()]);
+    [rows, cfg] = await Promise.all([fetchTickets(), fetchConfigTienda()]);
   } catch {
     return <div className="splash err">No pudimos cargar la cartelera.</div>;
   }
+  // Interruptor del panel: con Passion apagado quedan solo las propias.
+  if (!cfg.portalActivo) rows = rows.filter((t) => t.source !== "portal");
   // Todo a USD antes de renderizar: la tienda no vuelve a convertir.
-  return <StorefrontHome rows={normalizarPreciosUsd(rows, eurUsd)} />;
+  return <StorefrontHome rows={normalizarPreciosUsd(rows, cfg.eurUsd)} />;
 }

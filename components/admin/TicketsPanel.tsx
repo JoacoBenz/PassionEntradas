@@ -12,6 +12,8 @@ type Props = {
   portalCount: number;
   // De esas, las reservables ahora (con stock y en estado book).
   portalComprables: number;
+  // Interruptor: si las entradas de Passion se muestran en la tienda.
+  portalActivo: boolean;
 };
 
 const empty = {
@@ -26,12 +28,20 @@ const empty = {
 
 // Panel de catálogo: carga de entradas propias (source=manual) junto a las
 // sincronizadas del portal, y salud de las últimas corridas del worker.
-export default function TicketsPanel({ initial, syncRuns, portalCount, portalComprables }: Props) {
+export default function TicketsPanel({
+  initial,
+  syncRuns,
+  portalCount,
+  portalComprables,
+  portalActivo,
+}: Props) {
   const [tickets, setTickets] = useState<TicketFull[]>(initial);
   const [form, setForm] = useState(empty);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [passionOn, setPassionOn] = useState(portalActivo);
+  const [passionBusy, setPassionBusy] = useState(false);
   const { toasts, push } = useToast();
 
   // Paginado como en el panel: renderizar miles de filas juntas era el
@@ -79,6 +89,36 @@ export default function TicketsPanel({ initial, syncRuns, portalCount, portalCom
     }
   }
 
+  // Prende/apaga las entradas de Passion en la tienda. Sin optimismo: el
+  // estado recién cambia cuando el server confirmó (y ya revalidó la tienda).
+  async function togglePassion() {
+    if (passionBusy) return;
+    setPassionBusy(true);
+    try {
+      const res = await fetch("/api/portal", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activo: !passionOn }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        push("error", data.error ?? "No se pudo cambiar la tienda");
+        return;
+      }
+      setPassionOn(data.activo);
+      push(
+        "success",
+        data.activo
+          ? "Entradas de Passion visibles en la tienda"
+          : "Entradas de Passion ocultas: la tienda muestra solo las propias"
+      );
+    } catch {
+      push("error", "Error de red al cambiar la tienda");
+    } finally {
+      setPassionBusy(false);
+    }
+  }
+
   async function onDelete(id: string) {
     setBusyId(id);
     try {
@@ -112,10 +152,10 @@ export default function TicketsPanel({ initial, syncRuns, portalCount, portalCom
       <section className="card-shadow mb-5 overflow-hidden rounded-2xl bg-white">
         <div className="grid grid-cols-3 divide-x divide-dashed divide-line">
           <Stat
-            label="Del portal"
+            label="De Passion"
             value={String(portalCount)}
-            accent="#6C5BF2"
-            sub={`${portalComprables} comprables`}
+            accent={passionOn ? "#6C5BF2" : "#9AA0B2"}
+            sub={passionOn ? `${portalComprables} comprables` : "ocultas de la tienda"}
           />
           <Stat label="Propias" value={String(tickets.length)} accent="#0D9377" />
           <Stat
@@ -134,6 +174,34 @@ export default function TicketsPanel({ initial, syncRuns, portalCount, portalCom
             sub={lastSync ? lastSync.status : "sin corridas"}
           />
         </div>
+      </section>
+
+      {/* Interruptor: entradas de Passion visibles u ocultas en la tienda */}
+      <section className="card-shadow mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">Entradas de Passion en la tienda</p>
+          <p className="text-xs text-muted">
+            {passionOn
+              ? "Visibles junto a las propias"
+              : "Ocultas: la tienda muestra solo las entradas propias"}
+          </p>
+        </div>
+        <button
+          role="switch"
+          aria-checked={passionOn}
+          aria-label="Mostrar entradas de Passion en la tienda"
+          onClick={togglePassion}
+          disabled={passionBusy}
+          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
+            passionOn ? "bg-estado-confirmada" : "bg-[#C5C9D6]"
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-[left] ${
+              passionOn ? "left-[calc(100%-1.625rem)]" : "left-0.5"
+            }`}
+          />
+        </button>
       </section>
 
       {/* minmax(0,1fr) también en móvil: sin eso, el form impone su ancho

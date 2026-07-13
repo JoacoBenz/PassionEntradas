@@ -26,6 +26,7 @@ type MockDB = {
   syncRuns: SyncRun[];
   margenes: MockMargen[];
   eurUsd: number;
+  portalActivo: boolean;
 };
 
 function iso(minsAgo: number) {
@@ -117,7 +118,7 @@ function seed(): MockDB {
     { id: "m-mundial", source: "portal", competicion: "World Cup 2026 Canada / Mexico / USA", porcentaje: 35 },
   ];
 
-  return { ops, manual, syncRuns, margenes, eurUsd: 1.08 };
+  return { ops, manual, syncRuns, margenes, eurUsd: 1.08, portalActivo: true };
 }
 
 function db(): MockDB {
@@ -284,5 +285,15 @@ export function mockGetEurUsd(): number {
 
 export function mockSetEurUsd(v: number): number {
   db().eurUsd = v;
+  return v;
+}
+
+// ---- interruptor de entradas de Passion ---------------------------------------------
+export function mockGetPortalActivo(): boolean {
+  return db().portalActivo;
+}
+
+export function mockSetPortalActivo(v: boolean): boolean {
+  db().portalActivo = v;
   return v;
 }
