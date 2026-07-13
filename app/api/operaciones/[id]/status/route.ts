@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { estadoDe, type Operacion, type StatusAction } from "@/lib/operaciones";
 import { getRol, nombreDe } from "@/lib/auth";
@@ -67,6 +68,10 @@ export async function PATCH(
     if (!res.ok) {
       return NextResponse.json({ error: res.error }, { status: res.status });
     }
+    // Cerrar/reabrir puede haber tocado el stock de una entrada propia.
+    if (action.action === "cerrar") {
+      revalidatePath("/(tienda)", "layout");
+    }
     return NextResponse.json(pickResult(res.op));
   }
 
@@ -74,7 +79,7 @@ export async function PATCH(
 
   const { data: current, error: readErr } = await admin
     .from("operaciones")
-    .select("status, entrada_recibida_at, pago_confirmado_at, cerrada_at")
+    .select("status, entrada_recibida_at, pago_confirmado_at, cerrada_at, ticket_id")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -200,6 +205,30 @@ export async function PATCH(
       { error: error.message },
       { status: esInvariante ? 409 : 500 }
     );
+  }
+
+  // Entrada PROPIA vinculada: cerrar la operación descuenta 1 del stock de
+  // la tienda (evita la sobreventa por olvidarse de editarlo a mano);
+  // reabrir el cierre lo repone. Solo manual:: — las del portal las maneja
+  // el worker con el stock real de Passion. Fail-soft: si falla, la
+  // operación ya quedó cerrada igual (el stock se corrige desde Entradas).
+  if (action.action === "cerrar" && current.ticket_id?.startsWith("manual::")) {
+    const { data: t } = await admin
+      .from("tickets")
+      .select("stock")
+      .eq("id", current.ticket_id)
+      .eq("source", "manual")
+      .maybeSingle();
+    if (t) {
+      const stock = Math.max(0, (t.stock ?? 0) + (action.done ? -1 : 1));
+      await admin
+        .from("tickets")
+        .update({ stock, disponible: stock > 0 })
+        .eq("id", current.ticket_id)
+        .eq("source", "manual");
+      // La tienda muestra el stock: reflejarlo al instante.
+      revalidatePath("/(tienda)", "layout");
+    }
   }
 
   return NextResponse.json(pickResult(data as Operacion));

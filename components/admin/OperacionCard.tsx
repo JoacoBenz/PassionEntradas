@@ -88,6 +88,7 @@ export default function OperacionCard({
   const [open, setOpen] = useState(defaultOpen);
   const [editingNotas, setEditingNotas] = useState(false);
   const [notasDraft, setNotasDraft] = useState(op.notas ?? "");
+  const [confirmandoCancel, setConfirmandoCancel] = useState(false);
 
   async function copy(text: string, label: string) {
     try {
@@ -375,13 +376,27 @@ export default function OperacionCard({
               ) : (
                 !cerrada && (
                   <button
-                    onClick={() =>
-                      onAction?.(op, { action: "cancelar" }, "Operación cancelada")
-                    }
+                    onClick={() => {
+                      // Dos toques: el primero arma la confirmación (se
+                      // desarma sola a los 4s), el segundo cancela. Evita
+                      // cancelar por un toque accidental en el celular —
+                      // el link público mostraría "Cancelada" al cliente.
+                      if (!confirmandoCancel) {
+                        setConfirmandoCancel(true);
+                        window.setTimeout(() => setConfirmandoCancel(false), 4000);
+                        return;
+                      }
+                      setConfirmandoCancel(false);
+                      onAction?.(op, { action: "cancelar" }, "Operación cancelada");
+                    }}
                     disabled={busy}
-                    className="ml-auto rounded-lg border border-estado-cancelada px-3 py-1.5 text-xs font-semibold text-estado-cancelada transition-colors hover:bg-estado-cancelada/5 disabled:opacity-60"
+                    className={`ml-auto rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                      confirmandoCancel
+                        ? "border-estado-cancelada bg-estado-cancelada text-white"
+                        : "border-estado-cancelada text-estado-cancelada hover:bg-estado-cancelada/5"
+                    }`}
                   >
-                    Cancelar
+                    {confirmandoCancel ? "¿Confirmás cancelar?" : "Cancelar"}
                   </button>
                 )
               ))}
