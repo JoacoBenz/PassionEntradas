@@ -143,8 +143,11 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
             />
           </div>
 
+          {/* flex-col + justify-between: si un label envuelve a dos líneas
+              (pasa con "Alias comprador *" en desktop), los inputs quedan
+              anclados abajo y alineados entre sí. */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
+            <div className="flex flex-col justify-between">
               <label htmlFor="comprador" className={labelCls}>
                 Alias comprador *
               </label>
@@ -156,7 +159,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
                 placeholder="compra_marce"
               />
             </div>
-            <div>
+            <div className="flex flex-col justify-between">
               <label htmlFor="vendedor" className={labelCls}>
                 Alias vendedor *
               </label>
@@ -184,7 +187,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
+            <div className="flex flex-col justify-between">
               <label htmlFor="monto" className={labelCls}>
                 Monto (USD) *
               </label>
@@ -199,7 +202,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
                 placeholder="850"
               />
             </div>
-            <div>
+            <div className="flex flex-col justify-between">
               <label htmlFor="fee" className={labelCls}>
                 Comisión (USD)
               </label>

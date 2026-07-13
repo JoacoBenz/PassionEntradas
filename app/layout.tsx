@@ -22,7 +22,7 @@ const mono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AdminTickets — Custodia de operaciones",
+  title: "TicketMirror",
   description:
     "Seguimiento en tiempo real de operaciones de compra-venta de entradas.",
 };
