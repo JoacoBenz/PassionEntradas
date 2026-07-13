@@ -36,8 +36,24 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (enviando.current) return;
+    // Datos mínimos de una operación de custodia: qué se opera, entre quiénes
+    // y por cuánto. Sin esto no se crea (antes solo se validaba el evento y
+    // quedaban operaciones con comprador/vendedor/monto vacíos).
     if (!form.evento.trim()) {
       onError("El evento es obligatorio");
+      return;
+    }
+    if (!form.comprador_alias.trim()) {
+      onError("El alias del comprador es obligatorio");
+      return;
+    }
+    if (!form.vendedor_alias.trim()) {
+      onError("El alias del vendedor es obligatorio");
+      return;
+    }
+    const montoNum = Number(form.monto);
+    if (!form.monto.trim() || !Number.isFinite(montoNum) || montoNum <= 0) {
+      onError("El monto debe ser mayor a 0");
       return;
     }
     enviando.current = true;
@@ -116,7 +132,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
         <div className="space-y-3 p-5">
           <div>
             <label htmlFor="evento" className={labelCls}>
-              Evento
+              Evento *
             </label>
             <input
               id="evento"
@@ -130,7 +146,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="comprador" className={labelCls}>
-                Alias comprador
+                Alias comprador *
               </label>
               <input
                 id="comprador"
@@ -142,7 +158,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
             </div>
             <div>
               <label htmlFor="vendedor" className={labelCls}>
-                Alias vendedor
+                Alias vendedor *
               </label>
               <input
                 id="vendedor"
@@ -170,7 +186,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="monto" className={labelCls}>
-                Monto (USD)
+                Monto (USD) *
               </label>
               <input
                 id="monto"
