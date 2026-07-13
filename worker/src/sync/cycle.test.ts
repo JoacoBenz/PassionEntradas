@@ -43,6 +43,7 @@ function makeRepo() {
     fetchMargenes: vi.fn().mockResolvedValue([]),
     mapasExistentes: vi.fn().mockResolvedValue(new Map()),
     subirMapa: vi.fn().mockResolvedValue(null),
+    deleteReqStubsSuperados: vi.fn().mockResolvedValue(0),
     upsertBatches: vi.fn().mockResolvedValue(0),
     markAbsentBefore: vi.fn().mockResolvedValue(0),
     recordSyncRun: vi.fn().mockResolvedValue(undefined),
