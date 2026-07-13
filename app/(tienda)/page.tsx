@@ -1,4 +1,5 @@
 import { fetchEurUsd, fetchTickets } from "@/lib/supabase/public";
+import { normalizarPreciosUsd } from "@/lib/tickets";
 import { StorefrontHome } from "@/components/tienda/Storefront";
 
 // Revalidación de fondo cada 10 min como red de seguridad: los cambios desde
@@ -14,5 +15,6 @@ export default async function TiendaHome() {
   } catch {
     return <div className="splash err">No pudimos cargar la cartelera.</div>;
   }
-  return <StorefrontHome rows={rows} eurUsd={eurUsd} />;
+  // Todo a USD antes de renderizar: la tienda no vuelve a convertir.
+  return <StorefrontHome rows={normalizarPreciosUsd(rows, eurUsd)} />;
 }

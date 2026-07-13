@@ -210,7 +210,7 @@ export default function TicketsPanel({ initial, syncRuns, portalCount, portalCom
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Precio (EUR)</label>
+                  <label className={labelCls}>Precio (USD)</label>
                   <input
                     type="number"
                     min={0}
@@ -266,7 +266,7 @@ export default function TicketsPanel({ initial, syncRuns, portalCount, portalCom
                   <p className="truncate font-display font-semibold">{t.evento}</p>
                   <p className="text-xs text-muted">
                     {t.categoria ? `${t.categoria} · ` : ""}
-                    {t.precio_final != null ? `€ ${t.precio_final}` : "a consultar"} · stock{" "}
+                    {t.precio_final != null ? `US$ ${t.precio_final}` : "a consultar"} · stock{" "}
                     {t.stock ?? 0}
                   </p>
                 </div>
