@@ -26,6 +26,7 @@ export default async function AdminEntradasPage() {
   let portalCount: number;
   let portalComprables: number;
   let portalActivo: boolean;
+  let competiciones: string[];
 
   if (isMock()) {
     email = MOCK_USER.email;
@@ -34,6 +35,14 @@ export default async function AdminEntradasPage() {
     portalCount = mockPortalCount();
     portalComprables = portalCount;
     portalActivo = mockGetPortalActivo();
+    const { MOCK_TICKETS } = await import("@/lib/mock-tickets");
+    competiciones = Array.from(
+      new Set(
+        [...MOCK_TICKETS, ...manual]
+          .map((t) => t.competicion)
+          .filter((c): c is string => !!c)
+      )
+    ).sort();
   } else {
     const supabase = createServerSupabase();
     const {
@@ -49,7 +58,7 @@ export default async function AdminEntradasPage() {
     // como catálogo. "Comprables" = con stock y reservables ahora.
     // Mismo día de corte que la tienda (hora argentina).
     const hoy = hoyArgentina();
-    const [manualRes, syncRes, countRes, comprablesRes, portalRes] = await Promise.all([
+    const [manualRes, syncRes, countRes, comprablesRes, portalRes, compsRes] = await Promise.all([
       supabase
         .from("tickets")
         .select("*")
@@ -78,6 +87,13 @@ export default async function AdminEntradasPage() {
         .or(`fecha.is.null,fecha.gte.${hoy}`),
       // Interruptor de Passion (config es legible por usuarios logueados).
       supabase.from("config").select("value").eq("key", "portal_activo").maybeSingle(),
+      // Competiciones existentes (portal + propias, eventos vigentes) para
+      // el dropdown del formulario de carga.
+      supabase
+        .from("tickets")
+        .select("competicion")
+        .not("competicion", "is", null)
+        .or(`fecha.is.null,fecha.gte.${hoy}`),
     ]);
     manual = (manualRes.data ?? []) as TicketFull[];
     syncRuns = (syncRes.data ?? []) as SyncRun[];
@@ -85,6 +101,9 @@ export default async function AdminEntradasPage() {
     portalComprables = comprablesRes.count ?? 0;
     // Sin fila = activado (default histórico).
     portalActivo = portalRes.data == null || Number(portalRes.data.value) !== 0;
+    competiciones = Array.from(
+      new Set((compsRes.data ?? []).map((c) => c.competicion as string))
+    ).sort();
   }
 
   return (
@@ -101,6 +120,7 @@ export default async function AdminEntradasPage() {
         portalCount={portalCount}
         portalComprables={portalComprables}
         portalActivo={portalActivo}
+        competiciones={competiciones}
       />
       <div className="mx-auto w-full max-w-3xl px-4 pb-6">
         <MargenesPanel />
