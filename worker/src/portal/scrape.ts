@@ -81,9 +81,41 @@ export async function scrapeRawTickets(deps: {
     try {
       const html = await fetchPortalHtml({ url: e.detailUrl, cookieHeader, cfg, log, signal });
       // Mapa de sectores del evento, si el detalle trae una imagen con pinta.
-      const mapa = extraerMapaUrl(html, e.detailUrl);
+      let mapa = extraerMapaUrl(html, e.detailUrl);
+      let sectors = parseEventDetail(html, e);
+
+      // Fallback clave: la página "Book" (event_detail.php) de un evento
+      // AGOTADO devuelve un stub SIN tabla de sectores; las categorías reales
+      // y el mapa viven en event_detail_request.php. Si el book vino vacío y
+      // hay una URL de request, reintentamos ahí antes de rendirnos a un stub.
+      if (
+        sectors.length === 0 &&
+        e.detailUrl.includes("event_detail.php") &&
+        !e.detailUrl.includes("event_detail_request.php")
+      ) {
+        const reqUrl = e.detailUrl.replace(
+          "event_detail.php",
+          "event_detail_request.php",
+        );
+        try {
+          const reqHtml = await fetchPortalHtml({ url: reqUrl, cookieHeader, cfg, log, signal });
+          const reqSectors = parseEventDetail(reqHtml, { ...e, detailUrl: reqUrl });
+          if (reqSectors.length > 0) {
+            sectors = reqSectors;
+            const reqMapa = extraerMapaUrl(reqHtml, reqUrl);
+            if (reqMapa) mapa = reqMapa;
+            log.info(
+              { eventId: e.eventId },
+              "sectores recuperados desde event_detail_request.php",
+            );
+          }
+        } catch (err2) {
+          if (err2 instanceof BlockedError || err2 instanceof SessionExpiredError) throw err2;
+          log.warn({ err: err2, eventId: e.eventId }, "reintento request.php falló, sigo con el stub");
+        }
+      }
+
       if (mapa) imagenes.set(e.eventId, mapa);
-      const sectors = parseEventDetail(html, e);
       if (sectors.length > 0) {
         rows.push(...sectors);
       } else {

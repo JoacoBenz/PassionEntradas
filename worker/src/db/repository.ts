@@ -137,6 +137,50 @@ export class TicketRepository {
     return data?.publicUrl ?? null;
   }
 
+  /**
+   * Borra los stubs "<eventId>::REQ" de eventos que YA tienen filas de sector
+   * reales (ids "<eventId>::<catId>"). Esos stubs quedaron de cuando el book
+   * page venía sin tabla; ahora que recuperamos las categorías reales, la
+   * fila REQ es un duplicado sin categoría que ensuciaría la card. NO es la
+   * regla anti-borrado (esto corre tras un ciclo publicado y solo elimina un
+   * stub superado por datos frescos del mismo evento).
+   */
+  async deleteReqStubsSuperados(): Promise<number> {
+    const { data, error } = await this.db
+      .from(TABLE)
+      .select("id")
+      .eq("source", "portal")
+      .like("id", "%::REQ");
+    if (error) {
+      this.log.warn({ error: error.message }, "no se pudieron leer los stubs REQ");
+      return 0;
+    }
+    const reqIds = (data ?? []).map((r) => r.id as string);
+    if (reqIds.length === 0) return 0;
+
+    // Para cada evento con stub, ¿hay al menos una fila de sector real?
+    const eventIds = Array.from(new Set(reqIds.map((id) => id.split("::")[0]!)));
+    const superados: string[] = [];
+    for (const eventId of eventIds) {
+      const { count } = await this.db
+        .from(TABLE)
+        .select("id", { count: "exact", head: true })
+        .eq("source", "portal")
+        .like("id", `${eventId}::%`)
+        .not("id", "like", "%::REQ");
+      if ((count ?? 0) > 0) superados.push(`${eventId}::REQ`);
+    }
+    if (superados.length === 0) return 0;
+
+    const { error: delErr } = await this.db.from(TABLE).delete().in("id", superados);
+    if (delErr) {
+      this.log.warn({ error: delErr.message }, "no se pudieron borrar los stubs REQ superados");
+      return 0;
+    }
+    this.log.info({ borrados: superados.length }, "stubs REQ superados por sectores reales: borrados");
+    return superados.length;
+  }
+
   /** Registra el resultado del ciclo para auditoría/observabilidad. */
   async recordSyncRun(summary: SyncSummary): Promise<void> {
     const { error } = await this.db.from(RUNS_TABLE).insert({
