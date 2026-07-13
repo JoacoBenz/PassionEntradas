@@ -277,9 +277,12 @@ export default function TicketsPanel({
         </div>
       </section>
 
-      {/* Interruptor: entradas de Passion visibles u ocultas en la tienda */}
-      <section className="card-shadow mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3">
-        <div className="min-w-0">
+      {/* Interruptor: entradas de Passion visibles u ocultas en la tienda.
+          El botón es el área táctil (el global de móvil le pone min-height
+          40px, y eso deformaba la pastilla); el dibujo del switch vive en un
+          span interno de tamaño fijo, centrado, que no se estira. */}
+      <section className="card-shadow mb-5 flex flex-nowrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">Entradas de Passion en la tienda</p>
           <p className="text-xs text-muted">
             {passionOn
@@ -293,15 +296,20 @@ export default function TicketsPanel({
           aria-label="Mostrar entradas de Passion en la tienda"
           onClick={togglePassion}
           disabled={passionBusy}
-          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
-            passionOn ? "bg-estado-confirmada" : "bg-[#C5C9D6]"
-          }`}
+          className="flex shrink-0 items-center justify-center disabled:opacity-60"
         >
           <span
-            className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-[left] ${
-              passionOn ? "left-[calc(100%-1.625rem)]" : "left-0.5"
+            aria-hidden
+            className={`relative block h-7 w-12 rounded-full transition-colors ${
+              passionOn ? "bg-estado-confirmada" : "bg-[#C5C9D6]"
             }`}
-          />
+          >
+            <span
+              className={`absolute top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-white shadow transition-[left] ${
+                passionOn ? "left-[calc(100%-1.625rem)]" : "left-0.5"
+              }`}
+            />
+          </span>
         </button>
       </section>
 
