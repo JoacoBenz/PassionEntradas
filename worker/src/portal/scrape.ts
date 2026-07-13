@@ -2,6 +2,7 @@ import type { Config } from "../config/index.js";
 import { BlockedError, SessionExpiredError } from "../errors.js";
 import type { Logger } from "../logger.js";
 import { fetchPortalHtml } from "./client.js";
+import { extraerMapaUrl } from "./imagen.js";
 import { buildOnRequestRow, classifyDetail, parseEventDetail, parseEventList } from "./parser.js";
 import type { PortalSession } from "./session.js";
 import type { PortalEvent, RawTicketInput } from "./types.js";
@@ -15,6 +16,12 @@ export interface ScrapeResult {
    * no marcar como agotados eventos que simplemente no alcanzamos a procesar.
    */
   complete: boolean;
+  /**
+   * Mapa de sectores por evento: eventId -> URL de la imagen EN EL PORTAL
+   * (detrás del login). Se extrae del mismo HTML de detalle ya bajado (cero
+   * requests extra); el ciclo decide cuáles descargar y re-subir al bucket.
+   */
+  imagenes: Map<string, string>;
 }
 
 function matchesCategories(ev: PortalEvent, cats: string[]): boolean {
@@ -51,6 +58,7 @@ export async function scrapeRawTickets(deps: {
   );
 
   const rows: RawTicketInput[] = [];
+  const imagenes = new Map<string, string>();
   let complete = true;
 
   // Tanto "book" como "on_request" tienen una página de detalle con la tabla de
@@ -72,6 +80,9 @@ export async function scrapeRawTickets(deps: {
     const e = targets[i]!;
     try {
       const html = await fetchPortalHtml({ url: e.detailUrl, cookieHeader, cfg, log, signal });
+      // Mapa de sectores del evento, si el detalle trae una imagen con pinta.
+      const mapa = extraerMapaUrl(html, e.detailUrl);
+      if (mapa) imagenes.set(e.eventId, mapa);
       const sectors = parseEventDetail(html, e);
       if (sectors.length > 0) {
         rows.push(...sectors);
@@ -115,5 +126,5 @@ export async function scrapeRawTickets(deps: {
   // Dedup por id estable (último gana).
   const byId = new Map<string, RawTicketInput>();
   for (const r of rows) byId.set(r.id, r);
-  return { rows: [...byId.values()], complete };
+  return { rows: [...byId.values()], complete, imagenes };
 }

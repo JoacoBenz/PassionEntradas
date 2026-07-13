@@ -16,6 +16,8 @@ export type Ticket = {
   stock: number | null;
   estado: TicketEstado;
   source: TicketSource;
+  // Mapa de sectores del evento (URL pública del bucket `mapas`), si hay.
+  imagen_url?: string | null;
 };
 
 export type TicketFull = Ticket & {
@@ -53,6 +55,8 @@ export type EventoAgrupado = {
   bookStock: number;
   propias: boolean;
   minPrice: number | null;
+  // Mapa de sectores del evento (primera imagen no nula entre los sectores).
+  imagen: string | null;
   ubicaciones: Ticket[];
 };
 
@@ -190,6 +194,7 @@ export function buildEvents(rows: Ticket[]): EventoAgrupado[] {
         bookStock: 0,
         propias: false,
         minPrice: null,
+        imagen: null,
         ubicaciones: [],
       });
     }
@@ -216,6 +221,7 @@ export function buildEvents(rows: Ticket[]): EventoAgrupado[] {
     ev.bookable = book.length;
     ev.bookStock = book.reduce((a, u) => a + (u.stock ?? 0), 0);
     ev.propias = ev.ubicaciones.some((u) => u.source === "manual");
+    ev.imagen = ev.ubicaciones.find((u) => u.imagen_url)?.imagen_url ?? null;
     // "desde": menor precio real (>0). Prioriza lo reservable.
     const precioPos = (arr: Ticket[]) =>
       arr.map((u) => Number(u.precio_final)).filter((n) => Number.isFinite(n) && n > 0);

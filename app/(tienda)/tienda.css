@@ -250,6 +250,16 @@
 }
 .ticket.open .ladder { transform: none; opacity: 1; }
 
+/* Mapa de sectores del evento (importado del portal), arriba del ladder */
+.mapa-sectores {
+  display: block; width: 100%; height: auto; max-height: 340px;
+  object-fit: contain; background: #fff;
+  border: 1px solid #d8d4c6; border-radius: 10px;
+  margin: 10px 0 12px; opacity: 0;
+  transition: opacity .35s ease .1s;
+}
+.ticket.open .mapa-sectores { opacity: 1; }
+
 /* cada ubicación cae en cascada al desenrollar (de arriba hacia abajo) */
 .seat { opacity: 0; transform: translateY(-8px);
   transition: opacity .3s ease, transform .42s cubic-bezier(.2, .7, .2, 1); }
