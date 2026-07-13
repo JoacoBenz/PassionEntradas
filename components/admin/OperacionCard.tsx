@@ -442,7 +442,7 @@ function HitoButton({
         {label}
         {done && por && (
           <span className="block truncate text-[10px] font-normal text-white/75">
-            por {por}
+            Por {por}
           </span>
         )}
       </span>

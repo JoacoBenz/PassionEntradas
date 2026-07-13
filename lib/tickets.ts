@@ -118,14 +118,21 @@ export function fmtDate(iso: string | null) {
     d: dt.toLocaleDateString("es-AR", { day: "2-digit", timeZone }),
     m: dt.toLocaleDateString("es-AR", { month: "short", timeZone }).replace(".", "").toUpperCase(),
     y: dt.toLocaleDateString("es-AR", { year: "numeric", timeZone }),
-    full: dt.toLocaleDateString("es-AR", {
-      weekday: "long",
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-      timeZone,
-    }),
+    // Primera letra en mayúscula: es-AR devuelve "sábado, 18 de julio…".
+    full: capitalizar(
+      dt.toLocaleDateString("es-AR", {
+        weekday: "long",
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+        timeZone,
+      })
+    ),
   };
+}
+
+function capitalizar(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 // "Match 12, Group A - Argentina vs Chile" -> título + contexto.
