@@ -21,7 +21,14 @@ type OpMetrica = Pick<
   "monto" | "fee" | "status" | "pago_confirmado_at" | "cerrada_at"
 >;
 
-export function computeMetrics(ops: OpMetrica[]): Metrics {
+// Rango opcional (fechas YYYY-MM-DD, inclusive): filtra las métricas de
+// venta por CUÁNDO se confirmó el pago. "En juego" no depende del rango
+// (es exposición actual). Mismo criterio que el RPC metricas_operaciones.
+export function computeMetrics(
+  ops: OpMetrica[],
+  desde?: string | null,
+  hasta?: string | null
+): Metrics {
   let plataMovida = 0;
   let comisionGanada = 0;
   let entradasVendidas = 0;
@@ -32,6 +39,9 @@ export function computeMetrics(ops: OpMetrica[]): Metrics {
     if (op.status === "cancelada") continue;
 
     if (op.pago_confirmado_at) {
+      const dia = op.pago_confirmado_at.slice(0, 10);
+      if (desde && dia < desde) continue;
+      if (hasta && dia > hasta) continue;
       plataMovida += op.monto;
       comisionGanada += op.fee;
       entradasVendidas += 1;

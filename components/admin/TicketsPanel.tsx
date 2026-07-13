@@ -111,6 +111,9 @@ export default function TicketsPanel({
   const [comps, setComps] = useState<string[]>(competiciones);
   const [form, setForm] = useState(empty);
   const [sectores, setSectores] = useState<SectorForm[]>([sectorVacio()]);
+  // Edición de una entrada existente: el mismo form pasa a modo "Guardar
+  // cambios" (una entrada = un sector; el id y el link no cambian).
+  const [editando, setEditando] = useState<TicketFull | null>(null);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -134,6 +137,31 @@ export default function TicketsPanel({
 
   function setSector(i: number, key: keyof SectorForm, value: string) {
     setSectores((prev) => prev.map((s, j) => (j === i ? { ...s, [key]: value } : s)));
+  }
+
+  // Cargar una entrada existente en el form para editarla.
+  function empezarEdicion(t: TicketFull) {
+    setEditando(t);
+    setForm({
+      evento: t.evento,
+      competicion: t.competicion ?? "",
+      fecha: t.fecha ? t.fecha.slice(0, 10) : "",
+      ciudad: t.ciudad ?? "",
+    });
+    setSectores([
+      {
+        categoria: t.categoria ?? "",
+        precio: t.precio_final != null ? String(t.precio_final) : "",
+        stock: String(t.stock ?? 0),
+      },
+    ]);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelarEdicion() {
+    setEditando(null);
+    setForm(empty);
+    setSectores([sectorVacio()]);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -171,8 +199,11 @@ export default function TicketsPanel({
         return;
       }
       const stockNum = Math.trunc(Number(s.stock));
-      if (!s.stock.trim() || !Number.isFinite(stockNum) || stockNum < 1) {
-        push("error", `El stock debe ser al menos 1${n}`);
+      // Editando se permite stock 0 (agotada pero visible "sin cupo"); en el
+      // alta tiene que haber al menos 1.
+      const minStock = editando ? 0 : 1;
+      if (!s.stock.trim() || !Number.isFinite(stockNum) || stockNum < minStock) {
+        push("error", editando ? `Stock inválido${n}` : `El stock debe ser al menos 1${n}`);
         return;
       }
       const clave = s.categoria.trim().toLowerCase();
@@ -185,6 +216,29 @@ export default function TicketsPanel({
     enviando.current = true;
     setLoading(true);
     try {
+      if (editando) {
+        // Edición: una entrada, mismo id (y mismo link en la tienda).
+        const s = sectores[0];
+        const res = await fetch(`/api/tickets/${encodeURIComponent(editando.id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ticket: { ...form, categoria: s.categoria, precio: s.precio, stock: s.stock },
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          push("error", data.error ?? "No se pudo guardar la entrada");
+          return;
+        }
+        setTickets((prev) =>
+          prev.map((t) => (t.id === editando.id ? (data.row as TicketFull) : t))
+        );
+        cancelarEdicion();
+        push("success", "Entrada actualizada en la tienda");
+        return;
+      }
+
       const res = await fetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -258,6 +312,7 @@ export default function TicketsPanel({
         return;
       }
       setTickets((prev) => prev.filter((t) => t.id !== id));
+      if (editando?.id === id) cancelarEdicion();
       push("success", "Entrada borrada");
     } catch {
       push("error", "Error de red al borrar");
@@ -352,8 +407,13 @@ export default function TicketsPanel({
               Catálogo de la tienda
             </p>
             <h2 className="mt-0.5 font-display text-lg font-bold tracking-tight">
-              Cargar entrada propia
+              {editando ? "Editar entrada propia" : "Cargar entrada propia"}
             </h2>
+            {editando && (
+              <p className="mt-1 truncate text-xs text-white/60">
+                {editando.evento} — el link en la tienda no cambia
+              </p>
+            )}
           </div>
           <div className="punch-t bg-white">
             <div className="perf-line-light mx-5" />
@@ -463,7 +523,8 @@ export default function TicketsPanel({
                 </div>
               ))}
 
-              {sectores.length < MAX_SECTORES && (
+              {/* Editando, la entrada es UNA (un sector): sin agregar más. */}
+              {!editando && sectores.length < MAX_SECTORES && (
                 <button
                   type="button"
                   onClick={() => setSectores((prev) => [...prev, sectorVacio()])}
@@ -473,14 +534,27 @@ export default function TicketsPanel({
                 </button>
               )}
             </div>
-            <div className="px-5 pb-5">
+            <div className="space-y-2 px-5 pb-5">
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-deep disabled:opacity-60"
               >
-                {loading ? "Publicando…" : "Publicar en la tienda"}
+                {loading
+                  ? "Guardando…"
+                  : editando
+                    ? "Guardar cambios"
+                    : "Publicar en la tienda"}
               </button>
+              {editando && (
+                <button
+                  type="button"
+                  onClick={cancelarEdicion}
+                  className="w-full rounded-xl border border-line bg-white px-4 py-2 text-xs font-medium text-[#4A4E5E] transition-colors hover:bg-canvas"
+                >
+                  Cancelar edición
+                </button>
+              )}
             </div>
           </div>
         </form>
@@ -509,13 +583,20 @@ export default function TicketsPanel({
                     {t.stock ?? 0}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                   <Link
                     href={`/moderador?evento=${encodeURIComponent(t.evento)}&ticket=${encodeURIComponent(t.id)}`}
                     className="rounded-lg border border-brand px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/5"
                   >
                     Crear operación
                   </Link>
+                  <button
+                    onClick={() => empezarEdicion(t)}
+                    disabled={busyId === t.id}
+                    className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-semibold text-[#4A4E5E] transition-colors hover:bg-canvas disabled:opacity-60"
+                  >
+                    Editar
+                  </button>
                   <button
                     onClick={() => onDelete(t.id)}
                     disabled={busyId === t.id}

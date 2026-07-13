@@ -215,6 +215,16 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
           <option value="recientes">Más recientes</option>
           <option value="urgentes">Evento más próximo</option>
         </select>
+        {/* CSV con TODO el historial (server-side, sin el tope de 1000 del
+            panel) para contabilidad. Descarga directa. */}
+        <a
+          href="/api/operaciones/export"
+          download
+          className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-medium text-[#4A4E5E] shadow-sm transition-colors hover:bg-canvas"
+          title="Descargar todas las operaciones en CSV"
+        >
+          Exportar CSV
+        </a>
       </div>
 
       {/* Filtros por estado */}
