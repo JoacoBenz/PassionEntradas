@@ -72,10 +72,15 @@ function WcLogo({ comp }: { comp: string | null }) {
 // Widget de WhatsApp: el botón flotante abre un panel con los agentes y su
 // estado (disponible / con un cliente). Los estados rotan solos en
 // intervalos irregulares — transmite que del otro lado hay gente atendiendo.
+// Cada agente chatea desde SU número (no el general de la tienda).
 const AGENTES = [
-  { nombre: "Kiru", inicial: "K" },
-  { nombre: "Nacho", inicial: "N" },
+  { nombre: "Kiru", inicial: "K", telefono: "5492944806666" },
+  { nombre: "Nacho", inicial: "N", telefono: "5491136148053" },
 ] as const;
+
+function waAgente(telefono: string, text: string): string {
+  return `https://wa.me/${telefono}?text=${encodeURIComponent(text)}`;
+}
 
 type EstadoAgente = "disponible" | "ocupado";
 
@@ -131,7 +136,7 @@ function WaFloat({ lang }: { lang: Lang }) {
                 </span>
                 <a
                   className="wa-agente-btn"
-                  href={waLink(t.waAgenteMsg(a.nombre))}
+                  href={waAgente(a.telefono, t.waAgenteMsg(a.nombre))}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setAbierto(false)}
