@@ -194,6 +194,42 @@ export function classifyDetail(html: string): "book" | "on_request" | "other" {
 }
 
 /**
+ * Normalización Fórmula 1. El portal usa la subcategoría para el TORNEO
+ * ("World Cup 2026…", "English Premier League"), pero en los eventos de F1
+ * mete ahí la SEDE ("Belgium", "Monza", "Las Vegas") y el circuito va en la
+ * ubicación. Para que la tienda filtre bien:
+ *   - competición -> "F1"
+ *   - la sede pasa al lugar, entre paréntesis, que es lo que el filtro
+ *     "Lugar" de la tienda lee: "Spa-Francorchamps, Stavelot (Belgium)".
+ *     Si la ubicación ya termina con la sede, se mueve al paréntesis sin
+ *     duplicarla: "Autodromo Nazionale Monza, Monza" -> "Autodromo
+ *     Nazionale Monza (Monza)".
+ * Función PURA y testeada.
+ */
+export function normalizarF1(ev: {
+  titulo: string;
+  subCategoria: string | null;
+  ubicacion: string | null;
+}): { competicion: string | null; ciudad: string | null } {
+  if (!/^f1\b/i.test(ev.titulo.trim())) {
+    return { competicion: ev.subCategoria, ciudad: ev.ubicacion };
+  }
+  const sede = (ev.subCategoria ?? "").trim();
+  let ciudad = (ev.ubicacion ?? "").trim();
+  if (sede && ciudad.toLowerCase() !== sede.toLowerCase()) {
+    if (ciudad.toLowerCase().endsWith(sede.toLowerCase())) {
+      ciudad = ciudad
+        .slice(0, ciudad.length - sede.length)
+        .replace(/[\s,–—-]+$/, "");
+    }
+    ciudad = ciudad ? `${ciudad} (${sede})` : sede;
+  } else if (sede && !ciudad) {
+    ciudad = sede;
+  }
+  return { competicion: "F1", ciudad: ciudad || null };
+}
+
+/**
  * Parsea event_detail.php (book) o event_detail_request.php (on_request) -> un
  * RawTicketInput por sector/categoría. Ambas páginas usan la MISMA tabla de
  * sectores con inputs hidden (seat_cat_id[]/unit_price[]/available_seats[]);
@@ -210,7 +246,11 @@ export function parseEventDetail(html: string, ev: PortalEvent): RawTicketInput[
   const root = parse(html);
   const info = readEventInfo(root);
   const fecha = info.fecha ?? ev.fechaLista;
-  const ciudad = info.ciudad ?? ev.ubicacion;
+  const { competicion, ciudad } = normalizarF1({
+    titulo: ev.titulo,
+    subCategoria: ev.subCategoria,
+    ubicacion: info.ciudad ?? ev.ubicacion,
+  });
 
   const table = findTableByHeader(root, "ticket price", "category");
   if (!table) return [];
@@ -238,7 +278,7 @@ export function parseEventDetail(html: string, ev: PortalEvent): RawTicketInput[
     out.push({
       id: `${ev.eventId}::${catId}`,
       evento: ev.titulo,
-      competicion: ev.subCategoria,
+      competicion,
       fecha,
       ciudad,
       categoria: clean(tds[0]?.text) || null,
@@ -255,12 +295,17 @@ export function parseEventDetail(html: string, ev: PortalEvent): RawTicketInput[
 
 /** Construye la fila de un evento "On Request" (sin precio, contacto). */
 export function buildOnRequestRow(ev: PortalEvent): RawTicketInput {
+  const { competicion, ciudad } = normalizarF1({
+    titulo: ev.titulo,
+    subCategoria: ev.subCategoria,
+    ubicacion: ev.ubicacion,
+  });
   return {
     id: `${ev.eventId}::REQ`,
     evento: ev.titulo,
-    competicion: ev.subCategoria,
+    competicion,
     fecha: ev.fechaLista,
-    ciudad: ev.ubicacion,
+    ciudad,
     categoria: null,
     precio_origen: null,
     moneda_origen: "EUR",
