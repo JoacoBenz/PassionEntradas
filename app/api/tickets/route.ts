@@ -49,10 +49,12 @@ export async function POST(request: Request) {
     fecha: t.fecha || null,
     ciudad: t.ciudad?.trim() || null,
     categoria: t.categoria?.trim() || null,
+    // Las entradas propias se cargan directamente en USD (a diferencia del
+    // portal Passion, que cotiza en EUR y el worker convierte).
     precio_origen: precio,
-    moneda_origen: "EUR",
+    moneda_origen: "USD",
     precio_final: precio,
-    moneda_final: precio != null ? "EUR" : null,
+    moneda_final: precio != null ? "USD" : null,
     stock,
     disponible: hayStock,
     estado: hayStock ? "book" : "on_request",

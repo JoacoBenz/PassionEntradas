@@ -62,9 +62,9 @@ function Foot() {
 }
 
 // ---- fila de sector dentro de la card ----------------------------------------
-function LadderRow({ u, ev, eurUsd }: { u: Ticket; ev: EventoAgrupado; eurUsd: number }) {
+function LadderRow({ u, ev }: { u: Ticket; ev: EventoAgrupado }) {
   const hasPrice = u.precio_final != null && Number(u.precio_final) > 0;
-  const precio = hasPrice ? fmtPrice(u.precio_final, eurUsd) : null;
+  const precio = hasPrice ? fmtPrice(u.precio_final) : null;
   const stk = u.stock ?? 0;
   const bookable = stk > 0 && u.estado === "book" && hasPrice;
   const low = stk > 0 && stk <= 2;
@@ -102,7 +102,7 @@ function LadderRow({ u, ev, eurUsd }: { u: Ticket; ev: EventoAgrupado; eurUsd: n
 }
 
 // ---- card de evento (talón) ----------------------------------------------------
-function TicketCard({ ev, i, eurUsd }: { ev: EventoAgrupado; i: number; eurUsd: number }) {
+function TicketCard({ ev, i }: { ev: EventoAgrupado; i: number }) {
   const [open, setOpen] = useState(false);
   const [shared, setShared] = useState(false);
   const rollRef = useRef<HTMLDivElement>(null);
@@ -168,7 +168,7 @@ function TicketCard({ ev, i, eurUsd }: { ev: EventoAgrupado; i: number; eurUsd: 
           <span className="scroll-rod" aria-hidden />
           <ul className="ladder">
             {ev.ubicaciones.map((u) => (
-              <LadderRow key={u.id} u={u} ev={ev} eurUsd={eurUsd} />
+              <LadderRow key={u.id} u={u} ev={ev} />
             ))}
           </ul>
           <span className="scroll-curl" aria-hidden />
@@ -177,7 +177,7 @@ function TicketCard({ ev, i, eurUsd }: { ev: EventoAgrupado; i: number; eurUsd: 
       <aside className="ticket-stub">
         <span className="stub-label">{ev.minPrice != null ? "desde" : "precio"}</span>
         <span className={`stub-price ${ev.minPrice == null ? "is-consult" : ""}`}>
-          {ev.minPrice != null ? fmtPrice(ev.minPrice, eurUsd) : "Consultar"}
+          {ev.minPrice != null ? fmtPrice(ev.minPrice) : "Consultar"}
         </span>
         <span className="stub-meta">
           {n} ubicaciones{ev.bookable ? ` · ${ev.bookable} con stock` : ""}
@@ -219,7 +219,7 @@ const FAQS: [string, string][] = [
   ],
 ];
 
-export function StorefrontHome({ rows, eurUsd }: { rows: Ticket[]; eurUsd: number }) {
+export function StorefrontHome({ rows }: { rows: Ticket[] }) {
   const router = useRouter();
   const events = useMemo(() => buildEvents(rows), [rows]);
 
@@ -311,7 +311,7 @@ export function StorefrontHome({ rows, eurUsd }: { rows: Ticket[]; eurUsd: numbe
                   </span>
                   <span className="rank-price">
                     {ev.minPrice != null
-                      ? "desde " + fmtPrice(ev.minPrice, eurUsd)
+                      ? "desde " + fmtPrice(ev.minPrice)
                       : "a consultar"}
                   </span>
                 </div>
@@ -439,7 +439,7 @@ function uniqueOptions(
   return arr.map((a) => ({ value: a.key, label: `${a.label} (${a.n})` }));
 }
 
-export function StorefrontCatalog({ rows, eurUsd }: { rows: Ticket[]; eurUsd: number }) {
+export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
   const router = useRouter();
   const params = useSearchParams();
   const events = useMemo(() => buildEvents(rows), [rows]);
@@ -600,7 +600,7 @@ export function StorefrontCatalog({ rows, eurUsd }: { rows: Ticket[]; eurUsd: nu
 
       <main className="feed">
         {filtered.length ? (
-          visible.map((ev, i) => <TicketCard key={ev.comp + ev.evento} ev={ev} i={i} eurUsd={eurUsd} />)
+          visible.map((ev, i) => <TicketCard key={ev.comp + ev.evento} ev={ev} i={i} />)
         ) : (
           <p className="empty">
             Ningún evento coincide con estos filtros.
