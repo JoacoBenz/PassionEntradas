@@ -8,7 +8,7 @@ type Props = {
   // Muestra las tabs de sección en desktop (md+). En móvil la navegación
   // vive en la BottomNav; el moderador puro no lleva navegación.
   nav?: boolean;
-  // Link liviano opcional (ej: "Ver tienda ↗").
+  // Acción destacada opcional (ej: "Ver tienda").
   action?: { href: string; label: string };
 };
 
@@ -48,25 +48,28 @@ export default function AppHeader({ subtitle, email, nav = false, action }: Prop
           </div>
           {nav && <TopNav />}
         </div>
-        <div className="flex items-center gap-2.5">
-          {action && (
-            <Link
-              href={action.href}
-              className="whitespace-nowrap rounded-lg border border-white/25 px-3 py-1.5 text-xs font-medium text-white/85 transition-colors hover:bg-white/10"
-            >
-              {action.label}
-            </Link>
-          )}
+        {/* Acciones de sesión: misma altura para las tres (los <button>
+            reciben min-height 40px del global táctil y los <Link> no — eso
+            las dejaba desparejas en móvil). 40px en táctil, 36px en desktop. */}
+        <div className="flex items-center gap-2">
           {email && (
             <span className="hidden font-mono text-xs text-white/50 lg:inline">
               {email}
             </span>
           )}
+          {action && (
+            <Link
+              href={action.href}
+              className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-xl bg-cobalt px-3.5 text-xs font-semibold text-white transition-colors hover:bg-cobalt-deep md:h-9"
+            >
+              {action.label}
+            </Link>
+          )}
           <Link
             href="/admin/cuenta"
             title="Mi cuenta"
             aria-label="Mi cuenta"
-            className="rounded-lg border border-white/25 px-2.5 py-1.5 text-white/85 transition-colors hover:bg-white/10"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white/85 transition-colors hover:bg-white/15 md:h-9 md:w-9"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <circle cx="12" cy="8" r="4" />

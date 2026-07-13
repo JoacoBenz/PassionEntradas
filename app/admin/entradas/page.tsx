@@ -112,7 +112,7 @@ export default async function AdminEntradasPage() {
         subtitle="Entradas de la tienda"
         email={email}
         nav
-        action={{ href: "/", label: "Ver tienda ↗" }}
+        action={{ href: "/", label: "Ver tienda" }}
       />
       <TicketsPanel
         initial={manual}
