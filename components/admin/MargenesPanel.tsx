@@ -170,10 +170,10 @@ export default function MargenesPanel() {
     <section className="card-shadow overflow-hidden rounded-2xl">
       <div className="surface-ink punch-b px-5 py-4 text-white">
         <p className="text-[10px] font-medium uppercase tracking-[0.25em] text-white/50">
-          Precios del portal
+          Entradas de Passion
         </p>
         <h2 className="mt-0.5 font-display text-lg font-bold tracking-tight">
-          Margen por evento
+          Cotización y margen
         </h2>
       </div>
 
@@ -181,11 +181,13 @@ export default function MargenesPanel() {
         <div className="perf-line-light mx-5" />
         <div className="space-y-4 p-5">
           <p className="text-sm text-[#4A4E5E]">
-            El portal cotiza en euros y la tienda muestra todo en dólares. Acá
-            se maneja la cotización y el porcentaje que se le suma al precio de
-            origen, por evento o competición (una regla para el Mundial cubre
-            todos sus partidos). Al guardar se recalculan los precios ya
-            publicados y el worker usa estas reglas en cada sincronización.
+            Esto aplica <b>solo a las entradas que vienen de Passion</b> (las
+            propias se publican con el precio que cargás, tal cual). Passion
+            cotiza en euros: acá definís a cuántos dólares se convierte y qué
+            porcentaje de ganancia se le suma a cada entrada, por evento o
+            competición (una regla para el Mundial cubre todos sus partidos).
+            Al guardar se actualizan al instante los precios de la tienda, y
+            cada sincronización usa estas reglas.
           </p>
 
           {aviso && (
@@ -236,7 +238,7 @@ export default function MargenesPanel() {
                 <div>
                   <p className="text-sm font-semibold">Margen general</p>
                   <p className="text-xs text-muted">
-                    Todo evento sin regla propia
+                    Toda entrada de Passion sin regla propia
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
