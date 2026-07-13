@@ -42,24 +42,36 @@ export async function fetchTickets(): Promise<Ticket[]> {
   }
 }
 
-// Cotización EUR->USD editable desde el panel. Si no se puede leer, cae al
-// default: la tienda nunca se rompe por esto.
-export async function fetchEurUsd(): Promise<number> {
+// Config de la tienda (tabla config, editable desde el panel):
+// - eurUsd: cotización EUR->USD para las entradas de Passion.
+// - portalActivo: si las entradas de Passion se muestran (false = solo propias).
+// Ante cualquier error caen a defaults seguros: la tienda nunca se rompe.
+export type ConfigTienda = { eurUsd: number; portalActivo: boolean };
+
+export async function fetchConfigTienda(): Promise<ConfigTienda> {
   if (process.env.MOCK_DATA === "1") {
-    const { mockGetEurUsd } = await import("@/lib/mock-db");
-    return mockGetEurUsd();
+    const { mockGetEurUsd, mockGetPortalActivo } = await import("@/lib/mock-db");
+    return { eurUsd: mockGetEurUsd(), portalActivo: mockGetPortalActivo() };
   }
   try {
     const supabase = createPublicSupabase();
     const { data, error } = await supabase
       .from("config")
-      .select("value")
-      .eq("key", "eur_usd")
-      .maybeSingle();
-    if (error || data == null) return DEFAULT_EUR_USD;
-    const v = Number(data.value);
-    return Number.isFinite(v) && v > 0 ? v : DEFAULT_EUR_USD;
+      .select("key, value")
+      .in("key", ["eur_usd", "portal_activo"]);
+    if (error || !data) return { eurUsd: DEFAULT_EUR_USD, portalActivo: true };
+    const de = (key: string) => {
+      const v = Number(data.find((r) => r.key === key)?.value);
+      return Number.isFinite(v) ? v : null;
+    };
+    const eurUsd = de("eur_usd");
+    const activo = de("portal_activo");
+    return {
+      eurUsd: eurUsd != null && eurUsd > 0 ? eurUsd : DEFAULT_EUR_USD,
+      // Sin fila = activado (default histórico).
+      portalActivo: activo == null ? true : activo !== 0,
+    };
   } catch {
-    return DEFAULT_EUR_USD;
+    return { eurUsd: DEFAULT_EUR_USD, portalActivo: true };
   }
 }

@@ -6,7 +6,14 @@ import BottomNav from "@/components/BottomNav";
 import TicketsPanel from "@/components/admin/TicketsPanel";
 import MargenesPanel from "@/components/admin/MargenesPanel";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
-import { isMock, MOCK_USER, mockListManual, mockPortalCount, mockSyncRuns } from "@/lib/mock-db";
+import {
+  isMock,
+  MOCK_USER,
+  mockGetPortalActivo,
+  mockListManual,
+  mockPortalCount,
+  mockSyncRuns,
+} from "@/lib/mock-db";
 
 // Día calendario (UTC) para separar eventos vigentes de los ya pasados,
 // mismo criterio que el worker y la tienda.
@@ -24,6 +31,7 @@ export default async function AdminEntradasPage() {
   let syncRuns: SyncRun[];
   let portalCount: number;
   let portalComprables: number;
+  let portalActivo: boolean;
 
   if (isMock()) {
     email = MOCK_USER.email;
@@ -31,6 +39,7 @@ export default async function AdminEntradasPage() {
     syncRuns = mockSyncRuns();
     portalCount = mockPortalCount();
     portalComprables = portalCount;
+    portalActivo = mockGetPortalActivo();
   } else {
     const supabase = createServerSupabase();
     const {
@@ -45,7 +54,7 @@ export default async function AdminEntradasPage() {
     // quedan en la tabla (regla anti-borrado del worker) pero no cuentan
     // como catálogo. "Comprables" = con stock y reservables ahora.
     const hoy = hoyUTC();
-    const [manualRes, syncRes, countRes, comprablesRes] = await Promise.all([
+    const [manualRes, syncRes, countRes, comprablesRes, portalRes] = await Promise.all([
       supabase
         .from("tickets")
         .select("*")
@@ -72,11 +81,15 @@ export default async function AdminEntradasPage() {
         .eq("disponible", true)
         .gt("stock", 0)
         .or(`fecha.is.null,fecha.gte.${hoy}`),
+      // Interruptor de Passion (config es legible por usuarios logueados).
+      supabase.from("config").select("value").eq("key", "portal_activo").maybeSingle(),
     ]);
     manual = (manualRes.data ?? []) as TicketFull[];
     syncRuns = (syncRes.data ?? []) as SyncRun[];
     portalCount = countRes.count ?? 0;
     portalComprables = comprablesRes.count ?? 0;
+    // Sin fila = activado (default histórico).
+    portalActivo = portalRes.data == null || Number(portalRes.data.value) !== 0;
   }
 
   return (
@@ -92,6 +105,7 @@ export default async function AdminEntradasPage() {
         syncRuns={syncRuns}
         portalCount={portalCount}
         portalComprables={portalComprables}
+        portalActivo={portalActivo}
       />
       <div className="mx-auto w-full max-w-3xl px-4 pb-6">
         <MargenesPanel />

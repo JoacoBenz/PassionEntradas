@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { fetchEurUsd, fetchTickets } from "@/lib/supabase/public";
+import { fetchConfigTienda, fetchTickets } from "@/lib/supabase/public";
 import { normalizarPreciosUsd } from "@/lib/tickets";
 import { StorefrontCatalog } from "@/components/tienda/Storefront";
 
@@ -9,17 +9,19 @@ export const revalidate = 600;
 
 export default async function BuscarPage() {
   let rows: Awaited<ReturnType<typeof fetchTickets>> = [];
-  let eurUsd = 1.08;
+  let cfg = { eurUsd: 1.08, portalActivo: true };
   try {
-    [rows, eurUsd] = await Promise.all([fetchTickets(), fetchEurUsd()]);
+    [rows, cfg] = await Promise.all([fetchTickets(), fetchConfigTienda()]);
   } catch {
     return <div className="splash err">No pudimos cargar la cartelera.</div>;
   }
+  // Interruptor del panel: con Passion apagado quedan solo las propias.
+  if (!cfg.portalActivo) rows = rows.filter((t) => t.source !== "portal");
   return (
     // useSearchParams exige Suspense en páginas estáticas.
     <Suspense fallback={<div className="splash">Armando la cartelera…</div>}>
       {/* Todo a USD antes de renderizar: la tienda no vuelve a convertir. */}
-      <StorefrontCatalog rows={normalizarPreciosUsd(rows, eurUsd)} />
+      <StorefrontCatalog rows={normalizarPreciosUsd(rows, cfg.eurUsd)} />
     </Suspense>
   );
 }
