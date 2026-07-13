@@ -146,6 +146,20 @@ export function parseEventList(html: string, baseUrl: string): PortalEvent[] {
   return out;
 }
 
+/**
+ * Links de paginación de event_list.php. El portal lista de a 100 y pagina
+ * con "?first=101&total=235" (links "2", "3", "Next", "Last"). Devuelve las
+ * URLs absolutas ÚNICAS de las otras páginas (Next/Last repiten destino).
+ * Sin esto, el catálogo quedaba clavado en los primeros 100 eventos.
+ */
+export function parseListPagination(html: string, baseUrl: string): string[] {
+  const urls = new Set<string>();
+  for (const m of html.matchAll(/href="([^"]*event_list\.php\?[^"]*first=\d+[^"]*)"/gi)) {
+    urls.add(absUrl(m[1]!.replace(/&amp;/g, "&"), baseUrl));
+  }
+  return [...urls];
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // DETALLE: event_detail.php (Book) -> un RawTicketInput por sector.
 // ──────────────────────────────────────────────────────────────────────────

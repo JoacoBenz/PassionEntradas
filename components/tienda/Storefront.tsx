@@ -259,8 +259,10 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
 
   const totalEv = events.length;
   const totalStock = events.reduce((a, e) => a + e.bookStock, 0);
-  const populares = events
-    .filter((e) => e.bookStock > 0)
+  // Los 6 más próximos por fecha, tengan stock de compra o sean "a pedido":
+  // un partidazo On Request (ej: una semi del Mundial) también va en la
+  // vidriera — cambia la acción (Consultar en vez de Reservar), no el lugar.
+  const populares = [...events]
     .sort((a, b) => {
       const da = a.fecha ? Date.parse(a.fecha) : Infinity;
       const db = b.fecha ? Date.parse(b.fecha) : Infinity;
@@ -314,8 +316,8 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
       <section className="block">
         <div className="section-h">
           <span className="sh-eyebrow">Próximos</span>
-          <h2>Eventos más cercanos con entradas</h2>
-          <p>Los que están a la vuelta de la esquina y todavía tienen lugar.</p>
+          <h2>Eventos más cercanos</h2>
+          <p>Los que están a la vuelta de la esquina, con stock o a pedido.</p>
         </div>
         <ol className="rank">
           {populares.map((ev, idx) => {
@@ -341,7 +343,13 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
                 </div>
                 <div className="rank-aside">
                   <span className="rank-stock">
-                    {ev.bookStock} <small>entradas</small>
+                    {ev.bookStock > 0 ? (
+                      <>
+                        {ev.bookStock} <small>entradas</small>
+                      </>
+                    ) : (
+                      <small>a pedido</small>
+                    )}
                   </span>
                   <span className="rank-price">
                     {ev.minPrice != null
@@ -351,12 +359,16 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
                 </div>
                 <a
                   className="rank-act"
-                  href={waLink(`Hola! Quiero reservar para ${ev.evento}. ¿Qué disponibilidad hay?`)}
+                  href={waLink(
+                    ev.bookStock > 0
+                      ? `Hola! Quiero reservar para ${ev.evento}. ¿Qué disponibilidad hay?`
+                      : `Hola! Consulto por ${ev.evento}. ¿Se puede conseguir?`
+                  )}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  Reservar
+                  {ev.bookStock > 0 ? "Reservar" : "Consultar"}
                 </a>
               </li>
             );

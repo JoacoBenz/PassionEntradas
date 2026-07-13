@@ -124,7 +124,12 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const { data: recalculadas, error: rpcErr } = await admin.rpc("recalcular_precios_portal");
+  // Regla específica: repreciá solo esa competición. Margen general (null):
+  // todo el catálogo vigente (el RPC ya excluye los eventos pasados).
+  const { data: recalculadas, error: rpcErr } = await admin.rpc(
+    "recalcular_precios_portal",
+    { p_competicion: competicion }
+  );
   if (rpcErr) {
     return NextResponse.json(
       { error: `Margen guardado pero falló el recálculo: ${rpcErr.message}` },
@@ -175,7 +180,11 @@ export async function DELETE(request: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  const { data: recalculadas, error: rpcErr } = await admin.rpc("recalcular_precios_portal");
+  // Al borrar una regla, solo esa competición vuelve al margen general.
+  const { data: recalculadas, error: rpcErr } = await admin.rpc(
+    "recalcular_precios_portal",
+    { p_competicion: competicion }
+  );
   if (rpcErr) {
     return NextResponse.json(
       { error: `Regla borrada pero falló el recálculo: ${rpcErr.message}` },

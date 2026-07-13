@@ -1,5 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
-import { DEFAULT_EUR_USD, sinEventosPasados, type Ticket } from "@/lib/tickets";
+import {
+  DEFAULT_EUR_USD,
+  hoyArgentina,
+  sinEventosPasados,
+  type Ticket,
+} from "@/lib/tickets";
 
 // Cliente público (anon, sin cookies) para leer el catálogo desde
 // Server Components. RLS permite SELECT sobre `tickets` al rol anon.
@@ -29,20 +34,36 @@ export async function fetchTickets(): Promise<Ticket[]> {
   }
   try {
     const supabase = createPublicSupabase();
-    const { data, error } = await supabase
-      .from("tickets")
-      .select(
-        "id,evento,competicion,fecha,ciudad,categoria,precio_final,stock,estado,source,disponible,imagen_url"
-      )
-      .order("fecha", { ascending: true, nullsFirst: false });
-    if (error) throw new Error(error.message);
-    // Entradas "book" que el portal retiró (el worker las marca
-    // disponible=false y stock=0): afuera. Ojo: las on_request vigentes
-    // también vienen con disponible=false por diseño, esas se quedan
-    // (son las de "Consultar").
-    const rows = ((data ?? []) as (Ticket & { disponible: boolean })[]).filter(
-      (t) => !(t.source === "portal" && t.estado === "book" && !t.disponible)
-    );
+    // OJO: PostgREST devuelve como mucho 1000 filas por consulta. Con el
+    // catálogo completo (235 eventos ≈ 1500 filas) una sola consulta se
+    // cortaba en 1000 y la tienda mostraba una fracción de los eventos.
+    // Solución doble: filtrar en el server (afuera los eventos ya pasados y
+    // las book retiradas del portal) y paginar con range() hasta agotar.
+    const hoy = hoyArgentina();
+    const PAGINA = 1000;
+    const MAX_PAGINAS = 10; // red de seguridad: 10k filas es 6x el catálogo
+    let rows: (Ticket & { disponible: boolean })[] = [];
+    for (let p = 0; p < MAX_PAGINAS; p++) {
+      const { data, error } = await supabase
+        .from("tickets")
+        .select(
+          "id,evento,competicion,fecha,ciudad,categoria,precio_final,stock,estado,source,disponible,imagen_url"
+        )
+        // Eventos vigentes (sin fecha o de hoy en adelante, día argentino).
+        .or(`fecha.is.null,fecha.gte.${hoy}`)
+        // NOT (book y retirada) = no-book O disponible. Las on_request
+        // vigentes vienen con disponible=false por diseño y se quedan
+        // (son las de "Consultar").
+        .or("estado.neq.book,disponible.eq.true")
+        .order("fecha", { ascending: true, nullsFirst: false })
+        .order("id", { ascending: true })
+        .range(p * PAGINA, (p + 1) * PAGINA - 1);
+      if (error) throw new Error(error.message);
+      rows = rows.concat((data ?? []) as (Ticket & { disponible: boolean })[]);
+      if ((data ?? []).length < PAGINA) break;
+    }
+    // El filtro de pasados de nuevo en JS: barato, y cubre el borde del
+    // cambio de día entre el render y la consulta.
     return sinEventosPasados(rows);
   } catch (err) {
     console.warn("[tienda] Supabase no disponible, usando catálogo mock:", err);

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- La marca de TicketMirror: los dos cuadrados rojos en diagonal (▚) -->
+  <rect x="1" y="1" width="14" height="14" fill="#FF3B2E" />
+  <rect x="17" y="17" width="14" height="14" fill="#FF3B2E" />
+</svg>
