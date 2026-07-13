@@ -53,7 +53,7 @@ export default async function OperacionPublicaPage({
       <AutoRefresh versionUrl={`/api/op/${params.id}/version`} />
       <StatusStub op={op} />
       <footer className="mt-6 text-center text-xs text-muted">
-        AdminTickets · custodia de operaciones
+        AdminTickets · Custodia de operaciones
       </footer>
     </main>
   );

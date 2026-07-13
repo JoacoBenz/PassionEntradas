@@ -80,19 +80,19 @@ function LadderRow({ u, ev }: { u: Ticket; ev: EventoAgrupado }) {
         {stk > 0 ? (
           <>
             <i className={`dot ${low ? "low" : "ok"}`} />
-            {low ? `quedan ${stk}` : `${stk} lugares`}
+            {low ? `Quedan ${stk}` : `${stk} lugares`}
           </>
         ) : u.stock == null && u.estado === "on_request" ? (
           // Stock desconocido (a pedido), no agotado: "sin cupo" espantaba
           // consultas por entradas que sí se pueden conseguir.
           <>
             <i className="dot req" />
-            a pedido
+            A pedido
           </>
         ) : (
           <>
             <i className="dot req" />
-            sin cupo
+            Sin cupo
           </>
         )}
       </span>
@@ -194,7 +194,7 @@ function TicketCard({ ev, i, defaultOpen = false }: { ev: EventoAgrupado; i: num
         </div>
       </div>
       <aside className="ticket-stub">
-        <span className="stub-label">{ev.minPrice != null ? "desde" : "precio"}</span>
+        <span className="stub-label">{ev.minPrice != null ? "Desde" : "Precio"}</span>
         <span className={`stub-price ${ev.minPrice == null ? "is-consult" : ""}`}>
           {ev.minPrice != null ? fmtPrice(ev.minPrice) : "Consultar"}
         </span>
@@ -330,8 +330,8 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
                   </span>
                   <span className="rank-price">
                     {ev.minPrice != null
-                      ? "desde " + fmtPrice(ev.minPrice)
-                      : "a consultar"}
+                      ? "Desde " + fmtPrice(ev.minPrice)
+                      : "A consultar"}
                   </span>
                 </div>
                 <a
@@ -632,7 +632,7 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
         <b>{filtered.length}</b> {filtered.length === 1 ? "evento" : "eventos"}
         {totalPages > 1 && (
           <span className="range">
-            {" "}· mostrando {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, filtered.length)}
+            {" "}· Mostrando {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, filtered.length)}
           </span>
         )}
         {filtrando && (

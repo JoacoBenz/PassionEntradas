@@ -81,15 +81,19 @@ type Props = {
   competiciones: string[];
 };
 
+// Datos del evento (compartidos) + una fila por sector: un evento puede
+// publicarse con varios sectores, cada uno con su precio y stock (igual que
+// las entradas del portal: una fila de catálogo por sector).
 const empty = {
   evento: "",
   competicion: "",
   fecha: "",
   ciudad: "",
-  categoria: "",
-  precio: "",
-  stock: "1",
 };
+
+type SectorForm = { categoria: string; precio: string; stock: string };
+const sectorVacio = (): SectorForm => ({ categoria: "", precio: "", stock: "1" });
+const MAX_SECTORES = 20;
 
 // Panel de catálogo: carga de entradas propias (source=manual) junto a las
 // sincronizadas del portal, y salud de las últimas corridas del worker.
@@ -106,6 +110,7 @@ export default function TicketsPanel({
   // así aparece en la próxima carga sin recargar la página.
   const [comps, setComps] = useState<string[]>(competiciones);
   const [form, setForm] = useState(empty);
+  const [sectores, setSectores] = useState<SectorForm[]>([sectorVacio()]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -125,6 +130,10 @@ export default function TicketsPanel({
 
   function set<K extends keyof typeof empty>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function setSector(i: number, key: keyof SectorForm, value: string) {
+    setSectores((prev) => prev.map((s, j) => (j === i ? { ...s, [key]: value } : s)));
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -148,19 +157,30 @@ export default function TicketsPanel({
       push("error", "La fecha del evento es obligatoria");
       return;
     }
-    if (!form.categoria.trim()) {
-      push("error", "El sector es obligatorio");
-      return;
-    }
-    const precioNum = Number(form.precio);
-    if (!form.precio.trim() || !Number.isFinite(precioNum) || precioNum <= 0) {
-      push("error", "El precio debe ser mayor a 0");
-      return;
-    }
-    const stockNum = Math.trunc(Number(form.stock));
-    if (!form.stock.trim() || !Number.isFinite(stockNum) || stockNum < 1) {
-      push("error", "El stock debe ser al menos 1");
-      return;
+    const vistos = new Set<string>();
+    for (let i = 0; i < sectores.length; i++) {
+      const s = sectores[i];
+      const n = sectores.length > 1 ? ` (sector ${i + 1})` : "";
+      if (!s.categoria.trim()) {
+        push("error", `El sector es obligatorio${n}`);
+        return;
+      }
+      const precioNum = Number(s.precio);
+      if (!s.precio.trim() || !Number.isFinite(precioNum) || precioNum <= 0) {
+        push("error", `El precio debe ser mayor a 0${n}`);
+        return;
+      }
+      const stockNum = Math.trunc(Number(s.stock));
+      if (!s.stock.trim() || !Number.isFinite(stockNum) || stockNum < 1) {
+        push("error", `El stock debe ser al menos 1${n}`);
+        return;
+      }
+      const clave = s.categoria.trim().toLowerCase();
+      if (vistos.has(clave)) {
+        push("error", `El sector "${s.categoria.trim()}" está repetido`);
+        return;
+      }
+      vistos.add(clave);
     }
     enviando.current = true;
     setLoading(true);
@@ -168,20 +188,26 @@ export default function TicketsPanel({
       const res = await fetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticket: form }),
+        body: JSON.stringify({ ticket: { ...form, sectores } }),
       });
       const data = await res.json();
       if (!res.ok) {
         push("error", data.error ?? "No se pudo publicar la entrada");
         return;
       }
-      setTickets((prev) => [data.row as TicketFull, ...prev]);
+      setTickets((prev) => [...(data.rows as TicketFull[]), ...prev]);
       const nuevaComp = form.competicion.trim();
       if (nuevaComp && !comps.includes(nuevaComp)) {
         setComps((prev) => [...prev, nuevaComp].sort());
       }
       setForm(empty);
-      push("success", "Entrada publicada en la tienda");
+      setSectores([sectorVacio()]);
+      push(
+        "success",
+        sectores.length > 1
+          ? `Entrada publicada con ${sectores.length} sectores`
+          : "Entrada publicada en la tienda"
+      );
     } catch {
       push("error", "Error de red al publicar");
     } finally {
@@ -256,7 +282,7 @@ export default function TicketsPanel({
             label="De Passion"
             value={String(portalCount)}
             accent={passionOn ? "#6C5BF2" : "#9AA0B2"}
-            sub={passionOn ? `${portalComprables} comprables` : "ocultas de la tienda"}
+            sub={passionOn ? `${portalComprables} comprables` : "Ocultas de la tienda"}
           />
           <Stat label="Propias" value={String(tickets.length)} accent="#0D9377" />
           <Stat
@@ -272,7 +298,7 @@ export default function TicketsPanel({
                 : "—"
             }
             accent={lastSync?.status === "ok" ? "#0D9377" : "#D14D68"}
-            sub={lastSync ? lastSync.status : "sin corridas"}
+            sub={lastSync ? lastSync.status.toUpperCase() : "Sin corridas"}
           />
         </div>
       </section>
@@ -367,52 +393,85 @@ export default function TicketsPanel({
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>Fecha *</label>
-                  <input
-                    type="date"
-                    className={inputCls}
-                    value={form.fecha}
-                    onChange={(e) => set("fecha", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Sector *</label>
-                  <input
-                    className={inputCls}
-                    value={form.categoria}
-                    onChange={(e) => set("categoria", e.target.value)}
-                    placeholder="Platea Alta"
-                  />
-                </div>
+              <div>
+                <label className={labelCls}>Fecha *</label>
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={form.fecha}
+                  onChange={(e) => set("fecha", e.target.value)}
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>Precio (USD) *</label>
-                  <input
-                    type="number"
-                    min={1}
-                    step={1}
-                    className={`${inputCls} font-mono`}
-                    value={form.precio}
-                    onChange={(e) => set("precio", e.target.value)}
-                    placeholder="120"
-                  />
+              {/* Sectores: uno por defecto; se pueden sumar más (cada uno se
+                  publica como su propia fila del catálogo, como el portal). */}
+              {sectores.map((s, i) => (
+                <div
+                  key={i}
+                  className="space-y-3 rounded-xl border border-dashed border-line bg-canvas/60 p-3"
+                >
+                  <div className="flex items-end gap-3">
+                    <div className="min-w-0 flex-1">
+                      <label className={labelCls}>
+                        Sector {sectores.length > 1 ? i + 1 : ""} *
+                      </label>
+                      <input
+                        className={inputCls}
+                        value={s.categoria}
+                        onChange={(e) => setSector(i, "categoria", e.target.value)}
+                        placeholder="Platea Alta"
+                      />
+                    </div>
+                    {sectores.length > 1 && (
+                      <button
+                        type="button"
+                        aria-label={`Quitar sector ${i + 1}`}
+                        onClick={() =>
+                          setSectores((prev) => prev.filter((_, j) => j !== i))
+                        }
+                        className="shrink-0 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Precio (USD) *</label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        className={`${inputCls} font-mono`}
+                        value={s.precio}
+                        onChange={(e) => setSector(i, "precio", e.target.value)}
+                        placeholder="120"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Stock *</label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        className={`${inputCls} font-mono`}
+                        value={s.stock}
+                        onChange={(e) => setSector(i, "stock", e.target.value)}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className={labelCls}>Stock *</label>
-                  <input
-                    type="number"
-                    min={1}
-                    step={1}
-                    className={`${inputCls} font-mono`}
-                    value={form.stock}
-                    onChange={(e) => set("stock", e.target.value)}
-                  />
-                </div>
-              </div>
+              ))}
+
+              {sectores.length < MAX_SECTORES && (
+                <button
+                  type="button"
+                  onClick={() => setSectores((prev) => [...prev, sectorVacio()])}
+                  className="w-full rounded-xl border border-dashed border-brand/40 px-3 py-2 text-xs font-semibold text-brand transition-colors hover:bg-brand/5"
+                >
+                  + Agregar otro sector
+                </button>
+              )}
             </div>
             <div className="px-5 pb-5">
               <button
@@ -446,7 +505,7 @@ export default function TicketsPanel({
                   <p className="truncate font-display font-semibold">{t.evento}</p>
                   <p className="text-xs text-muted">
                     {t.categoria ? `${t.categoria} · ` : ""}
-                    {t.precio_final != null ? `US$ ${t.precio_final}` : "a consultar"} · stock{" "}
+                    {t.precio_final != null ? `US$ ${t.precio_final}` : "A consultar"} · Stock{" "}
                     {t.stock ?? 0}
                   </p>
                 </div>
