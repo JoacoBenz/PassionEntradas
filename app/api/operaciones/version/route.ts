@@ -24,16 +24,14 @@ export async function GET() {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { data, count, error } = await createAdminSupabase()
-    .from("operaciones")
-    .select("updated_at", { count: "exact" })
-    .order("updated_at", { ascending: false })
-    .limit(1);
+  // RPC único ("count:max(updated_at)"), respaldado por el índice
+  // operaciones_updated_at_idx: este endpoint se polea cada 15s por admin
+  // conectado, tiene que ser barato aunque la tabla crezca.
+  const { data, error } = await createAdminSupabase().rpc("version_operaciones");
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const max = data?.[0]?.updated_at ?? "";
-  return NextResponse.json({ v: `${count ?? 0}:${max}` });
+  return NextResponse.json({ v: String(data ?? "") });
 }
