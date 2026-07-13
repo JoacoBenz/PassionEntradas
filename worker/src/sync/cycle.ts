@@ -8,6 +8,7 @@ import type { TicketRepository } from "../db/repository.js";
 import type { SyncSummary, TicketRow } from "../types.js";
 import { decidePublish } from "./partial-guard.js";
 import { isPastEvent } from "./past-filter.js";
+import { sincronizarMapas } from "./mapas.js";
 import { margenPara } from "../pricing/margenes.js";
 
 export interface CycleDeps {
@@ -41,8 +42,8 @@ export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
   const startMs = now();
   const startedAtIso = new Date(startMs).toISOString();
 
-  // 1. Extraer.
-  const { rows: raw, complete } = await scrapeRawTickets({ cfg, log, session, signal });
+  // 1. Extraer (rows + mapas de sectores candidatos por evento).
+  const { rows: raw, complete, imagenes } = await scrapeRawTickets({ cfg, log, session, signal });
 
   // 2. Validar con zod + aplicar markup. Descartar inválidos y contar.
   // El margen sale de la tabla `margenes` (editable desde el panel), con
@@ -75,6 +76,7 @@ export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
         precio_final: precioFinal,
         moneda_final: monedaFinal,
         scraped_at: startedAtIso,
+        imagen_url: null, // se estampa tras resolver los mapas (paso 4)
       });
     } catch (err) {
       discarded++;
@@ -117,7 +119,15 @@ export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
     return summary;
   }
 
-  // 4. Publicar: upsert siempre; marcar ausentes solo si el scrape fue completo.
+  // 4. Mapas de sectores: descargar/subir los nuevos y estampar la URL
+  // pública en cada fila del evento (los ya subidos se reusan; sin esto el
+  // upsert pisaría con null las URLs existentes). Fail-soft siempre.
+  const mapas = await sincronizarMapas({ cfg, log, session, repo, candidatas: imagenes, signal });
+  for (const r of rows) {
+    r.imagen_url = mapas.get(r.id.split("::")[0]!) ?? null;
+  }
+
+  // 5. Publicar: upsert siempre; marcar ausentes solo si el scrape fue completo.
   const upserted = await repo.upsertBatches(rows, cfg.UPSERT_BATCH_SIZE);
   let markedUnavailable = 0;
   if (complete) {

@@ -31,12 +31,18 @@ function makeBookItems(n: number): RawTicketInput[] {
   }));
 }
 
-const result = (rows: RawTicketInput[], complete = true) => ({ rows, complete });
+const result = (rows: RawTicketInput[], complete = true) => ({
+  rows,
+  complete,
+  imagenes: new Map<string, string>(),
+});
 
 function makeRepo() {
   return {
     getLastSuccessfulScrapedCount: vi.fn().mockResolvedValue(100),
     fetchMargenes: vi.fn().mockResolvedValue([]),
+    mapasExistentes: vi.fn().mockResolvedValue(new Map()),
+    subirMapa: vi.fn().mockResolvedValue(null),
     upsertBatches: vi.fn().mockResolvedValue(0),
     markAbsentBefore: vi.fn().mockResolvedValue(0),
     recordSyncRun: vi.fn().mockResolvedValue(undefined),
