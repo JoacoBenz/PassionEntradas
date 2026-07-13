@@ -32,7 +32,7 @@ export async function fetchTickets(): Promise<Ticket[]> {
     const { data, error } = await supabase
       .from("tickets")
       .select(
-        "id,evento,competicion,fecha,ciudad,categoria,precio_final,stock,estado,source,disponible"
+        "id,evento,competicion,fecha,ciudad,categoria,precio_final,stock,estado,source,disponible,imagen_url"
       )
       .order("fecha", { ascending: true, nullsFirst: false });
     if (error) throw new Error(error.message);

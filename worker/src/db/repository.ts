@@ -88,6 +88,55 @@ export class TicketRepository {
     return data?.length ?? 0;
   }
 
+  /**
+   * Mapas de sectores ya subidos: eventId -> URL pública del bucket. Sirve
+   * para no re-descargar/re-subir la misma imagen en cada ciclo y para que
+   * el upsert no pise con null la URL de eventos ya resueltos. Fail-soft:
+   * un error devuelve mapa vacío (se re-subirían imágenes, nunca se frena
+   * el sync).
+   */
+  async mapasExistentes(): Promise<Map<string, string>> {
+    const { data, error } = await this.db
+      .from(TABLE)
+      .select("id, imagen_url")
+      .eq("source", "portal")
+      .not("imagen_url", "is", null)
+      .limit(5000);
+    if (error) {
+      this.log.warn({ error: error.message }, "no se pudieron leer los mapas existentes");
+      return new Map();
+    }
+    const out = new Map<string, string>();
+    for (const r of data ?? []) {
+      const eventId = String(r.id).split("::")[0]!;
+      if (!out.has(eventId)) out.set(eventId, r.imagen_url as string);
+    }
+    return out;
+  }
+
+  /**
+   * Sube el mapa de un evento al bucket público `mapas` y devuelve su URL
+   * pública (o null si falló). upsert: re-subir el mismo evento pisa el
+   * archivo, no acumula.
+   */
+  async subirMapa(
+    eventId: string,
+    buffer: Buffer,
+    contentType: string,
+    ext: string,
+  ): Promise<string | null> {
+    const path = `eventos/${eventId}.${ext}`;
+    const { error } = await this.db.storage
+      .from("mapas")
+      .upload(path, buffer, { contentType, upsert: true });
+    if (error) {
+      this.log.warn({ error: error.message, eventId }, "no se pudo subir el mapa");
+      return null;
+    }
+    const { data } = this.db.storage.from("mapas").getPublicUrl(path);
+    return data?.publicUrl ?? null;
+  }
+
   /** Registra el resultado del ciclo para auditoría/observabilidad. */
   async recordSyncRun(summary: SyncSummary): Promise<void> {
     const { error } = await this.db.from(RUNS_TABLE).insert({
@@ -124,5 +173,6 @@ function toDbRow(t: TicketRow): Record<string, unknown> {
     url_origen: t.url_origen,
     estado: t.estado,
     scraped_at: t.scraped_at,
+    imagen_url: t.imagen_url,
   };
 }

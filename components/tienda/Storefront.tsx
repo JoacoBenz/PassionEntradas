@@ -185,6 +185,21 @@ function TicketCard({ ev, i, defaultOpen = false }: { ev: EventoAgrupado; i: num
         </div>
         <div className="roll-wrap" ref={rollRef} style={{ maxHeight: 0 }}>
           <span className="scroll-rod" aria-hidden />
+          {ev.imagen && (
+            <img
+              src={ev.imagen}
+              alt={`Mapa de sectores de ${title}`}
+              loading="lazy"
+              className="mapa-sectores"
+              // La animación de despliegue fija maxHeight con el alto medido
+              // al abrir; si la imagen (lazy) carga después, el contenido
+              // crecería recortado. Al cargar, re-medimos.
+              onLoad={() => {
+                const roll = rollRef.current;
+                if (roll && open) roll.style.maxHeight = roll.scrollHeight + "px";
+              }}
+            />
+          )}
           <ul className="ladder">
             {ev.ubicaciones.map((u) => (
               <LadderRow key={u.id} u={u} ev={ev} />

@@ -74,3 +74,52 @@ export async function fetchPortalHtml(opts: {
   }
   throw lastErr instanceof Error ? lastErr : new Error("fetchPortalHtml agotó reintentos");
 }
+
+/**
+ * GET binario (imágenes) con la misma sesión. Sin chequeo de captcha (no es
+ * HTML) y con tope de tamaño: un mapa de sectores razonable no pasa de unos
+ * MB; si el portal devuelve algo gigante, mejor no traerlo.
+ */
+export async function fetchPortalBytes(opts: {
+  url: string;
+  cookieHeader: string;
+  cfg: Config;
+  log: Logger;
+  signal?: AbortSignal;
+  maxBytes?: number;
+}): Promise<{ buffer: Buffer; contentType: string | undefined } | null> {
+  const { url, cookieHeader, cfg, signal } = opts;
+  const maxBytes = opts.maxBytes ?? 5 * 1024 * 1024;
+
+  const res = await request(url, {
+    method: "GET",
+    headers: {
+      cookie: cookieHeader,
+      "user-agent": cfg.USER_AGENT,
+      accept: "image/*,*/*;q=0.8",
+    },
+    maxRedirections: 0,
+    signal,
+  });
+
+  if (res.statusCode === 401 || res.statusCode === 403) {
+    await res.body.dump();
+    throw new SessionExpiredError(`HTTP ${res.statusCode} en ${url}`);
+  }
+  if (res.statusCode !== 200) {
+    await res.body.dump();
+    return null;
+  }
+
+  const declared = Number(res.headers["content-length"]);
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await res.body.dump();
+    return null;
+  }
+
+  const buffer = Buffer.from(await res.body.arrayBuffer());
+  if (buffer.length === 0 || buffer.length > maxBytes) return null;
+
+  const contentType = String(res.headers["content-type"] ?? "") || undefined;
+  return { buffer, contentType };
+}

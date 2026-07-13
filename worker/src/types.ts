@@ -29,6 +29,8 @@ export interface TicketRow extends RawTicket {
   precio_final: number | null;
   moneda_final: string | null; // 'EUR' | 'ARS' | null
   scraped_at: string; // ISO; igual para todo el lote del ciclo (marca "visto")
+  /** URL pública del mapa de sectores en el bucket `mapas` (o null). */
+  imagen_url: string | null;
 }
 
 /** Resumen de un ciclo de sync, para logging y auditoría. */

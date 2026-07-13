@@ -8,6 +8,13 @@ const d = (days: number) => {
   return dt.toISOString();
 };
 
+// Mapa de sectores de muestra (SVG inline: funciona sin red en el demo).
+const MOCK_MAPA =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 240'><rect width='400' height='240' fill='#eceae3'/><ellipse cx='200' cy='120' rx='170' ry='95' fill='none' stroke='#16150f' stroke-width='3'/><rect x='120' y='75' width='160' height='90' fill='#0D9377' opacity='0.7'/><text x='200' y='125' font-family='sans-serif' font-size='16' text-anchor='middle' fill='#fff'>CAMPO</text><text x='200' y='40' font-family='sans-serif' font-size='12' text-anchor='middle' fill='#16150f'>FONDO NORTE</text><text x='200' y='215' font-family='sans-serif' font-size='12' text-anchor='middle' fill='#16150f'>FONDO SUR</text><text x='40' y='125' font-family='sans-serif' font-size='12' text-anchor='middle' fill='#16150f' transform='rotate(-90 40 125)'>LATERAL</text></svg>`
+  );
+
 export const MOCK_TICKETS: Ticket[] = [
   // Mundial 2026
   { id: "1001::1", evento: "Match 12, Group A - Argentina vs Chile", competicion: "FIFA World Cup 2026", fecha: d(20), ciudad: "Estadio Azteca, Ciudad de México (MEX)", categoria: "Category 1", precio_final: 720, stock: 4, estado: "book", source: "portal" },
@@ -19,7 +26,7 @@ export const MOCK_TICKETS: Ticket[] = [
   { id: "2001::1", evento: "Formula 1 - Gran Premio de Monza", competicion: "Formula 1", fecha: d(60), ciudad: "Autodromo Nazionale, Monza (ITA)", categoria: "Tribuna Ascari", precio_final: 390, stock: 8, estado: "book", source: "portal" },
   { id: "2001::2", evento: "Formula 1 - Gran Premio de Monza", competicion: "Formula 1", fecha: d(60), ciudad: "Autodromo Nazionale, Monza (ITA)", categoria: "General 3 días", precio_final: 210, stock: 12, estado: "book", source: "portal" },
   // Champions
-  { id: "3001::1", evento: "Real Madrid vs Manchester City", competicion: "UEFA Champions League", fecha: d(9), ciudad: "Santiago Bernabéu, Madrid (ESP)", categoria: "Lateral Alto", precio_final: 480, stock: 1, estado: "book", source: "portal" },
+  { id: "3001::1", evento: "Real Madrid vs Manchester City", competicion: "UEFA Champions League", fecha: d(9), ciudad: "Santiago Bernabéu, Madrid (ESP)", categoria: "Lateral Alto", precio_final: 480, stock: 1, estado: "book", source: "portal", imagen_url: MOCK_MAPA },
   { id: "3001::2", evento: "Real Madrid vs Manchester City", competicion: "UEFA Champions League", fecha: d(9), ciudad: "Santiago Bernabéu, Madrid (ESP)", categoria: "Fondo Norte", precio_final: 295, stock: 3, estado: "book", source: "portal" },
   // Sin fecha / a consultar
   { id: "4001::REQ", evento: "Final - FIFA World Cup 2026", competicion: "FIFA World Cup 2026", fecha: d(45), ciudad: "MetLife Stadium, New York (USA)", categoria: null, precio_final: null, stock: 0, estado: "on_request", source: "portal" },
