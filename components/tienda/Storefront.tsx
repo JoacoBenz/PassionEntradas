@@ -69,17 +69,89 @@ function WcLogo({ comp }: { comp: string | null }) {
   );
 }
 
+// Widget de WhatsApp: el botón flotante abre un panel con los agentes y su
+// estado (disponible / con un cliente). Los estados rotan solos en
+// intervalos irregulares — transmite que del otro lado hay gente atendiendo.
+const AGENTES = [
+  { nombre: "Kiru", inicial: "K" },
+  { nombre: "Nacho", inicial: "N" },
+] as const;
+
+type EstadoAgente = "disponible" | "ocupado";
+
 function WaFloat({ lang }: { lang: Lang }) {
+  const t = TX[lang];
+  const [abierto, setAbierto] = useState(false);
+  // Arranca con ambos disponibles (mismo HTML en server y cliente: nada de
+  // Math.random en el render inicial o rompería la hidratación). Recién
+  // montado, cada agente empieza a alternar por su cuenta.
+  const [estados, setEstados] = useState<EstadoAgente[]>(["disponible", "disponible"]);
+
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    function programar(i: number, delay: number) {
+      timers[i] = setTimeout(() => {
+        setEstados((prev) => {
+          const nx = [...prev];
+          // Sesgo a "disponible" (65%): ocupado aparece lo justo para que
+          // se note movimiento sin espantar consultas.
+          nx[i] = Math.random() < 0.65 ? "disponible" : "ocupado";
+          return nx;
+        });
+        programar(i, 15000 + Math.random() * 35000);
+      }, delay);
+    }
+    // Primer cambio a los pocos segundos, después cada 15-50s cada uno.
+    programar(0, 6000 + Math.random() * 10000);
+    programar(1, 12000 + Math.random() * 14000);
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
   return (
-    <a
-      className="wa-float"
-      href={waLink(TX[lang].waFloatMsg)}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label="WhatsApp"
-    >
-      WhatsApp
-    </a>
+    <div className="wa-widget">
+      {abierto && (
+        <div className="wa-panel" role="dialog" aria-label={t.waTitle}>
+          <div className="wa-panel-head">
+            <p className="wa-panel-title">{t.waTitle}</p>
+            <p className="wa-panel-sub">{t.waSubtitle}</p>
+          </div>
+          {AGENTES.map((a, i) => {
+            const disponible = estados[i] === "disponible";
+            return (
+              <div key={a.nombre} className="wa-agente">
+                <span className={`wa-avatar ${i === 0 ? "wa-avatar--a" : "wa-avatar--b"}`}>
+                  {a.inicial}
+                </span>
+                <span className="wa-agente-info">
+                  <span className="wa-agente-nombre">{a.nombre}</span>
+                  <span className={`wa-agente-estado ${disponible ? "on" : "off"}`}>
+                    <i aria-hidden />
+                    {disponible ? t.waDisponible : t.waOcupado}
+                  </span>
+                </span>
+                <a
+                  className="wa-agente-btn"
+                  href={waLink(t.waAgenteMsg(a.nombre))}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setAbierto(false)}
+                >
+                  {t.waChat}
+                </a>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <button
+        className="wa-float"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        aria-label="WhatsApp"
+      >
+        {abierto ? "✕" : "WhatsApp"}
+      </button>
+    </div>
   );
 }
 
