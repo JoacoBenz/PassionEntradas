@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { fetchEurUsd, fetchTickets } from "@/lib/supabase/public";
+import { normalizarPreciosUsd } from "@/lib/tickets";
 import { StorefrontCatalog } from "@/components/tienda/Storefront";
 
 // Igual que la home: revalidatePath cubre los cambios del panel al instante;
@@ -17,7 +18,8 @@ export default async function BuscarPage() {
   return (
     // useSearchParams exige Suspense en páginas estáticas.
     <Suspense fallback={<div className="splash">Armando la cartelera…</div>}>
-      <StorefrontCatalog rows={rows} eurUsd={eurUsd} />
+      {/* Todo a USD antes de renderizar: la tienda no vuelve a convertir. */}
+      <StorefrontCatalog rows={normalizarPreciosUsd(rows, eurUsd)} />
     </Suspense>
   );
 }

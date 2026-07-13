@@ -57,17 +57,32 @@ export type EventoAgrupado = {
 };
 
 // ---- moneda -----------------------------------------------------------------
-// La tienda muestra TODO en dólares. El precio base del portal está en EUR;
-// se convierte con la cotización EUR->USD editable desde el panel (tabla
-// `config`, clave eur_usd). Este default solo cubre el caso de no poder leerla.
+// La tienda trabaja SIEMPRE en dólares. El único origen en euros es el portal
+// Passion; sus precios se convierten a USD con la cotización editable del panel
+// (tabla `config`, clave eur_usd). Las entradas propias ya se cargan en USD.
+// Este default solo cubre el caso de no poder leer la cotización.
 export const DEFAULT_EUR_USD = 1.08;
 
-export function fmtPrice(eur: number | null, eurUsd: number): string | null {
-  if (eur == null) return null;
-  const v = Number(eur) * (eurUsd > 0 ? eurUsd : DEFAULT_EUR_USD);
+// Formatea un monto que YA está en USD (ver normalizarPreciosUsd).
+export function fmtPrice(usd: number | null): string | null {
+  if (usd == null) return null;
   return (
     "US$ " +
-    new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(Math.round(v))
+    new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(Math.round(usd))
+  );
+}
+
+// Normaliza el catálogo a USD: convierte los precios del portal (EUR) con la
+// cotización y deja el resto (entradas propias, ya en USD) como está. Así la
+// tienda muestra, ordena y calcula "desde" en una sola moneda.
+export function normalizarPreciosUsd<
+  T extends { precio_final: number | null; source: TicketSource }
+>(rows: T[], eurUsd: number): T[] {
+  const tasa = eurUsd > 0 ? eurUsd : DEFAULT_EUR_USD;
+  return rows.map((t) =>
+    t.source === "portal" && t.precio_final != null
+      ? { ...t, precio_final: t.precio_final * tasa }
+      : t
   );
 }
 

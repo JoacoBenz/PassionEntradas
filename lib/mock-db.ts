@@ -105,8 +105,8 @@ function seed(): MockDB {
   const manual: TicketFull[] = MOCK_TICKETS.filter((t) => t.source === "manual").map((t) => ({
     ...t,
     precio_origen: t.precio_final,
-    moneda_origen: "EUR",
-    moneda_final: t.precio_final != null ? "EUR" : null,
+    moneda_origen: "USD",
+    moneda_final: t.precio_final != null ? "USD" : null,
     disponible: (t.stock ?? 0) > 0,
     url_origen: null,
     scraped_at: iso(60),
