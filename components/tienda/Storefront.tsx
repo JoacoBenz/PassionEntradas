@@ -52,6 +52,18 @@ function LangToggle({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => voi
   );
 }
 
+// Link profundo al evento (mismo formato que el botón compartir) para pegar
+// en los mensajes de WhatsApp: el agente abre y ve exactamente qué entrada
+// le están pidiendo. Base determinística (env con fallback al dominio de
+// prod) para que el server y el cliente rendericen el mismo href.
+const SITE_BASE = (
+  process.env.NEXT_PUBLIC_SITE_URL || "https://tickermirror.vercel.app"
+).replace(/\/$/, "");
+
+function eventoLink(evento: string, comp: string): string {
+  return `${SITE_BASE}/buscar?ev=${encodeURIComponent(evento)}&c=${encodeURIComponent(comp)}`;
+}
+
 function Wordmark() {
   return (
     <Link className="wm" href="/">
@@ -181,9 +193,10 @@ function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang 
   const bookable = stk > 0 && u.estado === "book" && hasPrice;
   const low = stk > 0 && stk <= 2;
   const sector = u.categoria || t.entradaGeneral;
+  const link = eventoLink(ev.evento, ev.comp);
   const msg = bookable
-    ? t.msgReservar(ev.evento, sector, precio ?? "")
-    : t.msgConsultar(ev.evento, sector);
+    ? t.msgReservar(ev.evento, sector, precio ?? "", link)
+    : t.msgConsultar(ev.evento, sector, link);
   return (
     <li className={`seat ${bookable ? "" : "seat--req"}`}>
       <span className="seat-name">{sector}</span>
@@ -454,8 +467,8 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
                   className="rank-act"
                   href={waLink(
                     ev.bookStock > 0
-                      ? t.msgReservarRank(ev.evento)
-                      : t.msgConsultarRank(ev.evento)
+                      ? t.msgReservarRank(ev.evento, eventoLink(ev.evento, ev.comp))
+                      : t.msgConsultarRank(ev.evento, eventoLink(ev.evento, ev.comp))
                   )}
                   target="_blank"
                   rel="noopener noreferrer"
