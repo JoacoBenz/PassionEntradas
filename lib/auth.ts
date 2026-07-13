@@ -23,3 +23,13 @@ export function getRol(user: User): Rol | null {
 export function esStaff(rol: Rol | null): rol is Rol {
   return rol === "administrador" || rol === "moderador";
 }
+
+// Nombre para la auditoría de hitos: "Nombre Apellido" si el usuario cargó
+// sus datos en Mi cuenta; si no, el email (quienDe lo acorta al mostrar).
+export function nombreDe(user: User): string | null {
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+  const nombre = typeof meta.nombre === "string" ? meta.nombre.trim() : "";
+  const apellido = typeof meta.apellido === "string" ? meta.apellido.trim() : "";
+  const completo = `${nombre} ${apellido}`.trim();
+  return completo || user.email || null;
+}

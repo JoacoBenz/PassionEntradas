@@ -163,11 +163,13 @@ export function generateCode(): string {
   return `BX-${body}`;
 }
 
-// Nombre corto para mostrar quién hizo un paso
-// ("kiru@adminticker.test" -> "kiru").
-export function quienDe(email: string | null | undefined): string | null {
-  if (!email) return null;
-  return email.split("@")[0] || email;
+// Nombre corto para mostrar quién hizo un paso. El registro guarda
+// "Nombre Apellido" (si el usuario cargó sus datos) o el email como
+// fallback; los emails se acortan ("kiru@adminticker.test" -> "kiru").
+export function quienDe(valor: string | null | undefined): string | null {
+  if (!valor) return null;
+  if (!valor.includes("@")) return valor;
+  return valor.split("@")[0] || valor;
 }
 
 // Formato de moneda USD sin decimales ("US$ 1.234"): las operaciones se
