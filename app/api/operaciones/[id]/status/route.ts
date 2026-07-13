@@ -145,6 +145,14 @@ export async function PATCH(
           { status: 409 }
         );
       }
+      // Una operación cerrada ya terminó bien: no se cancela (el trigger de
+      // la base lo bloquearía igual, pero acá devolvemos un 409 claro).
+      if (current.cerrada_at) {
+        return NextResponse.json(
+          { error: "La operación está cerrada; reabrí el cierre antes de cancelar" },
+          { status: 409 }
+        );
+      }
       patch = { status: "cancelada" };
       break;
     }
@@ -168,7 +176,15 @@ export async function PATCH(
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // P0001 = RAISE del trigger validar_orden_hitos: dos admins tocando la
+    // misma operación a la vez pueden pasar el check de arriba y chocar acá.
+    // Es un conflicto de estado, no un error del servidor -> 409 con el
+    // mensaje del trigger (que ya está escrito para humanos).
+    const esInvariante = (error as { code?: string }).code === "P0001";
+    return NextResponse.json(
+      { error: error.message },
+      { status: esInvariante ? 409 : 500 }
+    );
   }
 
   // V2: si esta operación nació de una solicitud del feed y se cancela,

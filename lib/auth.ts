@@ -6,8 +6,9 @@ import type { User } from "@supabase/supabase-js";
 // - usuario: se registra solo; publica entradas y pide comprar en el feed.
 //
 // El rol se guarda en app_metadata.role del usuario de Supabase (no editable
-// por el propio usuario). Desde la V2 el default es el rol MENOS privilegiado:
-// una cuenta sin rol explícito es "usuario" y solo accede al feed.
+// por el propio usuario). En la V2 el default es el rol MENOS privilegiado:
+// una cuenta sin rol explícito es "usuario" y solo accede al feed — nunca al
+// panel (mismo cierre del fail-open que en main, donde sin rol es null).
 export type Rol = "administrador" | "moderador" | "usuario";
 
 export function getRol(user: User): Rol {

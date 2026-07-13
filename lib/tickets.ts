@@ -86,10 +86,20 @@ export function normalizarPreciosUsd<
   );
 }
 
-// Eventos ya pasados (día calendario UTC, mismo criterio que el worker):
-// afuera de la tienda. Los sin fecha y los del día se muestran.
+// Día calendario de HOY en Argentina (en-CA da formato YYYY-MM-DD).
+// Se usa el día local del negocio, no el UTC: con UTC, a partir de las 21:00
+// de Argentina "hoy" ya era mañana y los eventos de esa misma noche
+// desaparecían de la tienda horas antes de empezar.
+export function hoyArgentina(): string {
+  return new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  });
+}
+
+// Eventos ya pasados: afuera de la tienda. Los sin fecha y los del día (hora
+// argentina) se muestran. La fecha guardada es el día del evento en UTC.
 export function sinEventosPasados<T extends { fecha: string | null }>(rows: T[]): T[] {
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyArgentina();
   return rows.filter((t) => !t.fecha || t.fecha.slice(0, 10) >= hoy);
 }
 
@@ -97,12 +107,13 @@ export function sinEventosPasados<T extends { fecha: string | null }>(rows: T[])
 export function fmtDate(iso: string | null) {
   if (!iso) return { d: "—", m: "", y: "", full: "Fecha a confirmar" };
   const dt = new Date(iso);
-  // Fechas sin hora ("2026-07-11") se parsean como medianoche UTC: hay que
-  // formatearlas en UTC para que no retrocedan un día en Argentina (UTC-3).
-  // Con hora real, se muestra en hora argentina.
-  const timeZone = /^\d{4}-\d{2}-\d{2}$/.test(iso)
-    ? "UTC"
-    : "America/Argentina/Buenos_Aires";
+  // SIEMPRE en UTC: la columna es timestamptz y el día del evento viene
+  // codificado como día UTC (el worker guarda mediodía UTC; las entradas
+  // propias, medianoche UTC del date elegido). Formatear en hora argentina
+  // corría las de medianoche al día ANTERIOR (una entrada cargada para el
+  // 15/07 mostraba "14 JUL"), y desalineaba la card del filtro de mes, que
+  // ya agrupaba en UTC.
+  const timeZone = "UTC";
   return {
     d: dt.toLocaleDateString("es-AR", { day: "2-digit", timeZone }),
     m: dt.toLocaleDateString("es-AR", { month: "short", timeZone }).replace(".", "").toUpperCase(),
@@ -185,7 +196,16 @@ export function buildEvents(rows: Ticket[]): EventoAgrupado[] {
     ev.lugar = lugarDe(ev.ciudad);
     ev.mes = mesKey(ev.fecha);
     ev.mesLabel = mesLabel(ev.fecha);
-    const book = ev.ubicaciones.filter((u) => (u.stock ?? 0) > 0 && u.estado === "book");
+    // Mismo criterio que la fila (LadderRow): reservable = stock + book +
+    // precio real. Sin exigir precio, la card decía "Reservá ya" pero al
+    // desplegar no había ningún botón Reservar.
+    const book = ev.ubicaciones.filter(
+      (u) =>
+        (u.stock ?? 0) > 0 &&
+        u.estado === "book" &&
+        u.precio_final != null &&
+        Number(u.precio_final) > 0
+    );
     ev.bookable = book.length;
     ev.bookStock = book.reduce((a, u) => a + (u.stock ?? 0), 0);
     ev.propias = ev.ubicaciones.some((u) => u.source === "manual");

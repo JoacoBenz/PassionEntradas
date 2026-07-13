@@ -63,20 +63,22 @@ export async function POST(request: Request) {
     scraped_at: new Date().toISOString(),
   };
 
+  let full: unknown;
   if (isMock()) {
-    const full = mockCreateManual({ ...row, updated_at: row.scraped_at } as any);
-    return NextResponse.json({ ok: true, row: full }, { status: 201 });
+    full = mockCreateManual({ ...row, updated_at: row.scraped_at } as any);
+  } else {
+    const admin = createAdminSupabase();
+    const { data, error } = await admin.from("tickets").insert(row).select("*").single();
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    full = data;
   }
 
-  const admin = createAdminSupabase();
-  const { data, error } = await admin.from("tickets").insert(row).select("*").single();
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
-  }
-
-  // La tienda pública es ISR (revalidate 60): sin esto, la entrada nueva
-  // tarda hasta un minuto en aparecer en la home y la búsqueda.
+  // La tienda pública es ISR: sin esto, la entrada nueva tarda hasta la
+  // revalidación de fondo en aparecer. También en mock, para poder probar
+  // el flujo completo en local.
   revalidatePath("/(tienda)", "layout");
 
-  return NextResponse.json({ ok: true, row: data }, { status: 201 });
+  return NextResponse.json({ ok: true, row: full }, { status: 201 });
 }

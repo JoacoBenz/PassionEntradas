@@ -35,6 +35,7 @@ type MockDB = {
   solicitudes: Solicitud[];
   margenes: MockMargen[];
   eurUsd: number;
+  portalActivo: boolean;
 };
 
 function iso(minsAgo: number) {
@@ -193,7 +194,7 @@ function seed(): MockDB {
     { id: "m-mundial", source: "portal", competicion: "World Cup 2026 Canada / Mexico / USA", porcentaje: 35 },
   ];
 
-  return { ops, manual, syncRuns, pubs, solicitudes, margenes, eurUsd: 1.08 };
+  return { ops, manual, syncRuns, pubs, solicitudes, margenes, eurUsd: 1.08, portalActivo: true };
 }
 
 function db(): MockDB {
@@ -278,6 +279,9 @@ export function mockApplyAction(
       break;
     case "cancelar": {
       if (cancelada) return { ok: false, status: 409, error: "La operación ya está cancelada" };
+      if (op.cerrada_at) {
+        return { ok: false, status: 409, error: "La operación está cerrada; reabrí el cierre antes de cancelar" };
+      }
       op.status = "cancelada";
       // V2: solicitud enlazada rechazada y publicación de vuelta al feed.
       const sol = db().solicitudes.find(
@@ -561,5 +565,15 @@ export function mockGetEurUsd(): number {
 
 export function mockSetEurUsd(v: number): number {
   db().eurUsd = v;
+  return v;
+}
+
+// ---- interruptor de entradas de Passion ---------------------------------------------
+export function mockGetPortalActivo(): boolean {
+  return db().portalActivo;
+}
+
+export function mockSetPortalActivo(v: boolean): boolean {
+  db().portalActivo = v;
   return v;
 }
