@@ -90,12 +90,16 @@ const en = {
   desdeMayus: "From",
   entradasRank: "tickets",
   shareText: (t: string) => `Check out tickets for ${t} on TicketMirror`,
-  msgReservar: (evento: string, sector: string, precio: string) =>
-    `Hi! I'd like to book: ${evento} — ${sector}${precio ? ` (${precio})` : ""}. Is it still available?`,
-  msgConsultar: (evento: string, sector: string) =>
-    `Hi! Asking about: ${evento} — ${sector}. Any availability?`,
-  msgReservarRank: (evento: string) => `Hi! I'd like to book for ${evento}. What's available?`,
-  msgConsultarRank: (evento: string) => `Hi! Asking about ${evento}. Can you get it?`,
+  // El link del evento va al final del mensaje: el agente abre y ve
+  // exactamente de qué entrada le están hablando.
+  msgReservar: (evento: string, sector: string, precio: string, link: string) =>
+    `Hi! I'd like to book: ${evento} — ${sector}${precio ? ` (${precio})` : ""}. Is it still available?\n${link}`,
+  msgConsultar: (evento: string, sector: string, link: string) =>
+    `Hi! Asking about: ${evento} — ${sector}. Any availability?\n${link}`,
+  msgReservarRank: (evento: string, link: string) =>
+    `Hi! I'd like to book for ${evento}. What's available?\n${link}`,
+  msgConsultarRank: (evento: string, link: string) =>
+    `Hi! Asking about ${evento}. Can you get it?\n${link}`,
   msgBuscoEvento: "Hi! I'm looking for an event that isn't on the site.",
 
   // widget de WhatsApp (agentes)
@@ -207,12 +211,14 @@ const es: typeof en = {
   desdeMayus: "Desde",
   entradasRank: "entradas",
   shareText: (t) => `Mirá las entradas para ${t} en TicketMirror`,
-  msgReservar: (evento, sector, precio) =>
-    `Hola! Quiero reservar: ${evento} — ${sector}${precio ? ` (${precio})` : ""}. ¿Sigue disponible?`,
-  msgConsultar: (evento, sector) =>
-    `Hola! Consulto por: ${evento} — ${sector}. ¿Hay disponibilidad?`,
-  msgReservarRank: (evento) => `Hola! Quiero reservar para ${evento}. ¿Qué disponibilidad hay?`,
-  msgConsultarRank: (evento) => `Hola! Consulto por ${evento}. ¿Se puede conseguir?`,
+  msgReservar: (evento, sector, precio, link) =>
+    `Hola! Quiero reservar: ${evento} — ${sector}${precio ? ` (${precio})` : ""}. ¿Sigue disponible?\n${link}`,
+  msgConsultar: (evento, sector, link) =>
+    `Hola! Consulto por: ${evento} — ${sector}. ¿Hay disponibilidad?\n${link}`,
+  msgReservarRank: (evento, link) =>
+    `Hola! Quiero reservar para ${evento}. ¿Qué disponibilidad hay?\n${link}`,
+  msgConsultarRank: (evento, link) =>
+    `Hola! Consulto por ${evento}. ¿Se puede conseguir?\n${link}`,
   msgBuscoEvento: "Hola! Busco un evento que no aparece en la web.",
 
   waTitle: "Hablá con el equipo",
