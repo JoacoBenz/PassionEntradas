@@ -54,7 +54,7 @@ export default function MetricsBoard({ metrics }: { metrics: Metrics }) {
             big
             label="Volumen operado"
             value={formatUSD(metrics.plataMovida)}
-            detail="total con pago confirmado"
+            detail="Total con pago confirmado"
             accent="#0D9377"
             className="col-span-2 border-b border-dashed border-line md:col-span-1 md:border-b-0 md:border-r"
           />
@@ -62,7 +62,7 @@ export default function MetricsBoard({ metrics }: { metrics: Metrics }) {
             big
             label="Comisiones acumuladas"
             value={formatUSD(metrics.comisionGanada)}
-            detail="sobre ventas confirmadas"
+            detail="Sobre ventas confirmadas"
             accent="#6C5BF2"
             className="border-r border-dashed border-line"
           />
@@ -70,7 +70,7 @@ export default function MetricsBoard({ metrics }: { metrics: Metrics }) {
             big
             label="Ventas concretadas"
             value={String(metrics.entradasVendidas).padStart(2, "0")}
-            detail="operaciones cobradas"
+            detail="Operaciones cobradas"
             accent="#B07A14"
           />
         </div>
@@ -80,7 +80,7 @@ export default function MetricsBoard({ metrics }: { metrics: Metrics }) {
           <Tile
             label="Capital comprometido"
             value={formatUSD(metrics.enJuegoMonto)}
-            detail={`en ${metrics.enJuegoOps} ${
+            detail={`En ${metrics.enJuegoOps} ${
               metrics.enJuegoOps === 1
                 ? "operación en curso sin cobrar"
                 : "operaciones en curso sin cobrar"
@@ -91,7 +91,7 @@ export default function MetricsBoard({ metrics }: { metrics: Metrics }) {
           <Tile
             label="Valor promedio"
             value={formatUSD(metrics.ticketPromedio)}
-            detail="por operación concretada"
+            detail="Por operación concretada"
             accent="#5F6577"
           />
         </div>
