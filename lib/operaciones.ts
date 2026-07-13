@@ -28,6 +28,11 @@ export type Operacion = {
   pago_confirmado_at: string | null;
   // Cierre explícito: con los dos hitos listos, el admin cierra la operación.
   cerrada_at: string | null;
+  // Auditoría: email del admin que marcó cada paso (se limpia al desmarcar).
+  // Dato interno del panel — nunca va al link público.
+  entrada_recibida_por: string | null;
+  pago_confirmado_por: string | null;
+  cerrada_por: string | null;
   // Fecha del evento (date, sin hora): prioriza lo urgente en el panel.
   fecha_evento: string | null;
   // Notas internas del panel. NUNCA se exponen en la vista pública.
@@ -156,6 +161,15 @@ export function generateCode(): string {
     body += CODE_ALPHABET[idx];
   }
   return `BX-${body}`;
+}
+
+// Nombre corto para mostrar quién hizo un paso. El registro guarda
+// "Nombre Apellido" (si el usuario cargó sus datos) o el email como
+// fallback; los emails se acortan ("kiru@adminticker.test" -> "kiru").
+export function quienDe(valor: string | null | undefined): string | null {
+  if (!valor) return null;
+  if (!valor.includes("@")) return valor;
+  return valor.split("@")[0] || valor;
 }
 
 // Formato de moneda USD sin decimales ("US$ 1.234"): las operaciones se

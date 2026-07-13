@@ -9,6 +9,7 @@ import {
   estadoDe,
   formatUSD,
   formatFecha,
+  quienDe,
   whatsappMessage,
   type Operacion,
   type StatusAction,
@@ -249,6 +250,7 @@ export default function OperacionCard({
                 <HitoButton
                   label="Entrada recibida"
                   done={entrada}
+                  por={quienDe(op.entrada_recibida_por)}
                   color={HITO_COLOR.entrada}
                   busy={busy}
                   locked={pago}
@@ -264,6 +266,7 @@ export default function OperacionCard({
                 <HitoButton
                   label="Pago confirmado"
                   done={pago}
+                  por={quienDe(op.pago_confirmado_por)}
                   color={HITO_COLOR.pago}
                   busy={busy}
                   locked={!entrada}
@@ -292,10 +295,11 @@ export default function OperacionCard({
               </button>
             )}
 
-            {/* Cerrada: resumen con opción de reabrir el cierre */}
+            {/* Cerrada: resumen con opción de reabrir el cierre. Con los
+                botones de hitos ocultos, el "quién hizo qué" vive acá. */}
             {!readOnly && cerrada && (
               <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-ink px-4 py-3 text-white">
-                <span className="text-sm font-semibold">
+                <span className="min-w-0 text-sm font-semibold">
                   ✓ Operación cerrada
                   {op.cerrada_at && (
                     <span className="ml-2 font-normal text-white/60">
@@ -304,6 +308,20 @@ export default function OperacionCard({
                         month: "2-digit",
                         timeZone: "America/Argentina/Buenos_Aires",
                       })}
+                    </span>
+                  )}
+                  {quienDe(op.cerrada_por) && (
+                    <span className="ml-2 font-normal text-white/60">
+                      por {quienDe(op.cerrada_por)}
+                    </span>
+                  )}
+                  {(op.entrada_recibida_por || op.pago_confirmado_por) && (
+                    <span className="mt-0.5 block truncate text-[11px] font-normal text-white/50">
+                      {op.entrada_recibida_por &&
+                        `Entrada por ${quienDe(op.entrada_recibida_por)}`}
+                      {op.entrada_recibida_por && op.pago_confirmado_por && " · "}
+                      {op.pago_confirmado_por &&
+                        `Pago por ${quienDe(op.pago_confirmado_por)}`}
                     </span>
                   )}
                 </span>
@@ -376,9 +394,12 @@ export default function OperacionCard({
 
 // Botón de hito con dos estados: pendiente (delineado, "Marcar…") y hecho
 // (relleno con ✓; al tocarlo de nuevo se desmarca, por si hubo un error).
+// Completado, muestra además QUIÉN lo marcó ("por kiru"), para saber a quién
+// preguntarle por ese paso.
 function HitoButton({
   label,
   done,
+  por,
   color,
   busy,
   locked,
@@ -387,6 +408,7 @@ function HitoButton({
 }: {
   label: string;
   done: boolean;
+  por?: string | null;
   color: string;
   busy: boolean;
   locked?: boolean;
@@ -407,7 +429,7 @@ function HitoButton({
       }
     >
       <span
-        className="flex h-4 w-4 items-center justify-center rounded-full border text-[10px]"
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px]"
         style={{
           borderColor: done ? "rgba(255,255,255,0.7)" : `${color}88`,
           backgroundColor: done ? "rgba(255,255,255,0.2)" : "transparent",
@@ -416,7 +438,14 @@ function HitoButton({
       >
         {done ? "✓" : ""}
       </span>
-      {label}
+      <span className="min-w-0">
+        {label}
+        {done && por && (
+          <span className="block truncate text-[10px] font-normal text-white/75">
+            por {por}
+          </span>
+        )}
+      </span>
     </button>
   );
 }

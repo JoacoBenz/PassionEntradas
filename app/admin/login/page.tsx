@@ -45,7 +45,7 @@ export default function LoginPage() {
         <div className="surface-ink punch-b px-6 pb-7 pt-6 text-white">
           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-white/60">
             <span className="inline-block h-2 w-2 rounded-full bg-brand" />
-            AdminTickets · Custodia
+            TicketMirror
           </div>
           <h1 className="mt-2 font-display text-2xl font-bold tracking-tight">
             Panel de administración
