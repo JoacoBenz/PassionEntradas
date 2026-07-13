@@ -136,6 +136,14 @@ export async function runSyncCycle(deps: CycleDeps): Promise<SyncSummary> {
     log.warn("scrape incompleto: NO se marcan ausentes (evita falsos agotados)");
   }
 
+  // 6. Limpieza: borrar stubs "::REQ" de eventos que ya tienen sectores reales
+  // (recuperados desde event_detail_request.php). Fail-soft.
+  try {
+    await repo.deleteReqStubsSuperados();
+  } catch (err) {
+    log.warn({ err }, "limpieza de stubs REQ falló (no crítico)");
+  }
+
   const summary: SyncSummary = {
     ...base,
     status: "ok",
