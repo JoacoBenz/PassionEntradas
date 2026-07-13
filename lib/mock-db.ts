@@ -47,6 +47,9 @@ function seed(): MockDB {
       entrada_recibida_at: iso(90),
       pago_confirmado_at: null,
       cerrada_at: null,
+      entrada_recibida_por: MOCK_USER.email,
+      pago_confirmado_por: null,
+      cerrada_por: null,
       fecha_evento: "2026-07-18",
       notas: "Vendedor manda el QR el jueves.",
       cuenta_debitar: "admintickets.mp",
@@ -66,6 +69,9 @@ function seed(): MockDB {
       entrada_recibida_at: null,
       pago_confirmado_at: null,
       cerrada_at: null,
+      entrada_recibida_por: null,
+      pago_confirmado_por: null,
+      cerrada_por: null,
       fecha_evento: "2026-07-09",
       notas: null,
       cuenta_debitar: null,
@@ -85,6 +91,9 @@ function seed(): MockDB {
       entrada_recibida_at: iso(60 * 24 * 3),
       pago_confirmado_at: iso(60 * 24 * 2),
       cerrada_at: null,
+      entrada_recibida_por: MOCK_USER.email,
+      pago_confirmado_por: MOCK_USER.email,
+      cerrada_por: null,
       fecha_evento: null,
       notas: null,
       cuenta_debitar: null,
@@ -160,6 +169,9 @@ export function mockCreateOp(input: {
     entrada_recibida_at: null,
     pago_confirmado_at: null,
     cerrada_at: null,
+    entrada_recibida_por: null,
+    pago_confirmado_por: null,
+    cerrada_por: null,
     created_at: now,
     updated_at: now,
   };
@@ -191,7 +203,9 @@ export function mockApplyAction(
         return { ok: false, status: 409, error: "Hay un pago confirmado sobre esta entrada; desmarcá el pago primero" };
       }
       const col = action.action === "entrada" ? "entrada_recibida_at" : "pago_confirmado_at";
+      const colPor = action.action === "entrada" ? "entrada_recibida_por" : "pago_confirmado_por";
       op[col] = action.done ? new Date().toISOString() : null;
+      op[colPor] = action.done ? MOCK_USER.email : null;
       break;
     }
     case "cerrar":
@@ -200,6 +214,7 @@ export function mockApplyAction(
         return { ok: false, status: 409, error: "Para cerrar hacen falta la entrada recibida y el pago confirmado" };
       }
       op.cerrada_at = action.done ? new Date().toISOString() : null;
+      op.cerrada_por = action.done ? MOCK_USER.email : null;
       break;
     case "cancelar":
       if (cancelada) return { ok: false, status: 409, error: "La operación ya está cancelada" };
