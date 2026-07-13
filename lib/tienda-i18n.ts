@@ -98,6 +98,14 @@ const en = {
   msgConsultarRank: (evento: string) => `Hi! Asking about ${evento}. Can you get it?`,
   msgBuscoEvento: "Hi! I'm looking for an event that isn't on the site.",
 
+  // widget de WhatsApp (agentes)
+  waTitle: "Talk to our team",
+  waSubtitle: "Real people, replies in minutes",
+  waDisponible: "Available now",
+  waOcupado: "With a customer",
+  waChat: "Chat",
+  waAgenteMsg: (agente: string) => `Hi ${agente}! I'd like to ask about tickets.`,
+
   // catálogo
   fCategoria: "Category",
   fLugar: "Location",
@@ -206,6 +214,13 @@ const es: typeof en = {
   msgReservarRank: (evento) => `Hola! Quiero reservar para ${evento}. ¿Qué disponibilidad hay?`,
   msgConsultarRank: (evento) => `Hola! Consulto por ${evento}. ¿Se puede conseguir?`,
   msgBuscoEvento: "Hola! Busco un evento que no aparece en la web.",
+
+  waTitle: "Hablá con el equipo",
+  waSubtitle: "Personas reales, respuesta en minutos",
+  waDisponible: "Disponible ahora",
+  waOcupado: "Con un cliente",
+  waChat: "Chatear",
+  waAgenteMsg: (agente) => `Hola ${agente}! Quiero consultar por entradas.`,
 
   fCategoria: "Categoría",
   fLugar: "Lugar",
