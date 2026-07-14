@@ -1,0 +1,206 @@
+/* Factura/recibo de TicketMirror — el diseño aprobado, con las clases
+   scopeadas bajo fac- para no chocar con el panel ni la tienda. El
+   documento es "papel" a propósito (no cambia con el tema del sistema). */
+
+.fac-body {
+  --paper: #e7e6df;
+  --field: #fbfaf6;
+  --ink: #16150f;
+  --mute: #6c6a5e;
+  --cobalt: #1f33e0;
+  --flare: #ff3b2e;
+  --ok: #1f8a4c;
+  --hair: rgba(22, 21, 15, 0.14);
+
+  min-height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  padding: 40px 16px 72px;
+}
+.fac-body * { box-sizing: border-box; }
+.fac-mono { font-family: var(--font-mono), ui-monospace, Consolas, monospace; }
+
+.fac-sheet {
+  max-width: 700px;
+  margin: 0 auto;
+  background: var(--field);
+  border: 1.5px solid var(--ink);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+/* ---- cabecera ---- */
+.fac-head {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+  padding: 26px 30px 22px;
+  border-bottom: 2px solid var(--ink);
+}
+.fac-wm {
+  font-family: var(--font-body), sans-serif; font-weight: 900;
+  font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: 9px;
+}
+.fac-wm em { font-style: normal; color: var(--cobalt); }
+.fac-mark { color: var(--flare); letter-spacing: -0.2em; font-size: 17px; }
+.fac-head-right { text-align: right; }
+.fac-doc-kind {
+  font-family: var(--font-mono), monospace; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.22em; text-transform: uppercase; color: var(--cobalt);
+}
+.fac-doc-num {
+  font-family: var(--font-body), sans-serif; font-weight: 900;
+  font-size: 21px; margin: 3px 0 8px; letter-spacing: 0.01em;
+}
+.fac-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono), monospace; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: #fff; background: var(--ok); border: 1px solid var(--ink);
+  padding: 5px 10px;
+}
+.fac-chip i { width: 6px; height: 6px; border-radius: 50%; background: #fff; }
+
+/* ---- partes ---- */
+.fac-parties {
+  display: grid; grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--hair);
+}
+.fac-party { padding: 18px 30px 20px; }
+.fac-party + .fac-party { border-left: 1px dashed var(--hair); }
+.fac-label {
+  font-family: var(--font-mono), monospace; font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--mute);
+  margin: 0 0 7px;
+}
+.fac-party p { margin: 2px 0; font-size: 13px; line-height: 1.5; }
+.fac-party .fac-name { font-weight: 700; font-size: 14px; }
+.fac-party .fac-dato { color: var(--mute); font-size: 12px; }
+
+/* ---- ticket ---- */
+.fac-item-wrap { padding: 22px 30px 4px; }
+.fac-ticket {
+  display: grid; grid-template-columns: 1fr 168px;
+  border: 1.5px solid var(--ink);
+  background: #fff;
+}
+.fac-t-body { padding: 18px 20px 16px; min-width: 0; }
+.fac-t-eyebrow {
+  display: flex; align-items: center; gap: 8px; margin: 0;
+  font-family: var(--font-mono), monospace; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute);
+}
+.fac-t-title {
+  font-family: var(--font-body), sans-serif; font-weight: 900;
+  font-size: clamp(19px, 4.2vw, 24px); line-height: 1.02; letter-spacing: -0.01em;
+  text-transform: uppercase; margin: 7px 0 10px; text-wrap: balance;
+}
+.fac-t-meta {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 18px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--hair);
+}
+.fac-t-meta .k {
+  font-family: var(--font-mono), monospace; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); display: block;
+}
+.fac-t-meta .v { font-size: 13px; font-weight: 600; }
+
+.fac-t-stub {
+  position: relative;
+  border-left: 2px dashed var(--ink);
+  background: var(--field);
+  padding: 16px 16px 12px;
+  display: flex; flex-direction: column;
+  text-align: right;
+}
+.fac-stub-k {
+  font-family: var(--font-mono), monospace; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute);
+}
+.fac-stub-qty {
+  font-family: var(--font-body), sans-serif; font-weight: 900;
+  font-size: 26px; line-height: 1; margin: 2px 0 10px;
+}
+.fac-stub-price {
+  font-family: var(--font-mono), monospace; font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.fac-barcode {
+  margin-top: auto; height: 34px;
+  background: repeating-linear-gradient(90deg,
+    var(--ink) 0 2px, transparent 2px 4px, var(--ink) 4px 5px, transparent 5px 9px,
+    var(--ink) 9px 12px, transparent 12px 14px, var(--ink) 14px 15px, transparent 15px 19px);
+}
+.fac-stub-code {
+  font-family: var(--font-mono), monospace; font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.18em; color: var(--mute); margin-top: 6px;
+}
+
+/* ---- totales ---- */
+.fac-totals { padding: 18px 30px 6px; display: flex; justify-content: flex-end; }
+.fac-totals table { border-collapse: collapse; min-width: 300px; }
+.fac-totals td { padding: 7px 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.fac-totals td:last-child {
+  text-align: right; font-family: var(--font-mono), monospace; font-weight: 700;
+  padding-left: 42px;
+}
+.fac-totals .t-label { color: var(--mute); }
+.fac-totals .total-row td {
+  border-top: 2px solid var(--ink); padding-top: 12px;
+  font-family: var(--font-body), sans-serif; font-weight: 900;
+  font-size: 19px; text-transform: uppercase;
+}
+.fac-usd-note { font-size: 10.5px; color: var(--mute); text-align: right; margin: 0; padding: 0 30px 18px; }
+
+/* ---- pago ---- */
+.fac-pay {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;
+  margin: 0 30px; padding: 16px 0 18px;
+  border-top: 1px dashed var(--hair);
+}
+.fac-pay .k {
+  font-family: var(--font-mono), monospace; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute);
+  display: block; margin-bottom: 3px;
+}
+.fac-pay .v { font-size: 12.5px; font-weight: 600; }
+.fac-pay a { color: var(--cobalt); text-decoration: none; border-bottom: 1px solid rgba(31, 51, 224, 0.35); }
+
+/* ---- pie ---- */
+.fac-foot {
+  background: var(--ink); color: rgba(251, 250, 246, 0.75);
+  padding: 14px 30px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  font-size: 10.5px; line-height: 1.5;
+}
+.fac-foot .brand {
+  font-family: var(--font-mono), monospace; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: #fbfaf6;
+}
+.fac-foot .terms { max-width: 46ch; }
+
+/* botón imprimir (fuera de la hoja) */
+.fac-print-row { max-width: 700px; margin: 20px auto 0; text-align: center; }
+.fac-print {
+  font-family: var(--font-body), sans-serif; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.02em; font-size: 13px; cursor: pointer;
+  background: var(--cobalt); color: #fff; border: 1.5px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink); padding: 11px 20px; transition: 0.12s;
+}
+.fac-print:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--ink); }
+
+@media (max-width: 560px) {
+  .fac-head { flex-direction: column; }
+  .fac-head-right { text-align: left; }
+  .fac-parties { grid-template-columns: 1fr; }
+  .fac-party + .fac-party { border-left: none; border-top: 1px dashed var(--hair); }
+  .fac-ticket { grid-template-columns: 1fr; }
+  .fac-t-stub { border-left: none; border-top: 2px dashed var(--ink); text-align: left; }
+  .fac-barcode { margin-top: 12px; }
+  .fac-pay { grid-template-columns: 1fr; gap: 10px; }
+}
+
+@media print {
+  .fac-body { background: #fff; padding: 0; }
+  .fac-sheet { box-shadow: none; border-width: 1px; max-width: none; }
+  .fac-print-row { display: none; }
+}

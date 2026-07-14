@@ -4,7 +4,10 @@
 
 import { generateCode, type Operacion, type OperacionPublica, type StatusAction } from "@/lib/operaciones";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
+import type { Factura, FacturaDatos } from "@/lib/factura";
 import { MOCK_TICKETS } from "@/lib/mock-tickets";
+
+export type MockFactura = Factura & { operacion_id: string };
 
 export const isMock = () => process.env.MOCK_DATA === "1";
 
@@ -27,6 +30,8 @@ type MockDB = {
   margenes: MockMargen[];
   eurUsd: number;
   portalActivo: boolean;
+  facturas: MockFactura[];
+  facturaNumero: number;
 };
 
 function iso(minsAgo: number) {
@@ -127,7 +132,16 @@ function seed(): MockDB {
     { id: "m-mundial", source: "portal", competicion: "World Cup 2026 Canada / Mexico / USA", porcentaje: 35 },
   ];
 
-  return { ops, manual, syncRuns, margenes, eurUsd: 1.08, portalActivo: true };
+  return {
+    ops,
+    manual,
+    syncRuns,
+    margenes,
+    eurUsd: 1.08,
+    portalActivo: true,
+    facturas: [],
+    facturaNumero: 0,
+  };
 }
 
 function db(): MockDB {
@@ -319,6 +333,34 @@ export function mockDeleteMargen(competicion: string): boolean {
   const antes = d.margenes.length;
   d.margenes = d.margenes.filter((m) => m.competicion !== competicion);
   return d.margenes.length < antes;
+}
+
+// ---- facturas -----------------------------------------------------------------------
+export function mockFacturaDeOperacion(opId: string): MockFactura | null {
+  return db().facturas.find((f) => f.operacion_id === opId) ?? null;
+}
+
+export function mockFacturaPorId(id: string): MockFactura | null {
+  return db().facturas.find((f) => f.id === id) ?? null;
+}
+
+export function mockGuardarFactura(opId: string, datos: FacturaDatos): MockFactura {
+  const d = db();
+  const existente = d.facturas.find((f) => f.operacion_id === opId);
+  if (existente) {
+    // Re-emitir: nuevo snapshot, mismo numero/id/fecha (como el upsert real).
+    existente.datos = datos;
+    return existente;
+  }
+  const nueva: MockFactura = {
+    id: crypto.randomUUID(),
+    numero: ++d.facturaNumero,
+    operacion_id: opId,
+    datos,
+    created_at: new Date().toISOString(),
+  };
+  d.facturas.push(nueva);
+  return nueva;
 }
 
 // ---- cotización EUR->USD ------------------------------------------------------------

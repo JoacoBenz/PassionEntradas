@@ -15,6 +15,7 @@ import {
   type StatusAction,
 } from "@/lib/operaciones";
 import StatusChip from "@/components/StatusChip";
+import FacturaModal from "./FacturaModal";
 
 type Props = {
   op: Operacion;
@@ -89,6 +90,7 @@ export default function OperacionCard({
   const [editingNotas, setEditingNotas] = useState(false);
   const [notasDraft, setNotasDraft] = useState(op.notas ?? "");
   const [confirmandoCancel, setConfirmandoCancel] = useState(false);
+  const [facturaAbierta, setFacturaAbierta] = useState(false);
 
   async function copy(text: string, label: string) {
     try {
@@ -361,6 +363,12 @@ export default function OperacionCard({
             >
               Copiar WhatsApp
             </button>
+            {/* Recibo/factura: recién cuando el pago está confirmado. */}
+            {!readOnly && pago && !cancelada && (
+              <button onClick={() => setFacturaAbierta(true)} className={secondaryBtn}>
+                Factura
+              </button>
+            )}
 
             {!readOnly &&
               (cancelada ? (
@@ -402,6 +410,15 @@ export default function OperacionCard({
               ))}
           </div>
         </div>
+      )}
+
+      {facturaAbierta && (
+        <FacturaModal
+          op={op}
+          baseUrl={baseUrl}
+          onClose={() => setFacturaAbierta(false)}
+          onToast={(kind, msg) => onCopied(kind === "error" ? msg : msg)}
+        />
       )}
     </article>
   );
