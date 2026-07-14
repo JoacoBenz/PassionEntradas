@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { Operacion } from "@/lib/operaciones";
+import { parseTitle } from "@/lib/tickets";
 
 type Props = {
   onCreated: (op: Operacion) => void;
@@ -78,39 +79,56 @@ function EventoCombo({
         onBlur={() => setAbierto(false)}
       />
       {abierto && resultados.length > 0 && (
-        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-lg border border-line bg-white py-1 shadow-lg">
-          {resultados.map((t) => (
-            <li key={t.id}>
-              <button
-                type="button"
-                // onMouseDown: dispara ANTES del blur del input.
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onElegir(t);
-                  setAbierto(false);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-canvas"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{t.evento}</span>
-                  <span className="block truncate text-[11px] text-muted">
-                    {[t.categoria, t.fecha ? t.fecha.slice(0, 10) : null, t.stock != null ? `stock ${t.stock}` : null]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </span>
-                <span
-                  className={`shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider ${
-                    t.source === "manual"
-                      ? "bg-estado-confirmada/10 text-estado-confirmada"
-                      : "bg-canvas text-muted"
-                  }`}
+        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-lg border border-line bg-white py-1 shadow-lg">
+          {resultados.map((t) => {
+            // Mismo truco que la tienda: "Match 101, World Cup - Semi Final
+            // - France vs Spain" => título "France vs Spain" + su contexto.
+            const { title, context } = parseTitle(t.evento, t.competicion);
+            const contexto = context || t.competicion || "";
+            return (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  // onMouseDown: dispara ANTES del blur del input.
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onElegir(t);
+                    setAbierto(false);
+                  }}
+                  className="w-full border-b border-dashed border-line px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-canvas"
                 >
-                  {t.source === "manual" ? "Propia" : "Passion"}
-                </span>
-              </button>
-            </li>
-          ))}
+                  {contexto && (
+                    <span className="block font-mono text-[9px] font-bold uppercase tracking-wider text-muted">
+                      {contexto}
+                    </span>
+                  )}
+                  <span className="flex items-baseline justify-between gap-2">
+                    {/* El nombre envuelve completo, nunca se corta. */}
+                    <span className="min-w-0 whitespace-normal break-words text-sm font-semibold leading-snug">
+                      {title}
+                    </span>
+                    <span
+                      className={`shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider ${
+                        t.source === "manual"
+                          ? "bg-estado-confirmada/10 text-estado-confirmada"
+                          : "bg-canvas text-muted"
+                      }`}
+                    >
+                      {t.source === "manual" ? "Propia" : "Passion"}
+                    </span>
+                  </span>
+                  {/* El sector, protagonista y en su propia línea. */}
+                  <span className="mt-0.5 block whitespace-normal text-xs font-medium text-body">
+                    {t.categoria ?? "Entrada general"}
+                    <span className="font-normal text-muted">
+                      {t.fecha ? ` · ${t.fecha.slice(0, 10)}` : ""}
+                      {t.stock != null ? ` · stock ${t.stock}` : ""}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
