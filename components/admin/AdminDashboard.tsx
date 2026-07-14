@@ -227,11 +227,13 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
         </a>
       </div>
 
-      {/* Filtros por estado */}
+      {/* Filtros por estado: la barra ocupa el ancho completo y los 5 tabs
+          lo reparten en partes iguales — nada de barra corta ni scroll
+          horizontal con tabs cortados. */}
       <div
         role="tablist"
         aria-label="Filtrar operaciones"
-        className="mb-5 inline-flex w-full gap-1 overflow-x-auto rounded-xl border border-line bg-white p-1 shadow-sm sm:w-auto"
+        className="mb-5 flex w-full gap-1 rounded-xl border border-line bg-white p-1 shadow-sm"
       >
         {FILTERS.map((f) => {
           const active = filter === f.key;
@@ -241,11 +243,12 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
               role="tab"
               aria-selected={active}
               onClick={() => setFilter(f.key)}
-              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`min-w-0 flex-1 truncate rounded-lg px-1 py-1.5 text-center text-xs font-semibold transition-colors sm:px-3 ${
                 active
                   ? "bg-ink text-white"
                   : "text-[#4A4E5E] hover:bg-canvas"
               }`}
+              title={f.label}
             >
               {f.label}
             </button>

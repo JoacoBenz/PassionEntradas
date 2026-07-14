@@ -73,8 +73,12 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
 
   // Inputs "desnudos" adentro de una píldora blanca única: los dos date
   // pickers comparten un solo borde (nada de cajitas sueltas desalineadas).
+  // En móvil los dos inputs REPARTEN el ancho disponible (flex-1) en vez de
+  // un ancho fijo que desbordaba o dejaba huecos raros; en sm+ vuelven a su
+  // ancho natural. h-6 + text-left empareja el alto y la alineación del
+  // date picker de iOS con el resto de la píldora.
   const dateCls =
-    "w-[7.4rem] min-w-0 border-0 bg-transparent p-0 font-mono text-xs text-body outline-none [appearance:none] [&::-webkit-calendar-picker-indicator]:opacity-50";
+    "h-6 min-w-0 flex-1 border-0 bg-transparent p-0 text-left font-mono text-xs leading-6 text-body outline-none [appearance:none] [-webkit-appearance:none] [&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-date-and-time-value]:text-left sm:w-[7.4rem] sm:flex-none";
 
   return (
     <section aria-label="Resumen del negocio" className="mb-6">
@@ -84,8 +88,9 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
           {cargando ? "…" : ""}
         </h2>
         {/* Rango por fecha de pago confirmado. En móvil ocupa su propia
-            línea completa; en desktop queda a la derecha del título. */}
-        <div className="flex w-full items-center gap-2 rounded-xl border border-line bg-white px-3 py-1.5 shadow-sm sm:w-auto">
+            línea completa; en desktop queda a la derecha del título.
+            overflow-hidden: por si el date picker nativo intenta empujar. */}
+        <div className="flex w-full items-center gap-2 overflow-hidden rounded-xl border border-line bg-white px-3 py-2 shadow-sm sm:w-auto sm:py-1.5">
           <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted">
             Pagos
           </span>
