@@ -56,19 +56,15 @@ export async function GET() {
       .from("margenes")
       .select("id, source, competicion, porcentaje")
       .order("competicion", { ascending: true, nullsFirst: true }),
-    admin
-      .from("tickets")
-      .select("competicion")
-      .eq("source", "portal")
-      .not("competicion", "is", null)
-      .order("competicion"),
+    // DISTINCT en la base: bajar una fila por ticket chocaba con el tope de
+    // 1000 de PostgREST y "Elegir evento" mostraba la mitad de las
+    // competiciones.
+    admin.rpc("competiciones_catalogo", { p_solo_portal: true }),
   ]);
   if (margenes.error) {
     return NextResponse.json({ error: margenes.error.message }, { status: 500 });
   }
-  const competiciones = Array.from(
-    new Set((cats.data ?? []).map((c) => c.competicion as string))
-  );
+  const competiciones = (cats.data ?? []) as string[];
   return NextResponse.json({ margenes: margenes.data, competiciones });
 }
 
