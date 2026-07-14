@@ -47,6 +47,10 @@ function Microtext({ dark = false }: { dark?: boolean }) {
 export default function StatusStub({ op }: { op: OperacionPublica }) {
   const estado = estadoDe(op);
   const color = ESTADO_COLOR[estado];
+  // El sello vive sobre la sección de tinta: el color de "cerrada" ES tinta
+  // (sello tipo "CANJEADO" pensado para fondos claros) y desaparecía contra
+  // el fondo. Sobre oscuro, el sello final va en papel.
+  const colorSello = estado === "cerrada" ? "#FBFAF6" : color;
   // Aviso según la etapa del proceso: la página le dice a cada parte qué
   // puede hacer ahora, igual que lo haría el administrador en el grupo.
   const aviso =
@@ -111,7 +115,7 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
           <div className="flex justify-center px-6 pb-7 pt-9">
             <div
               className="stamp stamp-animate w-full max-w-[330px] px-6 py-3.5 text-center"
-              style={{ color }}
+              style={{ color: colorSello }}
             >
               <span className="block text-[10px] font-semibold tracking-[0.3em] opacity-70">
                 Estado

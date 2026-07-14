@@ -44,12 +44,40 @@ function Tile({
   );
 }
 
+// Presets del filtro de período (por fecha de pago confirmado). El rango se
+// calcula en la zona horaria local del navegador.
+type Preset = "todo" | "mes" | "mes_pasado" | "30" | "anio" | "custom";
+
+function rangoDePreset(p: Preset): { desde: string; hasta: string } {
+  const hoy = new Date();
+  const dia = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  switch (p) {
+    case "mes":
+      return { desde: dia(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), hasta: dia(hoy) };
+    case "mes_pasado":
+      return {
+        desde: dia(new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)),
+        hasta: dia(new Date(hoy.getFullYear(), hoy.getMonth(), 0)),
+      };
+    case "30": {
+      const d = new Date(hoy);
+      d.setDate(d.getDate() - 30);
+      return { desde: dia(d), hasta: dia(hoy) };
+    }
+    case "anio":
+      return { desde: dia(new Date(hoy.getFullYear(), 0, 1)), hasta: dia(hoy) };
+    default:
+      return { desde: "", hasta: "" };
+  }
+}
+
 export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics }) {
   const [metrics, setMetrics] = useState<Metrics>(inicial);
+  const [preset, setPreset] = useState<Preset>("todo");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [cargando, setCargando] = useState(false);
-  const [filtrado, setFiltrado] = useState(false);
   // Descarta respuestas viejas si el usuario cambia el rango rápido.
   const pedido = useRef(0);
 
@@ -63,7 +91,6 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
       const res = await fetch(`/api/metricas?${qs.toString()}`);
       if (!res.ok || id !== pedido.current) return;
       setMetrics((await res.json()) as Metrics);
-      setFiltrado(!!(d || h));
     } catch {
       // sin red: el tablero se queda como estaba
     } finally {
@@ -71,69 +98,82 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
     }
   }
 
-  // Inputs "desnudos" adentro de una píldora blanca única: los dos date
-  // pickers comparten un solo borde (nada de cajitas sueltas desalineadas).
-  // En móvil los dos inputs REPARTEN el ancho disponible (flex-1) en vez de
-  // un ancho fijo que desbordaba o dejaba huecos raros; en sm+ vuelven a su
-  // ancho natural. h-6 + text-left empareja el alto y la alineación del
-  // date picker de iOS con el resto de la píldora.
-  const dateCls =
-    "h-6 min-w-0 flex-1 border-0 bg-transparent p-0 text-left font-mono text-xs leading-6 text-body outline-none [appearance:none] [-webkit-appearance:none] [&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-date-and-time-value]:text-left sm:w-[7.4rem] sm:flex-none";
+  function elegirPreset(p: Preset) {
+    setPreset(p);
+    if (p === "custom") return; // espera a que carguen las fechas
+    const r = rangoDePreset(p);
+    setDesde(r.desde);
+    setHasta(r.hasta);
+    void aplicarRango(r.desde, r.hasta);
+  }
+
+  const inputCls =
+    "w-full min-w-0 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15";
 
   return (
     <section aria-label="Resumen del negocio" className="mb-6">
+      {/* Período por fecha de pago confirmado: un select con los rangos de
+          siempre (robusto en desktop y móvil) y, solo si se elige
+          "Personalizado", los dos campos de fecha con el estilo del panel. */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h2 className="text-xs font-medium uppercase tracking-widest text-muted">
-          Resumen{filtrado ? " · Rango elegido" : ""}
-          {cargando ? "…" : ""}
+          Resumen{cargando ? "…" : ""}
         </h2>
-        {/* Rango por fecha de pago confirmado. En móvil ocupa su propia
-            línea completa; en desktop queda a la derecha del título.
-            overflow-hidden: por si el date picker nativo intenta empujar. */}
-        <div className="flex w-full items-center gap-2 overflow-hidden rounded-xl border border-line bg-white px-3 py-2 shadow-sm sm:w-auto sm:py-1.5">
-          <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted">
-            Pagos
-          </span>
-          <input
-            id="m-desde"
-            type="date"
-            aria-label="Desde"
-            className={dateCls}
-            value={desde}
-            onChange={(e) => {
-              setDesde(e.target.value);
-              void aplicarRango(e.target.value, hasta);
-            }}
-          />
-          <span className="shrink-0 text-xs text-muted" aria-hidden>
-            –
-          </span>
-          <input
-            id="m-hasta"
-            type="date"
-            aria-label="Hasta"
-            className={dateCls}
-            value={hasta}
-            onChange={(e) => {
-              setHasta(e.target.value);
-              void aplicarRango(desde, e.target.value);
-            }}
-          />
-          {filtrado && (
-            <button
-              onClick={() => {
-                setDesde("");
-                setHasta("");
-                void aplicarRango("", "");
-              }}
-              title="Ver todo el histórico"
-              className="ml-auto shrink-0 rounded-md px-1.5 py-0.5 text-xs font-semibold text-muted transition-colors hover:bg-canvas hover:text-body"
-            >
-              ✕
-            </button>
-          )}
-        </div>
+        <select
+          aria-label="Período de las métricas"
+          value={preset}
+          onChange={(e) => elegirPreset(e.target.value as Preset)}
+          className="w-full rounded-lg border border-line bg-white px-3 py-2 text-xs font-medium text-[#4A4E5E] shadow-sm outline-none focus:border-brand sm:w-auto"
+        >
+          <option value="todo">Todo el historial</option>
+          <option value="mes">Este mes</option>
+          <option value="mes_pasado">Mes pasado</option>
+          <option value="30">Últimos 30 días</option>
+          <option value="anio">Este año</option>
+          <option value="custom">Personalizado…</option>
+        </select>
       </div>
+
+      {preset === "custom" && (
+        <div className="mb-2 grid grid-cols-2 gap-2">
+          <div>
+            <label
+              htmlFor="m-desde"
+              className="mb-1 block font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted"
+            >
+              Pagos desde
+            </label>
+            <input
+              id="m-desde"
+              type="date"
+              className={inputCls}
+              value={desde}
+              onChange={(e) => {
+                setDesde(e.target.value);
+                void aplicarRango(e.target.value, hasta);
+              }}
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="m-hasta"
+              className="mb-1 block font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted"
+            >
+              Hasta
+            </label>
+            <input
+              id="m-hasta"
+              type="date"
+              className={inputCls}
+              value={hasta}
+              onChange={(e) => {
+                setHasta(e.target.value);
+                void aplicarRango(desde, e.target.value);
+              }}
+            />
+          </div>
+        </div>
+      )}
       <div className="card-shadow overflow-hidden rounded-2xl bg-white">
         {/* Fila principal. En móvil la plata movida ocupa la fila entera
             (los montos en ARS no entran en tercios de 390px); comisión y
