@@ -62,13 +62,13 @@ export async function POST(request: Request) {
   }
   if (!comprador_alias) {
     return NextResponse.json(
-      { error: "El alias del comprador es obligatorio" },
+      { error: "El comprador es obligatorio" },
       { status: 400 }
     );
   }
   if (!vendedor_alias) {
     return NextResponse.json(
-      { error: "El alias del vendedor es obligatorio" },
+      { error: "El vendedor es obligatorio" },
       { status: 400 }
     );
   }
