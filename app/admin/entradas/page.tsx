@@ -87,13 +87,10 @@ export default async function AdminEntradasPage() {
         .or(`fecha.is.null,fecha.gte.${hoy}`),
       // Interruptor de Passion (config es legible por usuarios logueados).
       supabase.from("config").select("value").eq("key", "portal_activo").maybeSingle(),
-      // Competiciones existentes (portal + propias, eventos vigentes) para
-      // el dropdown del formulario de carga.
-      supabase
-        .from("tickets")
-        .select("competicion")
-        .not("competicion", "is", null)
-        .or(`fecha.is.null,fecha.gte.${hoy}`),
+      // Competiciones existentes (portal + propias, vigentes) para el
+      // dropdown del form. DISTINCT en la base: bajar una fila por ticket
+      // chocaba con el tope de 1000 de PostgREST y faltaban competiciones.
+      supabase.rpc("competiciones_catalogo", { p_solo_portal: false }),
     ]);
     manual = (manualRes.data ?? []) as TicketFull[];
     syncRuns = (syncRes.data ?? []) as SyncRun[];
@@ -101,9 +98,7 @@ export default async function AdminEntradasPage() {
     portalComprables = comprablesRes.count ?? 0;
     // Sin fila = activado (default histórico).
     portalActivo = portalRes.data == null || Number(portalRes.data.value) !== 0;
-    competiciones = Array.from(
-      new Set((compsRes.data ?? []).map((c) => c.competicion as string))
-    ).sort();
+    competiciones = (compsRes.data ?? []) as string[];
   }
 
   return (
