@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Operacion } from "@/lib/operaciones";
 import { numeroFactura, type Factura } from "@/lib/factura";
 
@@ -107,7 +108,10 @@ export default function FacturaModal({
     "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15";
   const labelCls = "mb-1 block text-xs font-medium uppercase tracking-wide text-[#6A6E7E]";
 
-  return (
+  // Portal al <body>: renderizado adentro de la card de la operación, el
+  // overflow/animaciones del árbol lo recortaban. Así flota arriba de TODA
+  // la página, siempre. (Solo se monta con el modal abierto: document existe.)
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
       onClick={onClose}
@@ -256,6 +260,7 @@ export default function FacturaModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
