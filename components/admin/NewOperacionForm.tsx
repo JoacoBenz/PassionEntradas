@@ -10,6 +10,113 @@ type Props = {
   prefill?: { evento?: string; ticketId?: string };
 };
 
+// Resultado del buscador de entradas (/api/tickets/buscar).
+type TicketMatch = {
+  id: string;
+  evento: string;
+  competicion: string | null;
+  fecha: string | null;
+  categoria: string | null;
+  precio_final: number | null;
+  stock: number | null;
+  source: "portal" | "manual";
+};
+
+// Autocompletado del evento contra el catálogo: elegir un resultado vincula
+// la operación a esa entrada (ticket_id) — con eso funcionan el descuento de
+// stock al cerrar (propias) y la factura con sede/sector. Escribir libre
+// sigue valiendo para eventos que no están en el catálogo.
+// A nivel módulo para que React no lo remonte en cada render.
+function EventoCombo({
+  value,
+  onTexto,
+  onElegir,
+  inputCls,
+}: {
+  value: string;
+  onTexto: (v: string) => void;
+  onElegir: (t: TicketMatch) => void;
+  inputCls: string;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [resultados, setResultados] = useState<TicketMatch[]>([]);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pedido = useRef(0);
+
+  function buscar(q: string) {
+    if (timer.current) clearTimeout(timer.current);
+    if (q.trim().length < 2) {
+      setResultados([]);
+      return;
+    }
+    timer.current = setTimeout(async () => {
+      const id = ++pedido.current;
+      try {
+        const res = await fetch(`/api/tickets/buscar?q=${encodeURIComponent(q)}`);
+        if (!res.ok || id !== pedido.current) return;
+        setResultados((await res.json()) as TicketMatch[]);
+      } catch {
+        // sin red: el desplegable simplemente no sugiere
+      }
+    }, 250);
+  }
+
+  return (
+    <div className="relative">
+      <input
+        id="evento"
+        className={inputCls}
+        value={value}
+        autoComplete="off"
+        placeholder="Buscá en el catálogo o escribí libre"
+        onChange={(e) => {
+          onTexto(e.target.value);
+          setAbierto(true);
+          buscar(e.target.value);
+        }}
+        onFocus={() => setAbierto(true)}
+        onBlur={() => setAbierto(false)}
+      />
+      {abierto && resultados.length > 0 && (
+        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-lg border border-line bg-white py-1 shadow-lg">
+          {resultados.map((t) => (
+            <li key={t.id}>
+              <button
+                type="button"
+                // onMouseDown: dispara ANTES del blur del input.
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onElegir(t);
+                  setAbierto(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-canvas"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{t.evento}</span>
+                  <span className="block truncate text-[11px] text-muted">
+                    {[t.categoria, t.fecha ? t.fecha.slice(0, 10) : null, t.stock != null ? `stock ${t.stock}` : null]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </span>
+                <span
+                  className={`shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider ${
+                    t.source === "manual"
+                      ? "bg-estado-confirmada/10 text-estado-confirmada"
+                      : "bg-canvas text-muted"
+                  }`}
+                >
+                  {t.source === "manual" ? "Propia" : "Passion"}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 const empty = {
   evento: "",
   comprador_alias: "",
@@ -24,6 +131,9 @@ const empty = {
 export default function NewOperacionForm({ onCreated, onError, prefill }: Props) {
   const [form, setForm] = useState({ ...empty, evento: prefill?.evento ?? "" });
   const [ticketId, setTicketId] = useState<string | null>(prefill?.ticketId ?? null);
+  // Detalle de la entrada vinculada para el chip (desde el buscador; el
+  // prefill de "Crear operación" no lo trae y muestra un texto genérico).
+  const [vinculo, setVinculo] = useState<{ categoria: string | null; source: string } | null>(null);
   const [loading, setLoading] = useState(false);
   // El disabled de React llega tarde si dos taps caen en el mismo tick:
   // el ref corta el segundo submit antes de que dispare otro POST.
@@ -31,6 +141,38 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
 
   function set<K extends keyof typeof empty>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  // Elegir una entrada del buscador: vincula el ticket y autocompleta fecha
+  // (siempre) y monto (solo si está vacío y la entrada es propia: las de
+  // Passion están en EUR en la base, no sirven como monto USD directo).
+  function elegirTicket(t: TicketMatch) {
+    setTicketId(t.id);
+    setVinculo({ categoria: t.categoria, source: t.source });
+    setForm((f) => ({
+      ...f,
+      evento: t.evento,
+      fecha_evento: t.fecha ? t.fecha.slice(0, 10) : f.fecha_evento,
+      monto:
+        !f.monto.trim() && t.source === "manual" && t.precio_final != null
+          ? String(Math.round(t.precio_final))
+          : f.monto,
+    }));
+  }
+
+  // Editar el texto a mano rompe el vínculo (el nombre ya no es el del
+  // catálogo); se puede volver a elegir del desplegable.
+  function editarEvento(v: string) {
+    set("evento", v);
+    if (ticketId) {
+      setTicketId(null);
+      setVinculo(null);
+    }
+  }
+
+  function desvincular() {
+    setTicketId(null);
+    setVinculo(null);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -137,13 +279,32 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
             <label htmlFor="evento" className={labelCls}>
               Evento *
             </label>
-            <input
-              id="evento"
-              className={inputCls}
+            <EventoCombo
               value={form.evento}
-              onChange={(e) => set("evento", e.target.value)}
-              placeholder="River vs Boca — Superclásico"
+              onTexto={editarEvento}
+              onElegir={elegirTicket}
+              inputCls={inputCls}
             />
+            {ticketId && (
+              <div className="mt-1.5 flex items-center justify-between gap-2 rounded-lg bg-canvas px-2.5 py-1.5">
+                <span className="min-w-0 truncate text-[11px] text-muted">
+                  Vinculada al catálogo
+                  {vinculo
+                    ? `: ${vinculo.categoria ?? "Entrada general"} · ${
+                        vinculo.source === "manual" ? "Propia" : "Passion"
+                      }`
+                    : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={desvincular}
+                  title="Desvincular de la entrada del catálogo"
+                  className="shrink-0 rounded-md px-1.5 text-xs font-semibold text-muted transition-colors hover:bg-white hover:text-body"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
           </div>
 
           {/* flex-col + justify-between: si un label envuelve a dos líneas,
