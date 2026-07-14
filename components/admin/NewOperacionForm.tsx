@@ -44,11 +44,11 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
       return;
     }
     if (!form.comprador_alias.trim()) {
-      onError("El alias del comprador es obligatorio");
+      onError("El comprador es obligatorio");
       return;
     }
     if (!form.vendedor_alias.trim()) {
-      onError("El alias del vendedor es obligatorio");
+      onError("El vendedor es obligatorio");
       return;
     }
     const montoNum = Number(form.monto);
@@ -146,32 +146,31 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
             />
           </div>
 
-          {/* flex-col + justify-between: si un label envuelve a dos líneas
-              (pasa con "Alias comprador *" en desktop), los inputs quedan
-              anclados abajo y alineados entre sí. */}
+          {/* flex-col + justify-between: si un label envuelve a dos líneas,
+              los inputs quedan anclados abajo y alineados entre sí. */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col justify-between">
               <label htmlFor="comprador" className={labelCls}>
-                Alias comprador *
+                Comprador *
               </label>
               <input
                 id="comprador"
                 className={inputCls}
                 value={form.comprador_alias}
                 onChange={(e) => set("comprador_alias", e.target.value)}
-                placeholder="compra_marce"
+                placeholder="Nombre o alias"
               />
             </div>
             <div className="flex flex-col justify-between">
               <label htmlFor="vendedor" className={labelCls}>
-                Alias vendedor *
+                Vendedor *
               </label>
               <input
                 id="vendedor"
                 className={inputCls}
                 value={form.vendedor_alias}
                 onChange={(e) => set("vendedor_alias", e.target.value)}
-                placeholder="vende_lucho"
+                placeholder="Nombre o alias"
               />
             </div>
           </div>
