@@ -115,7 +115,10 @@ export default function FacturaModal({
       aria-label="Factura de la operación"
     >
       <div
-        className="card-shadow w-full max-w-md overflow-hidden rounded-2xl bg-white"
+        // max-h + scroll interno: con la operación completa (bloque de
+        // factura emitida + formulario) el contenido supera el alto de la
+        // pantalla y quedaba cortado sin forma de llegar a los botones.
+        className="card-shadow flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="surface-ink px-5 py-4 text-white">
@@ -128,7 +131,7 @@ export default function FacturaModal({
           <p className="mt-1 truncate text-xs text-white/60">{op.evento}</p>
         </div>
 
-        <div className="space-y-3 p-5">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
           {cargando ? (
             <p className="py-4 text-center text-sm text-muted">Cargando…</p>
           ) : (
