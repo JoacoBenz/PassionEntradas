@@ -4,6 +4,7 @@
 
 import { generateCode, type Operacion, type OperacionPublica, type StatusAction } from "@/lib/operaciones";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
+import type { Publicacion, Solicitud, SolicitudConPublicacion } from "@/lib/comunidad";
 import type { Factura, FacturaDatos } from "@/lib/factura";
 import { MOCK_TICKETS } from "@/lib/mock-tickets";
 
@@ -14,6 +15,12 @@ export const isMock = () => process.env.MOCK_DATA === "1";
 export const MOCK_USER = {
   email: "demo@passion.local",
   rol: "administrador" as const,
+};
+
+// Identidad del "usuario común" en mock: navega el feed, publica y solicita.
+export const MOCK_FEED_USER = {
+  id: "99999999-9999-4999-8999-999999999999",
+  alias: "demo_user",
 };
 
 export type MockMargen = {
@@ -27,6 +34,8 @@ type MockDB = {
   ops: Operacion[];
   manual: TicketFull[];
   syncRuns: SyncRun[];
+  pubs: Publicacion[];
+  solicitudes: Solicitud[];
   margenes: MockMargen[];
   eurUsd: number;
   portalActivo: boolean;
@@ -127,6 +136,73 @@ function seed(): MockDB {
     { id: 1, status: "ok", reason: null, scraped_valid: 129, upserted: 129, marked_unavailable: 0, complete: true, duration_ms: 62000, created_at: iso(67) },
   ];
 
+  const pubs: Publicacion[] = [
+    {
+      id: "aaaa1111-1111-4111-8111-aaaaaaaa1111",
+      user_id: "88888888-8888-4888-8888-888888888888",
+      vendedor_alias: "lu.entradas",
+      evento: "Coldplay en River — Campo",
+      descripcion: "Dos entradas juntas, transfiero por la app oficial.",
+      fecha_evento: "2026-08-15",
+      precio: 420000,
+      cantidad: 2,
+      estado: "activa",
+      created_at: iso(60 * 5),
+      updated_at: iso(60 * 5),
+    },
+    {
+      id: "aaaa2222-2222-4222-8222-aaaaaaaa2222",
+      user_id: MOCK_FEED_USER.id,
+      vendedor_alias: MOCK_FEED_USER.alias,
+      evento: "Lollapalooza 2027 — Abono 3 días",
+      descripcion: null,
+      fecha_evento: "2027-03-19",
+      precio: 690000,
+      cantidad: 1,
+      estado: "activa",
+      created_at: iso(60 * 2),
+      updated_at: iso(60 * 2),
+    },
+    {
+      id: "aaaa3333-3333-4333-8333-aaaaaaaa3333",
+      user_id: "77777777-7777-4777-8777-777777777777",
+      vendedor_alias: "tano_92",
+      evento: "River vs Boca — Superclásico",
+      descripcion: "Sivori media. Solo venta por custodia.",
+      fecha_evento: "2026-07-20",
+      precio: 310000,
+      cantidad: 1,
+      estado: "en_proceso",
+      created_at: iso(60 * 26),
+      updated_at: iso(60),
+    },
+  ];
+
+  const solicitudes: Solicitud[] = [
+    {
+      id: "bbbb1111-1111-4111-8111-bbbbbbbb1111",
+      publicacion_id: "aaaa3333-3333-4333-8333-aaaaaaaa3333",
+      comprador_id: MOCK_FEED_USER.id,
+      comprador_alias: MOCK_FEED_USER.alias,
+      mensaje: "La quiero, puedo pagar hoy mismo.",
+      estado: "en_proceso",
+      operacion_id: "11111111-1111-4111-8111-111111111111",
+      created_at: iso(60 * 3),
+      updated_at: iso(60),
+    },
+    {
+      id: "bbbb2222-2222-4222-8222-bbbbbbbb2222",
+      publicacion_id: "aaaa1111-1111-4111-8111-aaaaaaaa1111",
+      comprador_id: "66666666-6666-4666-8666-666666666666",
+      comprador_alias: "caro.mdq",
+      mensaje: null,
+      estado: "pendiente",
+      operacion_id: null,
+      created_at: iso(45),
+      updated_at: iso(45),
+    },
+  ];
+
   const margenes: MockMargen[] = [
     { id: "m-default", source: "portal", competicion: null, porcentaje: 20 },
     { id: "m-mundial", source: "portal", competicion: "World Cup 2026 Canada / Mexico / USA", porcentaje: 35 },
@@ -136,6 +212,8 @@ function seed(): MockDB {
     ops,
     manual,
     syncRuns,
+    pubs,
+    solicitudes,
     margenes,
     eurUsd: 1.08,
     portalActivo: true,
@@ -235,13 +313,27 @@ export function mockApplyAction(
         mockAjustarStockManual(op.ticket_id, action.done ? -1 : 1);
       }
       break;
-    case "cancelar":
+    case "cancelar": {
       if (cancelada) return { ok: false, status: 409, error: "La operación ya está cancelada" };
       if (op.cerrada_at) {
         return { ok: false, status: 409, error: "La operación está cerrada; reabrí el cierre antes de cancelar" };
       }
       op.status = "cancelada";
+      // V2: solicitud enlazada rechazada y publicación de vuelta al feed.
+      const sol = db().solicitudes.find(
+        (s) => s.operacion_id === op.id && s.estado === "en_proceso"
+      );
+      if (sol) {
+        sol.estado = "rechazada";
+        sol.updated_at = new Date().toISOString();
+        const pub = db().pubs.find((p) => p.id === sol.publicacion_id);
+        if (pub && pub.estado === "en_proceso") {
+          pub.estado = "activa";
+          pub.updated_at = sol.updated_at;
+        }
+      }
       break;
+    }
     case "reabrir":
       if (!cancelada) return { ok: false, status: 409, error: "Solo se puede reabrir una operación cancelada" };
       op.status = "esperando_entrada";
@@ -307,6 +399,193 @@ export function mockSyncRuns(): SyncRun[] {
 
 export function mockPortalCount(): number {
   return MOCK_TICKETS.filter((t) => t.source === "portal").length;
+}
+
+// ---- comunidad (V2) ---------------------------------------------------------------
+type Err = { ok: false; status: number; error: string };
+
+export function mockListPublicaciones(): Publicacion[] {
+  return [...db().pubs].sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export function mockMisSolicitudes(userId: string): Solicitud[] {
+  return db().solicitudes.filter((s) => s.comprador_id === userId);
+}
+
+export function mockCreatePublicacion(input: {
+  user_id: string;
+  vendedor_alias: string;
+  evento: string;
+  descripcion: string | null;
+  fecha_evento: string | null;
+  precio: number;
+  cantidad: number;
+}): Publicacion {
+  const now = new Date().toISOString();
+  const pub: Publicacion = {
+    id: crypto.randomUUID(),
+    ...input,
+    estado: "activa",
+    created_at: now,
+    updated_at: now,
+  };
+  db().pubs.unshift(pub);
+  return pub;
+}
+
+export function mockPatchPublicacion(
+  id: string,
+  userId: string,
+  esAdmin: boolean,
+  estado: Publicacion["estado"]
+): { ok: true; pub: Publicacion } | Err {
+  const pub = db().pubs.find((p) => p.id === id);
+  if (!pub) return { ok: false, status: 404, error: "Publicación no encontrada" };
+  if (!esAdmin && pub.user_id !== userId) {
+    return { ok: false, status: 403, error: "Solo el dueño puede modificar su publicación" };
+  }
+  if (!esAdmin && pub.estado === "en_proceso") {
+    return { ok: false, status: 409, error: "Hay una operación en curso sobre esta publicación; hablá con el administrador" };
+  }
+  pub.estado = estado;
+  pub.updated_at = new Date().toISOString();
+  return { ok: true, pub };
+}
+
+export function mockCreateSolicitud(input: {
+  publicacion_id: string;
+  comprador_id: string;
+  comprador_alias: string;
+  mensaje: string | null;
+}): { ok: true; sol: Solicitud } | Err {
+  const pub = db().pubs.find((p) => p.id === input.publicacion_id);
+  if (!pub) return { ok: false, status: 404, error: "Publicación no encontrada" };
+  if (pub.estado !== "activa") {
+    return { ok: false, status: 409, error: "La publicación ya no está disponible" };
+  }
+  if (pub.user_id === input.comprador_id) {
+    return { ok: false, status: 409, error: "No podés solicitar tu propia publicación" };
+  }
+  const dupe = db().solicitudes.find(
+    (s) =>
+      s.publicacion_id === input.publicacion_id &&
+      s.comprador_id === input.comprador_id &&
+      (s.estado === "pendiente" || s.estado === "en_proceso")
+  );
+  if (dupe) return { ok: false, status: 409, error: "Ya enviaste una solicitud para esta publicación" };
+  const now = new Date().toISOString();
+  const sol: Solicitud = {
+    id: crypto.randomUUID(),
+    ...input,
+    estado: "pendiente",
+    operacion_id: null,
+    created_at: now,
+    updated_at: now,
+  };
+  db().solicitudes.unshift(sol);
+  return { ok: true, sol };
+}
+
+export function mockListSolicitudes(): SolicitudConPublicacion[] {
+  const d = db();
+  return d.solicitudes
+    .map((s): SolicitudConPublicacion | null => {
+      const pub = d.pubs.find((p) => p.id === s.publicacion_id);
+      if (!pub) return null;
+      const op = s.operacion_id ? d.ops.find((o) => o.id === s.operacion_id) : null;
+      const operacion = op
+        ? {
+            id: op.id,
+            status: op.status,
+            entrada_recibida_at: op.entrada_recibida_at,
+            pago_confirmado_at: op.pago_confirmado_at,
+            cerrada_at: op.cerrada_at,
+          }
+        : null;
+      return { ...s, publicacion: pub, operacion };
+    })
+    .filter((s): s is SolicitudConPublicacion => s !== null)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+// Acciones del admin sobre una solicitud. "iniciar" crea la operación de
+// custodia y deja todo enlazado, igual que la ruta real.
+export function mockAccionSolicitud(
+  id: string,
+  accion: "iniciar" | "rechazar" | "concretar"
+): { ok: true; sol: Solicitud; operacion?: Operacion } | Err {
+  const d = db();
+  const sol = d.solicitudes.find((s) => s.id === id);
+  if (!sol) return { ok: false, status: 404, error: "Solicitud no encontrada" };
+  const pub = d.pubs.find((p) => p.id === sol.publicacion_id);
+  if (!pub) return { ok: false, status: 404, error: "Publicación no encontrada" };
+
+  if (accion === "iniciar") {
+    if (sol.estado !== "pendiente") {
+      return { ok: false, status: 409, error: "La solicitud ya fue procesada" };
+    }
+    if (pub.estado !== "activa") {
+      return { ok: false, status: 409, error: "La publicación no está activa (ya hay una custodia en curso, se vendió o fue retirada)" };
+    }
+    const op = mockCreateOp({
+      evento: pub.evento,
+      comprador_alias: sol.comprador_alias,
+      vendedor_alias: pub.vendedor_alias,
+      monto: pub.precio,
+      fee: 0,
+      ticket_id: null,
+      fecha_evento: pub.fecha_evento,
+      notas: `V2: solicitud de ${sol.comprador_alias} sobre publicación de ${pub.vendedor_alias}`,
+      cuenta_debitar: null,
+    });
+    sol.estado = "en_proceso";
+    sol.operacion_id = op.id;
+    pub.estado = "en_proceso";
+    pub.updated_at = new Date().toISOString();
+    sol.updated_at = pub.updated_at;
+    return { ok: true, sol, operacion: op };
+  }
+
+  if (accion === "rechazar") {
+    if (sol.estado === "concretada") {
+      return { ok: false, status: 409, error: "La solicitud ya se concretó" };
+    }
+    const eraEnProceso = sol.estado === "en_proceso";
+    if (eraEnProceso && sol.operacion_id) {
+      const op = d.ops.find((o) => o.id === sol.operacion_id);
+      if (op?.cerrada_at) {
+        return { ok: false, status: 409, error: "La operación de custodia ya se cerró: concretá la venta en lugar de rechazar" };
+      }
+      if (op && op.status !== "cancelada") {
+        op.status = "cancelada";
+        op.updated_at = new Date().toISOString();
+      }
+    }
+    sol.estado = "rechazada";
+    sol.updated_at = new Date().toISOString();
+    if (eraEnProceso && pub.estado === "en_proceso") {
+      pub.estado = "activa";
+      pub.updated_at = sol.updated_at;
+    }
+    return { ok: true, sol };
+  }
+
+  // concretar
+  if (sol.estado !== "en_proceso") {
+    return { ok: false, status: 409, error: "Solo se concreta una solicitud con operación en curso" };
+  }
+  sol.estado = "concretada";
+  pub.estado = "vendida";
+  sol.updated_at = new Date().toISOString();
+  pub.updated_at = sol.updated_at;
+  // Las hermanas pendientes ya no tienen sentido sobre una pub vendida.
+  for (const otra of d.solicitudes) {
+    if (otra.publicacion_id === pub.id && otra.estado === "pendiente") {
+      otra.estado = "rechazada";
+      otra.updated_at = sol.updated_at;
+    }
+  }
+  return { ok: true, sol };
 }
 
 // ---- margenes ---------------------------------------------------------------------

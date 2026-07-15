@@ -5,8 +5,8 @@ import { generateCode } from "@/lib/operaciones";
 import { isMock, mockCreateOp } from "@/lib/mock-db";
 
 // POST /api/operaciones — crea una operación.
-// Solo staff (admin o moderador): una sesión sin rol del panel no carga
-// operaciones. La escritura va con service role.
+// Solo staff (admin/moderador): los usuarios de la comunidad compran y venden
+// únicamente vía solicitudes, que media el administrador. Service role.
 export async function POST(request: Request) {
   if (!isMock()) {
     const supabase = createServerSupabase();
