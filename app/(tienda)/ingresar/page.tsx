@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { getRol } from "@/lib/auth";
@@ -40,7 +39,6 @@ function LangToggle({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => voi
 }
 
 export default function IngresarPage() {
-  const router = useRouter();
   const [lang, setLang] = useLang();
   const a = TX[lang].auth;
 
@@ -67,8 +65,11 @@ export default function IngresarPage() {
     const rol = data.user ? getRol(data.user) : null;
     const destino =
       rol === "administrador" ? "/admin" : rol === "moderador" ? "/moderador" : "/entradas";
-    router.replace(destino);
-    router.refresh();
+    // Navegación DURA (no soft): el login vive con el CSS de la tienda y el
+    // panel usa Tailwind. Un router.replace cliente cruzaba de un stylesheet a
+    // otro y el panel se renderizaba sin estilos (todo enorme) hasta refrescar.
+    // Con una carga completa cada destino trae su propio CSS.
+    window.location.assign(destino);
   }
 
   async function onReset(e: React.FormEvent) {

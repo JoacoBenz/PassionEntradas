@@ -58,12 +58,15 @@ export default function AppHeader({ subtitle, email, nav = false, action }: Prop
             </span>
           )}
           {action && (
-            <Link
+            // <a> y no <Link>: la acción suele llevar a la tienda (CSS propio,
+            // no Tailwind). Un soft-nav cruzaría stylesheets y renderizaría sin
+            // estilos hasta refrescar; una carga completa trae el CSS correcto.
+            <a
               href={action.href}
               className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-xl bg-cobalt px-3.5 text-xs font-semibold text-white transition-colors hover:bg-cobalt-deep md:h-9"
             >
               {action.label}
-            </Link>
+            </a>
           )}
           <Link
             href="/admin/cuenta"
