@@ -398,7 +398,7 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
           <h1>
             {t.heroTitle1}
             <br />
-            <span>{t.heroTitle2}</span>.
+            <span>{t.heroTitle2}</span>
           </h1>
           <p>{t.heroP}</p>
           <div className="cta-row">
