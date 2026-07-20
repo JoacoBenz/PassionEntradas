@@ -757,3 +757,86 @@
   .lp-form, .lp-ok { box-shadow: 4px 4px 0 var(--ink); padding: 20px 16px; }
   .lp-nav-login { font-size: 11px; }
 }
+
+/* =====================================================================
+   Mapa mundial de eventos (/mapa) + botón del header.
+   ===================================================================== */
+
+/* Botón del mapa en el header de la tienda (icono con borde, estilo .back). */
+.mapa-nav {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; flex-shrink: 0;
+  border: 1px solid var(--ink); color: var(--ink); background: transparent;
+  transition: .12s;
+}
+.mapa-nav svg { width: 17px; height: 17px; }
+.mapa-nav:hover { background: var(--ink); color: var(--field); }
+
+.mapa-block { padding-top: 26px; }
+
+/* Marco del mapa: tarjeta con borde e ink-shadow, tierra en tinta sobre
+   papel de ticket; los puntos cobalto saltan a la vista. */
+.mapa-frame {
+  border: 1.5px solid var(--ink); background: var(--field);
+  box-shadow: 6px 6px 0 var(--ink); padding: 12px;
+}
+.mapa-svg { display: block; width: 100%; height: auto; }
+.mapa-land { fill: var(--ink); opacity: .88; }
+.mapa-dot { cursor: pointer; }
+.mapa-punto { fill: var(--cobalt); stroke: var(--field); stroke-width: 1.4; transition: .12s; }
+.mapa-dot:hover .mapa-punto { fill: var(--cobalt-d); }
+.mapa-dot.sel .mapa-punto { fill: var(--flare); }
+.mapa-ring { fill: none; stroke: var(--flare); stroke-width: 1.4; }
+
+.mapa-meta {
+  margin: 12px 0 0; font-family: var(--font-mono), monospace; font-size: 12px;
+  color: var(--mute); text-transform: uppercase; letter-spacing: .08em;
+}
+.mapa-chips { margin-top: 12px; }
+.mapa-hint { margin: 18px 0 0; color: var(--mute); font-size: 14px; }
+
+/* Panel de la ciudad seleccionada. */
+.mapa-panel {
+  margin-top: 18px; border: 1.5px solid var(--ink); background: var(--field);
+  box-shadow: 6px 6px 0 var(--ink); padding: 16px 18px;
+}
+.mapa-panel-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  border-bottom: 2px solid var(--ink); padding-bottom: 10px; margin-bottom: 4px;
+}
+.mapa-panel-head h3 {
+  font-family: var(--font-body), sans-serif; font-weight: 900; text-transform: uppercase;
+  font-size: 22px; margin: 0;
+}
+.mapa-panel-head span {
+  font-family: var(--font-mono), monospace; font-size: 11px; color: var(--mute);
+  text-transform: uppercase; letter-spacing: .1em;
+}
+.mapa-lista { list-style: none; margin: 0; padding: 0; }
+.mapa-ev {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 12px 0; border-bottom: 1px solid var(--hair);
+}
+.mapa-ev:last-child { border-bottom: none; }
+.mapa-ev-main { min-width: 0; display: grid; gap: 2px; }
+.mapa-ev-eyebrow {
+  font-family: var(--font-mono), monospace; font-size: 10px; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--mute);
+}
+.mapa-ev-title {
+  font-family: var(--font-body), sans-serif; font-weight: 800; text-transform: uppercase;
+  font-size: 16px; line-height: 1.12;
+}
+.mapa-ev-meta { font-size: 12.5px; color: var(--mute); }
+.mapa-ev-link {
+  font-family: var(--font-mono), monospace; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em; color: var(--cobalt);
+  border: 1px solid var(--cobalt); padding: 8px 10px; white-space: nowrap; transition: .12s;
+}
+.mapa-ev-link:hover { background: var(--cobalt); color: #fff; }
+
+@media (max-width: 640px) {
+  .mapa-frame, .mapa-panel { box-shadow: 4px 4px 0 var(--ink); }
+  .mapa-frame { padding: 8px; }
+  .mapa-ev { flex-direction: column; align-items: flex-start; gap: 8px; }
+}

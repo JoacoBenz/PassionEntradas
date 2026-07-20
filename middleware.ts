@@ -14,7 +14,10 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const esPanel = path.startsWith("/admin") || path.startsWith("/moderador");
   const esTienda =
-    path === "/buscar" || path.startsWith("/entradas") || path.startsWith("/cuenta");
+    path === "/buscar" ||
+    path === "/mapa" ||
+    path.startsWith("/entradas") ||
+    path.startsWith("/cuenta");
   const esLoginAdmin = path === "/admin/login";
   const esLoginCliente = path === "/ingresar";
   const esLogin = esLoginAdmin || esLoginCliente;
@@ -119,6 +122,7 @@ export const config = {
     "/entradas/:path*",
     "/cuenta/:path*",
     "/buscar",
+    "/mapa",
     "/ingresar",
   ],
 };
