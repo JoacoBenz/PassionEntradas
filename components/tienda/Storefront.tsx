@@ -73,6 +73,26 @@ function Wordmark() {
   );
 }
 
+// Botón del mapa mundial de eventos (header de la tienda).
+function MapaNavLink({ label }: { label: string }) {
+  return (
+    <Link className="mapa-nav" href="/mapa" title={label} aria-label={label}>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        <path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10Z" />
+        <circle cx="12" cy="11" r="2.3" />
+      </svg>
+    </Link>
+  );
+}
+
 function WcLogo({ comp }: { comp: string | null }) {
   if (!isWC(comp)) return null;
   return (
@@ -389,6 +409,7 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
           <Wordmark />
           <div className="mast-right">
             <LangToggle lang={lang} onChange={setLang} />
+            <MapaNavLink label={t.mapa.nav} />
             <Link className="lp-nav-login" href="/cuenta">
               {t.lp.navCuenta}
             </Link>
@@ -728,6 +749,7 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
           <Wordmark />
           <div className="mast-right">
             <LangToggle lang={lang} onChange={setLang} />
+            <MapaNavLink label={t.mapa.nav} />
             <Link className="lp-nav-login" href="/cuenta">
               {t.lp.navCuenta}
             </Link>

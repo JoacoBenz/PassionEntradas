@@ -128,6 +128,19 @@ const en = {
   pagina: (a: number, b: number) => `Page ${a} of ${b}`,
   mesTBC: "TBC",
 
+  // mapa mundial de eventos (/mapa)
+  mapa: {
+    nav: "Events map",
+    eyebrow: "Worldwide",
+    h2: "The catalogue on the map",
+    p: "Every event, pinned where it happens. Tap a city to see what's on there.",
+    resumen: (ev: number, ci: number) =>
+      `${ev} ${ev === 1 ? "event" : "events"} across ${ci} ${ci === 1 ? "city" : "cities"}`,
+    sinUbicar: (n: number) => `+ ${n} without a pinned venue`,
+    elegi: "Tap a dot or a city to see its events.",
+    verCatalogo: "Open in catalogue →",
+  },
+
   // landing pública (/): capta clientes y toma la solicitud de acceso.
   lp: {
     navIngresar: "Log in",
@@ -334,6 +347,18 @@ const es: typeof en = {
   siguiente: "Siguientes →",
   pagina: (a, b) => `Página ${a} de ${b}`,
   mesTBC: "A confirmar",
+
+  mapa: {
+    nav: "Mapa de eventos",
+    eyebrow: "Por el mundo",
+    h2: "El catálogo en el mapa",
+    p: "Cada evento, marcado donde sucede. Tocá una ciudad para ver qué hay ahí.",
+    resumen: (ev, ci) =>
+      `${ev} ${ev === 1 ? "evento" : "eventos"} en ${ci} ${ci === 1 ? "ciudad" : "ciudades"}`,
+    sinUbicar: (n) => `+ ${n} sin sede ubicada`,
+    elegi: "Tocá un punto o una ciudad para ver sus eventos.",
+    verCatalogo: "Ver en el catálogo →",
+  },
 
   lp: {
     navIngresar: "Ingresar",
