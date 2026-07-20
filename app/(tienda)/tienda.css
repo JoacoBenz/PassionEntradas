@@ -672,6 +672,20 @@
   outline: none; border-color: var(--cobalt); box-shadow: 0 0 0 3px #1f33e022;
 }
 
+/* Teléfono: selector de código de país + número. */
+.lp-tel { display: grid; grid-template-columns: minmax(0, 44%) 1fr; gap: 8px; }
+.lp-tel-cod {
+  font-family: var(--font-spline), system-ui, sans-serif; font-size: 15px; color: var(--ink);
+  background: #fff; border: 1.5px solid var(--ink); padding: 11px 8px 11px 12px; width: 100%;
+  transition: .12s; text-overflow: ellipsis;
+}
+.lp-tel-cod:focus {
+  outline: none; border-color: var(--cobalt); box-shadow: 0 0 0 3px #1f33e022;
+}
+@media (max-width: 420px) {
+  .lp-tel { grid-template-columns: minmax(0, 38%) 1fr; }
+}
+
 .lp-submit { margin-top: 4px; width: 100%; }
 .lp-submit:disabled { opacity: .6; cursor: default; transform: none; box-shadow: 4px 4px 0 var(--ink); }
 

@@ -107,6 +107,37 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
     }
   }
 
+  // Reenviar el acceso de una solicitud ya aprobada desde el historial:
+  // regenera la contraseña y muestra las credenciales nuevas para reenviar.
+  async function reenviar(id: string) {
+    if (busy[id]) return;
+    if (!confirm("Reenviar el acceso genera una contraseña nueva (la anterior deja de funcionar). ¿Continuar?"))
+      return;
+    setBusy((b) => ({ ...b, [id]: true }));
+    try {
+      const res = await fetch(`/api/acceso/${id}/reenviar`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        avisar("error", typeof data?.error === "string" ? data.error : "No se pudo reenviar");
+        return;
+      }
+      setEmailEstado((e) => ({ ...e, [id]: { estado: "idle" } }));
+      setReveal((r) => ({
+        ...r,
+        [id]: {
+          creds: data.credenciales,
+          mensaje: data.mensaje ?? "",
+          emailConfigurado: Boolean(data.emailConfigurado),
+        },
+      }));
+      avisar("ok", "Acceso regenerado. Copiá o enviá las credenciales nuevas.");
+    } catch {
+      avisar("error", "Error de red");
+    } finally {
+      setBusy((b) => ({ ...b, [id]: false }));
+    }
+  }
+
   async function enviarEmail(id: string, password: string) {
     setEmailEstado((e) => ({ ...e, [id]: { estado: "sending" } }));
     try {
@@ -323,6 +354,16 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
                     >
                       {s.estado === "aprobada" ? "Aprobada" : "Rechazada"}
                     </span>
+                    {s.estado === "aprobada" && (
+                      <button
+                        onClick={() => reenviar(s.id)}
+                        disabled={busy[s.id]}
+                        className={btnGhost}
+                        title="Genera una contraseña nueva y muestra las credenciales para reenviarlas"
+                      >
+                        {busy[s.id] ? "…" : "Reenviar acceso"}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

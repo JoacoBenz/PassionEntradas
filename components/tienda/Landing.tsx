@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LANGS, TX, type Lang } from "@/lib/tienda-i18n";
+import { PAISES, PAIS_DEFAULT, dialDe } from "@/lib/paises";
 
 function useLang() {
   const [lang, setLang] = useState<Lang>("en");
@@ -48,6 +49,8 @@ export function Landing() {
 
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
+  // Teléfono en dos partes: país (código) + número. Se combinan al enviar.
+  const [pais, setPais] = useState(PAIS_DEFAULT);
   const [telefono, setTelefono] = useState("");
   const [direccion, setDireccion] = useState("");
   const [mensaje, setMensaje] = useState("");
@@ -62,10 +65,12 @@ export function Landing() {
     setEstado("sending");
     setError(null);
     try {
+      // El número se manda con el prefijo del país elegido.
+      const telefonoCompleto = telefono.trim() ? `${dialDe(pais)} ${telefono.trim()}` : "";
       const res = await fetch("/api/acceso/solicitar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, email, telefono, direccion, mensaje, empresa }),
+        body: JSON.stringify({ nombre, email, telefono: telefonoCompleto, direccion, mensaje, empresa }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -83,6 +88,7 @@ export function Landing() {
   function reset() {
     setNombre("");
     setEmail("");
+    setPais(PAIS_DEFAULT);
     setTelefono("");
     setDireccion("");
     setMensaje("");
@@ -173,14 +179,30 @@ export function Landing() {
                 </label>
                 <label className="lp-field">
                   <span>{lp.fTelefono}</span>
-                  <input
-                    type="tel"
-                    name="telefono"
-                    autoComplete="tel"
-                    required
-                    value={telefono}
-                    onChange={(e) => setTelefono(e.target.value)}
-                  />
+                  <div className="lp-tel">
+                    <select
+                      className="lp-tel-cod"
+                      name="pais"
+                      aria-label="Código de país"
+                      value={pais}
+                      onChange={(e) => setPais(e.target.value)}
+                    >
+                      {PAISES.map((p) => (
+                        <option key={p.iso} value={p.iso}>
+                          {p.flag} {p.dial} · {p.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="tel"
+                      name="telefono"
+                      inputMode="tel"
+                      autoComplete="tel-national"
+                      required
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value)}
+                    />
+                  </div>
                 </label>
                 <label className="lp-field">
                   <span>{lp.fDireccion}</span>

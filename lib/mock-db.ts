@@ -482,3 +482,19 @@ export function mockDecidirSolicitud(
   s.user_id = crypto.randomUUID();
   return { ok: true, solicitud: s, credenciales: { email: s.email, password } };
 }
+
+// Reenvía el acceso de una solicitud YA aprobada: regenera la contraseña
+// (la anterior no se guarda) y devuelve las credenciales nuevas.
+export function mockReenviarSolicitud(
+  id: string
+):
+  | { ok: true; solicitud: SolicitudAcceso; credenciales: { email: string; password: string } }
+  | { ok: false; status: number; error: string } {
+  const s = db().solicitudes.find((x) => x.id === id);
+  if (!s) return { ok: false, status: 404, error: "Solicitud no encontrada" };
+  if (s.estado !== "aprobada") {
+    return { ok: false, status: 409, error: "Solo se reenvía el acceso de una solicitud aprobada" };
+  }
+  const password = generarPassword();
+  return { ok: true, solicitud: s, credenciales: { email: s.email, password } };
+}
