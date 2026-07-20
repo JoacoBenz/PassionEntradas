@@ -13,7 +13,8 @@ import { getRol } from "@/lib/auth";
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const esPanel = path.startsWith("/admin") || path.startsWith("/moderador");
-  const esTienda = path === "/buscar" || path.startsWith("/entradas");
+  const esTienda =
+    path === "/buscar" || path.startsWith("/entradas") || path.startsWith("/cuenta");
   const esLoginAdmin = path === "/admin/login";
   const esLoginCliente = path === "/ingresar";
   const esLogin = esLoginAdmin || esLoginCliente;
@@ -65,10 +66,10 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getSession();
   const user = session?.user ?? null;
 
-  // Sin sesión en una ruta protegida (que no sea un login) -> al login que toca.
+  // Sin sesión en una ruta protegida (que no sea un login) -> al login único.
   if (!user) {
     if (esTienda) return redirectTo("/ingresar");
-    if (esPanel && !esLoginAdmin) return redirectTo("/admin/login");
+    if (esPanel && !esLoginAdmin) return redirectTo("/ingresar");
     return response;
   }
 
@@ -79,7 +80,7 @@ export async function middleware(request: NextRequest) {
   if (rol == null) {
     if (esLogin) return response; // dejar re-loguear
     await supabase.auth.signOut();
-    return redirectTo(esPanel ? "/admin/login" : "/ingresar");
+    return redirectTo("/ingresar");
   }
 
   // Ya logueado y entrando a CUALQUIER login -> a su lugar.
@@ -114,6 +115,7 @@ export const config = {
     "/admin/:path*",
     "/moderador/:path*",
     "/entradas/:path*",
+    "/cuenta/:path*",
     "/buscar",
     "/ingresar",
   ],

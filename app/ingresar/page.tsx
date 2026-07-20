@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { getRol } from "@/lib/auth";
 
-// Login del CLIENTE (visitante aprobado desde la landing). Mismo Supabase Auth
-// que el staff; el middleware lo manda a /entradas según su rol. Quien todavía
-// no tiene acceso, lo pide desde la landing. También ofrece el reset de
-// contraseña self-service (envía un link al email vía Supabase Auth).
+// Login ÚNICO y público: entran tanto el staff como los clientes. Según el rol,
+// se redirige a su lugar (admin -> /admin, moderador -> /moderador, cliente ->
+// /entradas). Quien todavía no tiene acceso, lo pide desde la landing. También
+// ofrece el reset de contraseña self-service (link al email vía Supabase Auth).
 export default function IngresarPage() {
   const router = useRouter();
   const [modo, setModo] = useState<"login" | "reset">("login");
@@ -24,7 +25,7 @@ export default function IngresarPage() {
     setError(null);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setError("Email o contraseña incorrectos.");
@@ -32,8 +33,11 @@ export default function IngresarPage() {
       return;
     }
 
-    // El middleware ajusta el destino según el rol (staff -> su panel).
-    router.replace("/entradas");
+    // Redirige según el rol: staff a su panel, cliente a la tienda.
+    const rol = data.user ? getRol(data.user) : null;
+    const destino =
+      rol === "administrador" ? "/admin" : rol === "moderador" ? "/moderador" : "/entradas";
+    router.replace(destino);
     router.refresh();
   }
 
@@ -70,11 +74,11 @@ export default function IngresarPage() {
             TicketMirror
           </div>
           <h1 className="mt-2 font-display text-2xl font-bold tracking-tight">
-            {modo === "login" ? "Ingresá a la tienda" : "Recuperar contraseña"}
+            {modo === "login" ? "Iniciar sesión" : "Recuperar contraseña"}
           </h1>
           <p className="mt-1 text-sm text-white/60">
             {modo === "login"
-              ? "Con el usuario y la contraseña que te enviamos."
+              ? "Ingresá con tu email y contraseña."
               : "Te mandamos un link para crear una nueva."}
           </p>
         </div>

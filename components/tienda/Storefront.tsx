@@ -179,7 +179,7 @@ function Foot({ lang }: { lang: Lang }) {
     <footer className="foot">
       <span>TicketMirror</span>
       <span>
-        {t.footSync} · <Link href="/admin/login">{t.footTeam}</Link>
+        {t.footSync} · <Link href="/ingresar">{t.footTeam}</Link>
       </span>
     </footer>
   );
@@ -389,7 +389,12 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
       <header className="masthead masthead--home">
         <div className="toprow">
           <Wordmark />
-          <LangToggle lang={lang} onChange={setLang} />
+          <div className="mast-right">
+            <LangToggle lang={lang} onChange={setLang} />
+            <Link className="lp-nav-login" href="/cuenta">
+              {t.lp.navCuenta}
+            </Link>
+          </div>
         </div>
         <div className="hero hero--home">
           <h1>
@@ -725,6 +730,9 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
           <Wordmark />
           <div className="mast-right">
             <LangToggle lang={lang} onChange={setLang} />
+            <Link className="lp-nav-login" href="/cuenta">
+              {t.lp.navCuenta}
+            </Link>
             <button className="back" onClick={() => router.push("/entradas")}>
               {t.backHome}
             </button>

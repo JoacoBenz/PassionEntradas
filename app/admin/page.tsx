@@ -38,7 +38,7 @@ export default async function AdminPage() {
 
     // Refuerzo por si el middleware no corrió (defensa en profundidad).
     if (!user) {
-      redirect("/admin/login");
+      redirect("/ingresar");
     }
     if (getRol(user) !== "administrador") {
       redirect("/moderador");

@@ -22,7 +22,7 @@ export default async function CuentaPage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) redirect("/admin/login");
+    if (!user) redirect("/ingresar");
     email = user.email;
     const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
     datos = {
