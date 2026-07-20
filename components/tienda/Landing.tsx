@@ -105,63 +105,132 @@ export function Landing() {
           </div>
         </div>
 
-        <div className="hero hero--home">
-          <span className="lp-eyebrow">{lp.heroEyebrow}</span>
-          <h1>
-            {lp.heroTitle1}
-            <br />
-            <span>{lp.heroTitle2}</span>.
-          </h1>
-          <p>{lp.heroP}</p>
-          <div className="cta-row">
-            <a className="btn-primary" href="#solicitar">
-              {lp.ctaSolicitar}
-            </a>
-            <Link className="btn-ghost" href="/ingresar">
-              {lp.ctaIngresar}
-            </Link>
-            {lp.stats.map(([n, l]) => (
-              <span className="stat" key={l}>
-                <b>{n}</b> {l}
-              </span>
-            ))}
+        <div className="lp-hero">
+          {/* Columna de venta: corta y al grano. */}
+          <div className="hero hero--home lp-hero-copy">
+            <span className="lp-eyebrow">{lp.heroEyebrow}</span>
+            <h1>
+              {lp.heroTitle1}
+              <br />
+              <span>{lp.heroTitle2}</span>
+            </h1>
+            <p>{lp.heroP}</p>
+            <ul className="lp-bullets">
+              {lp.bullets.map((b) => (
+                <li key={b}>{b}</li>
+              ))}
+            </ul>
+            <div className="cta-row">
+              <a className="btn-primary lp-hero-cta" href="#solicitar">
+                {lp.ctaSolicitar}
+              </a>
+              <Link className="btn-ghost" href="/ingresar">
+                {lp.ctaIngresar}
+              </Link>
+            </div>
+          </div>
+
+          {/* El formulario es el protagonista. */}
+          <div className="lp-hero-form" id="solicitar">
+            {estado === "ok" ? (
+              <div className="lp-ok" role="status">
+                <span className="lp-ok-ic" aria-hidden>
+                  ✓
+                </span>
+                <h3>{lp.okTitle}</h3>
+                <p>{lp.okP}</p>
+                <button className="btn-ghost" onClick={reset}>
+                  {lp.okOtra}
+                </button>
+              </div>
+            ) : (
+              <form className="lp-form" onSubmit={onSubmit} noValidate>
+                <div className="lp-form-head">
+                  <span className="sh-eyebrow">{lp.formEyebrow}</span>
+                  <h2>{lp.formTitle}</h2>
+                </div>
+                <label className="lp-field">
+                  <span>{lp.fNombre}</span>
+                  <input
+                    type="text"
+                    name="nombre"
+                    autoComplete="name"
+                    required
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                  />
+                </label>
+                <label className="lp-field">
+                  <span>{lp.fEmail}</span>
+                  <input
+                    type="email"
+                    name="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </label>
+                <label className="lp-field">
+                  <span>{lp.fTelefono}</span>
+                  <input
+                    type="tel"
+                    name="telefono"
+                    autoComplete="tel"
+                    required
+                    value={telefono}
+                    onChange={(e) => setTelefono(e.target.value)}
+                  />
+                </label>
+                <label className="lp-field">
+                  <span>{lp.fDireccion}</span>
+                  <input
+                    type="text"
+                    name="direccion"
+                    autoComplete="street-address"
+                    required
+                    value={direccion}
+                    onChange={(e) => setDireccion(e.target.value)}
+                  />
+                </label>
+                <label className="lp-field">
+                  <span>{lp.fMensaje}</span>
+                  <textarea
+                    name="mensaje"
+                    rows={2}
+                    placeholder={lp.fMensajePh}
+                    value={mensaje}
+                    onChange={(e) => setMensaje(e.target.value)}
+                  />
+                </label>
+
+                {/* Honeypot anti-spam: oculto para personas, tentador para bots. */}
+                <div className="lp-hp" aria-hidden>
+                  <label>
+                    Empresa
+                    <input
+                      type="text"
+                      name="empresa"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      value={empresa}
+                      onChange={(e) => setEmpresa(e.target.value)}
+                    />
+                  </label>
+                </div>
+
+                {estado === "error" && error && <p className="lp-err">{error}</p>}
+
+                <button className="btn-primary lp-submit" type="submit" disabled={estado === "sending"}>
+                  {estado === "sending" ? lp.enviando : lp.enviar}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Qué ofrecemos */}
-      <section className="block">
-        <div className="section-h">
-          <span className="sh-eyebrow">{lp.serviciosEyebrow}</span>
-          <h2>{lp.serviciosH2}</h2>
-        </div>
-        <div className="lp-services">
-          {lp.servicios.map(([tt, d]) => (
-            <div className="card3" key={tt}>
-              <h3>{tt}</h3>
-              <p>{d}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Lo que conseguimos */}
-      <section className="block">
-        <div className="section-h">
-          <span className="sh-eyebrow">{lp.coberturaEyebrow}</span>
-          <h2>{lp.coberturaH2}</h2>
-          <p>{lp.coberturaP}</p>
-        </div>
-        <div className="catstrip lp-chips">
-          {lp.categorias.map((c) => (
-            <span className="catlink" key={c}>
-              {c}
-            </span>
-          ))}
-        </div>
-      </section>
-
-      {/* Cómo funciona */}
+      {/* Cómo funciona: tres pasos, rápido. */}
       <section className="block">
         <div className="section-h">
           <span className="sh-eyebrow">{lp.comoEyebrow}</span>
@@ -176,118 +245,6 @@ export function Landing() {
             </div>
           ))}
         </div>
-      </section>
-
-      {/* CTA hacia el formulario */}
-      <section className="block">
-        <div className="cta-band">
-          <div>
-            <h2>{lp.ctaBandH2}</h2>
-            <p>{lp.ctaBandP}</p>
-          </div>
-          <a className="btn-primary" href="#solicitar">
-            {lp.ctaBandBtn}
-          </a>
-        </div>
-      </section>
-
-      <section className="block lp-form-block" id="solicitar">
-        <div className="section-h">
-          <span className="sh-eyebrow">{lp.formEyebrow}</span>
-          <h2>{lp.formTitle}</h2>
-          <p>{lp.formP}</p>
-        </div>
-
-        {estado === "ok" ? (
-          <div className="lp-ok" role="status">
-            <span className="lp-ok-ic" aria-hidden>
-              ✓
-            </span>
-            <h3>{lp.okTitle}</h3>
-            <p>{lp.okP}</p>
-            <button className="btn-ghost" onClick={reset}>
-              {lp.okOtra}
-            </button>
-          </div>
-        ) : (
-          <form className="lp-form" onSubmit={onSubmit} noValidate>
-            <label className="lp-field">
-              <span>{lp.fNombre}</span>
-              <input
-                type="text"
-                name="nombre"
-                autoComplete="name"
-                required
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-              />
-            </label>
-            <label className="lp-field">
-              <span>{lp.fEmail}</span>
-              <input
-                type="email"
-                name="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </label>
-            <label className="lp-field">
-              <span>{lp.fTelefono}</span>
-              <input
-                type="tel"
-                name="telefono"
-                autoComplete="tel"
-                required
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-              />
-            </label>
-            <label className="lp-field">
-              <span>{lp.fDireccion}</span>
-              <input
-                type="text"
-                name="direccion"
-                autoComplete="street-address"
-                required
-                value={direccion}
-                onChange={(e) => setDireccion(e.target.value)}
-              />
-            </label>
-            <label className="lp-field">
-              <span>{lp.fMensaje}</span>
-              <textarea
-                name="mensaje"
-                rows={3}
-                placeholder={lp.fMensajePh}
-                value={mensaje}
-                onChange={(e) => setMensaje(e.target.value)}
-              />
-            </label>
-
-            {/* Honeypot anti-spam: oculto para personas, tentador para bots. */}
-            <div className="lp-hp" aria-hidden>
-              <label>
-                Empresa
-                <input
-                  type="text"
-                  name="empresa"
-                  tabIndex={-1}
-                  autoComplete="off"
-                  value={empresa}
-                  onChange={(e) => setEmpresa(e.target.value)}
-                />
-              </label>
-            </div>
-
-            {estado === "error" && error && <p className="lp-err">{error}</p>}
-
-            <button className="btn-primary lp-submit" type="submit" disabled={estado === "sending"}>
-              {estado === "sending" ? lp.enviando : lp.enviar}
-            </button>
-          </form>
-        )}
       </section>
 
       <footer className="foot">

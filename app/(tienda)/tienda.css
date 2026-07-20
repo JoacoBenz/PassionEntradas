@@ -601,13 +601,35 @@
 /* Wordmark no clickeable (la landing no lleva a la tienda logueada). */
 .wm--static { cursor: default; }
 
-/* Grilla de servicios (4 tarjetas) de la landing. */
-.lp-services { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-@media (max-width: 900px) { .lp-services { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px) { .lp-services { grid-template-columns: 1fr; } }
+/* Hero de la landing: pitch corto a la izquierda, formulario protagonista a
+   la derecha. En móvil se apila (pitch arriba, formulario abajo). */
+.lp-hero {
+  display: grid; grid-template-columns: 1.02fr 0.98fr; gap: 40px;
+  align-items: center; padding: 20px 0 36px;
+}
+.lp-hero-copy { border-bottom: none; padding: 0; }
+.lp-hero-copy h1 { font-size: clamp(30px, 4.2vw, 52px); line-height: .98; }
+.lp-hero-copy > p { max-width: 44ch; }
+.lp-bullets { list-style: none; margin: 6px 0 22px; padding: 0; display: grid; gap: 10px; }
+.lp-bullets li {
+  position: relative; padding-left: 26px; font-size: 15px; color: var(--ink); line-height: 1.4;
+}
+.lp-bullets li::before {
+  content: "✓"; position: absolute; left: 0; top: -1px; color: var(--cobalt); font-weight: 900;
+}
+.lp-hero-form { min-width: 0; }
 
-/* Chips de cobertura: reusan .catlink pero son informativos (no clickeables). */
-.lp-chips .catlink { cursor: default; }
+/* Título compacto dentro de la tarjeta del formulario. */
+.lp-form-head { margin-bottom: 2px; }
+.lp-form-head h2 {
+  font-family: var(--font-body), sans-serif; font-weight: 900; text-transform: uppercase;
+  letter-spacing: -.01em; font-size: 20px; margin: 4px 0 0;
+}
+
+@media (max-width: 860px) {
+  .lp-hero { grid-template-columns: 1fr; gap: 24px; padding: 10px 0 28px; }
+  .lp-hero-form { max-width: 560px; }
+}
 
 /* Link "Ingresar" del header. */
 .lp-nav-login {
