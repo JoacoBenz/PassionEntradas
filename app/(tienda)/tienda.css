@@ -694,6 +694,14 @@
   border-left: 3px solid var(--flare); padding-left: 12px;
 }
 
+/* Mi cuenta del cliente: form acotado + mensaje de éxito + logout. */
+.lp-cuenta-form { max-width: 460px; }
+.lp-ok-msg {
+  margin: 0; font-size: 14px; font-weight: 600; color: var(--ok);
+  border-left: 3px solid var(--ok); padding-left: 12px;
+}
+.lp-cuenta-logout { margin-top: 20px; }
+
 /* Estado de éxito tras enviar. */
 .lp-ok {
   max-width: 560px; background: var(--field); border: 1.5px solid var(--ink);

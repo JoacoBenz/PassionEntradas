@@ -272,7 +272,7 @@ export function Landing() {
       <footer className="foot">
         <span>TicketMirror</span>
         <span>
-          {lp.footTagline} · <Link href="/admin/login">{t.footTeam}</Link>
+          {lp.footTagline} · <Link href="/ingresar">{t.footTeam}</Link>
         </span>
       </footer>
     </>

@@ -45,12 +45,12 @@ export default async function ModeradorPage({
     } = await supabase.auth.getUser();
 
     if (!user) {
-      redirect("/admin/login");
+      redirect("/ingresar");
     }
     const rol = getRol(user);
     // Refuerzo del middleware: sin rol del panel no hay módulo de carga.
     if (!esStaff(rol)) {
-      redirect("/admin/login");
+      redirect("/ingresar");
     }
     email = user.email;
     esAdmin = rol === "administrador";

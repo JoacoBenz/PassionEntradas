@@ -23,7 +23,7 @@ export default async function SolicitudesPage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) redirect("/admin/login");
+    if (!user) redirect("/ingresar");
     if (getRol(user) !== "administrador") redirect("/moderador");
     email = user.email;
 
