@@ -694,6 +694,35 @@
   border-left: 3px solid var(--flare); padding-left: 12px;
 }
 
+/* Login / recuperar contraseña, con la estética de la tienda. */
+.lp-auth { min-height: 100dvh; display: flex; flex-direction: column; }
+.lp-auth-body {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  min-height: 68vh; padding: 8px 0 48px;
+}
+.lp-auth-card {
+  width: 100%; max-width: 420px; background: var(--field); border: 1.5px solid var(--ink);
+  box-shadow: 6px 6px 0 var(--ink); padding: 26px 24px;
+}
+.lp-auth-card h1 {
+  font-family: var(--font-body), sans-serif; font-weight: 900; text-transform: uppercase;
+  letter-spacing: -.01em; font-size: 26px; line-height: 1.02; margin: 8px 0 6px;
+}
+.lp-auth-sub { margin: 0 0 18px; color: var(--mute); font-size: 14px; line-height: 1.5; }
+.lp-auth-form { display: grid; gap: 14px; }
+.lp-auth-links {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 2px;
+}
+.lp-auth-link {
+  background: none; border: none; padding: 0; cursor: pointer; font: inherit;
+  font-size: 13px; font-weight: 600; color: var(--cobalt);
+}
+.lp-auth-link:hover { text-decoration: underline; }
+.lp-auth-link--muted { color: var(--mute); font-weight: 500; text-decoration: none; }
+@media (max-width: 640px) {
+  .lp-auth-card { box-shadow: 4px 4px 0 var(--ink); padding: 22px 18px; }
+}
+
 /* Mi cuenta del cliente: form acotado + mensaje de éxito + logout. */
 .lp-cuenta-form { max-width: 460px; }
 .lp-ok-msg {
