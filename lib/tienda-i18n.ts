@@ -9,7 +9,6 @@ const en = {
   // header / footer
   backHome: "← Home",
   footSync: "Stock and prices synced from the source",
-  footTeam: "Team access",
   waFloatMsg: "Hi! I'd like to ask about tickets.",
 
   // hero
@@ -153,8 +152,6 @@ const en = {
     ] as [string, string][],
     formEyebrow: "Request access",
     formTitle: "Create your access request",
-    formP:
-      "Leave your details and our team will review it. Once approved, we'll send you a username and password to browse every available ticket.",
     fNombre: "Full name",
     fEmail: "Email",
     fTelefono: "Phone",
@@ -219,7 +216,6 @@ const en = {
 const es: typeof en = {
   backHome: "← Inicio",
   footSync: "Stock y precios sincronizados desde la fuente",
-  footTeam: "Acceso equipo",
   waFloatMsg: "Hola! Quiero consultar por entradas.",
 
   heroTitle1: "Entradas para los",
@@ -355,8 +351,6 @@ const es: typeof en = {
     ],
     formEyebrow: "Solicitar acceso",
     formTitle: "Creá tu solicitud de acceso",
-    formP:
-      "Dejanos tus datos y nuestro equipo la revisa. Una vez aprobada, te enviamos un usuario y contraseña para ver todas las entradas disponibles.",
     fNombre: "Nombre y apellido",
     fEmail: "Email",
     fTelefono: "Teléfono",
