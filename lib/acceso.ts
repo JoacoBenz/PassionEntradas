@@ -15,6 +15,10 @@ export type SolicitudAcceso = {
   user_id: string | null;
   decidida_por: string | null;
   decidida_at: string | null;
+  // Revocación (sub-estado de 'aprobada'): si revocada_at está seteado, el
+  // cliente perdió el acceso hasta que se reactive.
+  revocada_at: string | null;
+  revocada_por: string | null;
   created_at: string;
   updated_at: string;
 };

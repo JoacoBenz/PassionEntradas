@@ -138,6 +138,46 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
     }
   }
 
+  // Revoca / reactiva el acceso de un cliente aprobado.
+  async function revocar(id: string, accion: "revocar" | "reactivar") {
+    if (busy[id]) return;
+    const msg =
+      accion === "revocar"
+        ? "Revocar el acceso: el cliente deja de poder entrar hasta que lo reactives. ¿Continuar?"
+        : "Reactivar el acceso de este cliente?";
+    if (!confirm(msg)) return;
+    setBusy((b) => ({ ...b, [id]: true }));
+    try {
+      const res = await fetch(`/api/acceso/${id}/revocar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        avisar("error", typeof data?.error === "string" ? data.error : "No se pudo cambiar el acceso");
+        return;
+      }
+      const ahora = new Date().toISOString();
+      setItems((prev) =>
+        prev.map((s) =>
+          s.id === id
+            ? {
+                ...s,
+                revocada_at: accion === "revocar" ? ahora : null,
+                revocada_por: accion === "revocar" ? "vos" : null,
+              }
+            : s
+        )
+      );
+      avisar("ok", accion === "revocar" ? "Acceso revocado." : "Acceso reactivado.");
+    } catch {
+      avisar("error", "Error de red");
+    } finally {
+      setBusy((b) => ({ ...b, [id]: false }));
+    }
+  }
+
   async function enviarEmail(id: string, password: string) {
     setEmailEstado((e) => ({ ...e, [id]: { estado: "sending" } }));
     try {
@@ -166,6 +206,8 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
     "rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-[#4A4E5E] transition-colors hover:bg-canvas disabled:opacity-50";
   const btnDanger =
     "rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50";
+  const btnWarn =
+    "rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50";
 
   return (
     <section className="card-shadow overflow-hidden rounded-2xl">
@@ -330,43 +372,73 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
                 Historial
               </h3>
-              {resueltas.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-canvas px-3 py-2.5"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{s.nombre}</p>
-                    <p className="break-all text-xs text-muted">{s.email}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {s.decidida_at && (
-                      <span className="font-mono text-[11px] text-muted">
-                        {fmtFecha(s.decidida_at)}
-                      </span>
-                    )}
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                        s.estado === "aprobada"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {s.estado === "aprobada" ? "Aprobada" : "Rechazada"}
-                    </span>
-                    {s.estado === "aprobada" && (
-                      <button
-                        onClick={() => reenviar(s.id)}
-                        disabled={busy[s.id]}
-                        className={btnGhost}
-                        title="Genera una contraseña nueva y muestra las credenciales para reenviarlas"
+              {resueltas.map((s) => {
+                const revocada = s.estado === "aprobada" && !!s.revocada_at;
+                return (
+                  <div
+                    key={s.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-canvas px-3 py-2.5"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{s.nombre}</p>
+                      <p className="break-all text-xs text-muted">{s.email}</p>
+                      {/* Auditoría: quién decidió/revocó y cuándo. */}
+                      <p className="text-[11px] text-muted">
+                        {s.estado === "aprobada" ? "Aprobada" : "Rechazada"}
+                        {s.decidida_por ? ` por ${s.decidida_por}` : ""}
+                        {s.decidida_at ? ` · ${fmtFecha(s.decidida_at)}` : ""}
+                        {revocada
+                          ? ` — revocada${s.revocada_por ? ` por ${s.revocada_por}` : ""}${
+                              s.revocada_at ? ` · ${fmtFecha(s.revocada_at)}` : ""
+                            }`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                          revocada
+                            ? "bg-amber-100 text-amber-800"
+                            : s.estado === "aprobada"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-red-100 text-red-700"
+                        }`}
                       >
-                        {busy[s.id] ? "…" : "Reenviar acceso"}
-                      </button>
-                    )}
+                        {revocada ? "Revocado" : s.estado === "aprobada" ? "Aprobada" : "Rechazada"}
+                      </span>
+                      {s.estado === "aprobada" && !revocada && (
+                        <>
+                          <button
+                            onClick={() => reenviar(s.id)}
+                            disabled={busy[s.id]}
+                            className={btnGhost}
+                            title="Genera una contraseña nueva y muestra las credenciales para reenviarlas"
+                          >
+                            {busy[s.id] ? "…" : "Reenviar acceso"}
+                          </button>
+                          <button
+                            onClick={() => revocar(s.id, "revocar")}
+                            disabled={busy[s.id]}
+                            className={btnWarn}
+                            title="El cliente deja de poder entrar hasta que lo reactives"
+                          >
+                            Revocar
+                          </button>
+                        </>
+                      )}
+                      {revocada && (
+                        <button
+                          onClick={() => revocar(s.id, "reactivar")}
+                          disabled={busy[s.id]}
+                          className={btnGhost}
+                        >
+                          {busy[s.id] ? "…" : "Reactivar"}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

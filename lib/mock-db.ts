@@ -146,6 +146,8 @@ function seed(): MockDB {
       user_id: null,
       decidida_por: null,
       decidida_at: null,
+      revocada_at: null,
+      revocada_por: null,
       created_at: iso(40),
       updated_at: iso(40),
     },
@@ -160,6 +162,8 @@ function seed(): MockDB {
       user_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       decidida_por: MOCK_USER.email,
       decidida_at: iso(60 * 20),
+      revocada_at: null,
+      revocada_por: null,
       created_at: iso(60 * 22),
       updated_at: iso(60 * 20),
     },
@@ -438,6 +442,8 @@ export function mockCrearSolicitud(input: SolicitudInput): { ok: true } | { ok: 
     user_id: null,
     decidida_por: null,
     decidida_at: null,
+    revocada_at: null,
+    revocada_por: null,
     created_at: now,
     updated_at: now,
   });
@@ -497,4 +503,28 @@ export function mockReenviarSolicitud(
   }
   const password = generarPassword();
   return { ok: true, solicitud: s, credenciales: { email: s.email, password } };
+}
+
+// Revoca/reactiva el acceso de una solicitud aprobada.
+export function mockRevocarSolicitud(
+  id: string,
+  accion: "revocar" | "reactivar",
+  quien: string
+): { ok: true; solicitud: SolicitudAcceso } | { ok: false; status: number; error: string } {
+  const s = db().solicitudes.find((x) => x.id === id);
+  if (!s) return { ok: false, status: 404, error: "Solicitud no encontrada" };
+  if (s.estado !== "aprobada") {
+    return { ok: false, status: 409, error: "Solo se revoca el acceso de una solicitud aprobada" };
+  }
+  if (accion === "revocar") {
+    if (s.revocada_at) return { ok: false, status: 409, error: "El acceso ya está revocado" };
+    s.revocada_at = new Date().toISOString();
+    s.revocada_por = quien;
+  } else {
+    if (!s.revocada_at) return { ok: false, status: 409, error: "El acceso no está revocado" };
+    s.revocada_at = null;
+    s.revocada_por = null;
+  }
+  s.updated_at = new Date().toISOString();
+  return { ok: true, solicitud: s };
 }

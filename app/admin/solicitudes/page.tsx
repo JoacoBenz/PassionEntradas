@@ -31,7 +31,7 @@ export default async function SolicitudesPage() {
     const { data } = await createAdminSupabase()
       .from("solicitudes_acceso")
       .select(
-        "id, nombre, email, telefono, direccion, mensaje, estado, user_id, decidida_por, decidida_at, created_at, updated_at"
+        "id, nombre, email, telefono, direccion, mensaje, estado, user_id, decidida_por, decidida_at, revocada_at, revocada_por, created_at, updated_at"
       )
       .order("created_at", { ascending: false })
       .limit(500);
