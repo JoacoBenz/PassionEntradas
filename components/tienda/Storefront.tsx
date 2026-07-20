@@ -178,9 +178,7 @@ function Foot({ lang }: { lang: Lang }) {
   return (
     <footer className="foot">
       <span>TicketMirror</span>
-      <span>
-        {t.footSync} · <Link href="/ingresar">{t.footTeam}</Link>
-      </span>
+      <span>{t.footSync}</span>
     </footer>
   );
 }
