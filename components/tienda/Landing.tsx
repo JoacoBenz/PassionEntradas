@@ -120,18 +120,74 @@ export function Landing() {
             <Link className="btn-ghost" href="/ingresar">
               {lp.ctaIngresar}
             </Link>
+            {lp.stats.map(([n, l]) => (
+              <span className="stat" key={l}>
+                <b>{n}</b> {l}
+              </span>
+            ))}
           </div>
         </div>
       </header>
 
+      {/* Qué ofrecemos */}
       <section className="block">
-        <div className="cards3">
-          {lp.beneficios.map(([tt, d]) => (
+        <div className="section-h">
+          <span className="sh-eyebrow">{lp.serviciosEyebrow}</span>
+          <h2>{lp.serviciosH2}</h2>
+        </div>
+        <div className="lp-services">
+          {lp.servicios.map(([tt, d]) => (
             <div className="card3" key={tt}>
               <h3>{tt}</h3>
               <p>{d}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Lo que conseguimos */}
+      <section className="block">
+        <div className="section-h">
+          <span className="sh-eyebrow">{lp.coberturaEyebrow}</span>
+          <h2>{lp.coberturaH2}</h2>
+          <p>{lp.coberturaP}</p>
+        </div>
+        <div className="catstrip lp-chips">
+          {lp.categorias.map((c) => (
+            <span className="catlink" key={c}>
+              {c}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {/* Cómo funciona */}
+      <section className="block">
+        <div className="section-h">
+          <span className="sh-eyebrow">{lp.comoEyebrow}</span>
+          <h2>{lp.comoH2}</h2>
+        </div>
+        <div className="steps">
+          {lp.pasos.map(([tt, d], i) => (
+            <div className="step" key={tt}>
+              <span className="step-n">{i + 1}</span>
+              <h3>{tt}</h3>
+              <p>{d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA hacia el formulario */}
+      <section className="block">
+        <div className="cta-band">
+          <div>
+            <h2>{lp.ctaBandH2}</h2>
+            <p>{lp.ctaBandP}</p>
+          </div>
+          <a className="btn-primary" href="#solicitar">
+            {lp.ctaBandBtn}
+          </a>
         </div>
       </section>
 
