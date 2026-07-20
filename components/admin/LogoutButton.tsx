@@ -1,16 +1,14 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LogoutButton() {
-  const router = useRouter();
-
   async function logout() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.replace("/ingresar");
-    router.refresh();
+    // Navegación dura: el panel (Tailwind) sale al login (CSS de la tienda);
+    // un soft-nav cruzaba stylesheets y renderizaba sin estilos hasta refrescar.
+    window.location.assign("/ingresar");
   }
 
   return (
