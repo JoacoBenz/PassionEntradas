@@ -58,8 +58,8 @@ export const PAISES: Pais[] = [
   { iso: "MA", nombre: "Marruecos", dial: "+212", flag: "🇲🇦" },
 ];
 
-export const PAIS_DEFAULT = "AR";
+export const PAIS_DEFAULT = "US";
 
 export function dialDe(iso: string): string {
-  return PAISES.find((p) => p.iso === iso)?.dial ?? "+54";
+  return PAISES.find((p) => p.iso === iso)?.dial ?? "+1";
 }

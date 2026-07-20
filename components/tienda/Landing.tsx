@@ -189,7 +189,7 @@ export function Landing() {
                     >
                       {PAISES.map((p) => (
                         <option key={p.iso} value={p.iso}>
-                          {p.flag} {p.dial} · {p.nombre}
+                          {p.dial} · {p.nombre}
                         </option>
                       ))}
                     </select>
