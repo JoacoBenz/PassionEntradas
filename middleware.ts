@@ -66,10 +66,12 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getSession();
   const user = session?.user ?? null;
 
-  // Sin sesión en una ruta protegida (que no sea un login) -> al login único.
+  // Sin sesión: la tienda y el panel van al login único. /admin/login es solo
+  // un alias, así que también se resuelve acá (evita depender del redirect de
+  // la página, que al ser estática no emitía Location).
   if (!user) {
     if (esTienda) return redirectTo("/ingresar");
-    if (esPanel && !esLoginAdmin) return redirectTo("/ingresar");
+    if (esPanel) return redirectTo("/ingresar");
     return response;
   }
 
