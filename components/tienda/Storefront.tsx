@@ -65,8 +65,9 @@ function eventoLink(evento: string, comp: string): string {
 }
 
 function Wordmark() {
+  // La marca lleva al home de la tienda (zona logueada), no a la landing.
   return (
-    <Link className="wm" href="/">
+    <Link className="wm" href="/entradas">
       <span className="ticketmark">▚</span> TICKET<em>MIRROR</em>
     </Link>
   );
@@ -724,7 +725,7 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
           <Wordmark />
           <div className="mast-right">
             <LangToggle lang={lang} onChange={setLang} />
-            <button className="back" onClick={() => router.push("/")}>
+            <button className="back" onClick={() => router.push("/entradas")}>
               {t.backHome}
             </button>
           </div>

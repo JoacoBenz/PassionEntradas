@@ -5,6 +5,7 @@
 import { generateCode, type Operacion, type OperacionPublica, type StatusAction } from "@/lib/operaciones";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import type { Factura, FacturaDatos } from "@/lib/factura";
+import { generarPassword, type SolicitudAcceso, type SolicitudInput } from "@/lib/acceso";
 import { MOCK_TICKETS } from "@/lib/mock-tickets";
 
 export type MockFactura = Factura & { operacion_id: string };
@@ -32,6 +33,7 @@ type MockDB = {
   portalActivo: boolean;
   facturas: MockFactura[];
   facturaNumero: number;
+  solicitudes: SolicitudAcceso[];
 };
 
 function iso(minsAgo: number) {
@@ -132,6 +134,35 @@ function seed(): MockDB {
     { id: "m-mundial", source: "portal", competicion: "World Cup 2026 Canada / Mexico / USA", porcentaje: 35 },
   ];
 
+  const solicitudes: SolicitudAcceso[] = [
+    {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      nombre: "Lucía Fernández",
+      email: "lucia.fernandez@example.com",
+      telefono: "+54 9 11 5555 1234",
+      mensaje: "Busco entradas para la final del Mundial 2026.",
+      estado: "pendiente",
+      user_id: null,
+      decidida_por: null,
+      decidida_at: null,
+      created_at: iso(40),
+      updated_at: iso(40),
+    },
+    {
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      nombre: "Diego Sosa",
+      email: "diego.sosa@example.com",
+      telefono: null,
+      mensaje: null,
+      estado: "aprobada",
+      user_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      decidida_por: MOCK_USER.email,
+      decidida_at: iso(60 * 20),
+      created_at: iso(60 * 22),
+      updated_at: iso(60 * 20),
+    },
+  ];
+
   return {
     ops,
     manual,
@@ -141,6 +172,7 @@ function seed(): MockDB {
     portalActivo: true,
     facturas: [],
     facturaNumero: 0,
+    solicitudes,
   };
 }
 
@@ -381,4 +413,69 @@ export function mockGetPortalActivo(): boolean {
 export function mockSetPortalActivo(v: boolean): boolean {
   db().portalActivo = v;
   return v;
+}
+
+// ---- solicitudes de acceso (landing) ------------------------------------------------
+// Crea una solicitud. Una PENDIENTE por email (idempotente: si ya hay una
+// pendiente devuelve ok sin duplicar, igual que el unique index real).
+export function mockCrearSolicitud(input: SolicitudInput): { ok: true } | { ok: false; error: string } {
+  const d = db();
+  const yaPendiente = d.solicitudes.some(
+    (s) => s.estado === "pendiente" && s.email.toLowerCase() === input.email.toLowerCase()
+  );
+  if (yaPendiente) return { ok: true };
+  const now = new Date().toISOString();
+  d.solicitudes.unshift({
+    id: crypto.randomUUID(),
+    nombre: input.nombre,
+    email: input.email,
+    telefono: input.telefono,
+    mensaje: input.mensaje,
+    estado: "pendiente",
+    user_id: null,
+    decidida_por: null,
+    decidida_at: null,
+    created_at: now,
+    updated_at: now,
+  });
+  return { ok: true };
+}
+
+// Lista para el panel: pendientes primero, luego por fecha (más nuevas arriba).
+export function mockListSolicitudes(): SolicitudAcceso[] {
+  return [...db().solicitudes].sort((a, b) => {
+    if (a.estado !== b.estado) {
+      if (a.estado === "pendiente") return -1;
+      if (b.estado === "pendiente") return 1;
+    }
+    return b.created_at.localeCompare(a.created_at);
+  });
+}
+
+// Aprueba/rechaza una solicitud pendiente. Al aprobar "crea" un usuario
+// (user_id ficticio) y devuelve las credenciales para mostrarlas una vez.
+export function mockDecidirSolicitud(
+  id: string,
+  accion: "aprobar" | "rechazar",
+  decididaPor: string
+):
+  | { ok: true; solicitud: SolicitudAcceso; credenciales?: { email: string; password: string } }
+  | { ok: false; status: number; error: string } {
+  const s = db().solicitudes.find((x) => x.id === id);
+  if (!s) return { ok: false, status: 404, error: "Solicitud no encontrada" };
+  if (s.estado !== "pendiente") {
+    return { ok: false, status: 409, error: "La solicitud ya fue resuelta" };
+  }
+  const now = new Date().toISOString();
+  s.decidida_por = decididaPor;
+  s.decidida_at = now;
+  s.updated_at = now;
+  if (accion === "rechazar") {
+    s.estado = "rechazada";
+    return { ok: true, solicitud: s };
+  }
+  const password = generarPassword();
+  s.estado = "aprobada";
+  s.user_id = crypto.randomUUID();
+  return { ok: true, solicitud: s, credenciales: { email: s.email, password } };
 }

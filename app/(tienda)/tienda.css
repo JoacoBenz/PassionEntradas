@@ -592,3 +592,86 @@
 .pager-btn:disabled { opacity: 0.35; cursor: default; }
 .pager-info { font-family: var(--font-mono), monospace; font-size: 12px; color: var(--mute); }
 .result-line .range { color: var(--mute); font-weight: 400; }
+
+/* =====================================================================
+   Landing pública (/) — capta clientes y toma la solicitud de acceso.
+   Reutiliza masthead / hero / cards3 / section-h de la tienda.
+   ===================================================================== */
+
+/* Wordmark no clickeable (la landing no lleva a la tienda logueada). */
+.wm--static { cursor: default; }
+
+/* Link "Ingresar" del header. */
+.lp-nav-login {
+  font-family: var(--font-mono), monospace; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .1em; color: var(--ink);
+  text-decoration: none; border-bottom: 2px solid var(--cobalt); padding-bottom: 2px;
+  transition: .12s;
+}
+.lp-nav-login:hover { color: var(--cobalt); }
+
+/* Eyebrow del hero (mismo lenguaje que .kicker). */
+.lp-eyebrow {
+  display: inline-block; font-family: var(--font-mono), monospace; font-size: 11px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--cobalt);
+  border: 1px solid var(--cobalt); padding: 5px 10px; margin-bottom: 20px;
+}
+
+/* Bloque del formulario. */
+.lp-form-block { padding-bottom: 8px; }
+
+.lp-form {
+  display: grid; gap: 16px; max-width: 560px;
+  background: var(--field); border: 1.5px solid var(--ink);
+  box-shadow: 6px 6px 0 var(--ink); padding: 24px;
+}
+
+.lp-field { display: grid; gap: 6px; }
+.lp-field > span {
+  font-family: var(--font-mono), monospace; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .1em; color: var(--mute);
+}
+.lp-field input,
+.lp-field textarea {
+  font-family: var(--font-spline), system-ui, sans-serif; font-size: 15px; color: var(--ink);
+  background: #fff; border: 1.5px solid var(--ink); padding: 11px 12px; width: 100%;
+  transition: .12s; resize: vertical;
+}
+.lp-field input:focus,
+.lp-field textarea:focus {
+  outline: none; border-color: var(--cobalt); box-shadow: 0 0 0 3px #1f33e022;
+}
+
+.lp-submit { margin-top: 4px; width: 100%; }
+.lp-submit:disabled { opacity: .6; cursor: default; transform: none; box-shadow: 4px 4px 0 var(--ink); }
+
+.lp-err {
+  margin: 0; font-size: 13.5px; color: var(--flare); font-weight: 600;
+  border-left: 3px solid var(--flare); padding-left: 12px;
+}
+
+/* Estado de éxito tras enviar. */
+.lp-ok {
+  max-width: 560px; background: var(--field); border: 1.5px solid var(--ink);
+  box-shadow: 6px 6px 0 var(--ink); padding: 28px 24px; text-align: center;
+}
+.lp-ok-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 46px; height: 46px; border-radius: 50%; background: var(--ok); color: #fff;
+  font-size: 24px; font-weight: 900; margin-bottom: 14px;
+}
+.lp-ok h3 {
+  font-family: var(--font-body), sans-serif; font-weight: 900; text-transform: uppercase;
+  font-size: 22px; margin: 0 0 8px;
+}
+.lp-ok p { margin: 0 auto 18px; color: var(--mute); font-size: 14.5px; max-width: 420px; line-height: 1.55; }
+
+/* Honeypot: fuera de la vista para personas, presente en el DOM para bots. */
+.lp-hp {
+  position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .lp-form, .lp-ok { box-shadow: 4px 4px 0 var(--ink); padding: 20px 16px; }
+  .lp-nav-login { font-size: 11px; }
+}

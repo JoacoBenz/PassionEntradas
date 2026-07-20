@@ -37,6 +37,16 @@ export const NAV_ITEMS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: "/admin/solicitudes",
+    label: "Accesos",
+    icon: (
+      <svg className={ICON_CLS} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
+        <path d="m3.5 6.5 8.5 6 8.5-6" />
+      </svg>
+    ),
+  },
 ];
 
 // La ruta más específica gana: /admin/entradas no debe activar también /admin.

@@ -1,21 +1,33 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { esStaff, getRol } from "@/lib/auth";
+import { getRol } from "@/lib/auth";
 
-// Refresca la sesión de Supabase Auth y protege los módulos:
-// - /admin: solo rol administrador (los moderadores van a /moderador),
-//   salvo /admin/cuenta (cambio de contraseña propio): todo el staff.
-// - /moderador: cualquier usuario del staff (rol asignado).
-// - Sesión SIN rol asignado: no es del equipo, no entra a ningún módulo.
-// La página pública /op/[id] queda fuera del matcher (acceso anónimo).
+// Refresca la sesión de Supabase Auth y RUTEA los módulos:
+// - /admin: solo administrador (los moderadores van a /moderador), salvo
+//   /admin/cuenta (cambio de contraseña propio): todo el staff.
+// - /moderador: cualquier usuario del staff.
+// - /entradas y /buscar (la tienda): staff o CLIENTE aprobado. Anónimo -> al
+//   login de cliente (/ingresar). La tienda dejó de ser pública.
+// - Sesión SIN rol: no es de nadie, se corta y afuera.
+// La landing (/), /op/[id] y la factura pública quedan fuera del matcher.
 export async function middleware(request: NextRequest) {
-  // Modo demo sin Supabase: todo el mundo es admin, el login se saltea.
+  const path = request.nextUrl.pathname;
+  const esPanel = path.startsWith("/admin") || path.startsWith("/moderador");
+  const esTienda = path === "/buscar" || path.startsWith("/entradas");
+  const esLoginAdmin = path === "/admin/login";
+  const esLoginCliente = path === "/ingresar";
+  const esLogin = esLoginAdmin || esLoginCliente;
+
+  function redirectTo(pathname: string) {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname;
+    return NextResponse.redirect(url);
+  }
+
+  // Modo demo sin Supabase: todo abierto; los logins mandan a su módulo.
   if (process.env.MOCK_DATA === "1") {
-    if (request.nextUrl.pathname === "/admin/login") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/admin";
-      return NextResponse.redirect(url);
-    }
+    if (esLoginAdmin) return redirectTo("/admin");
+    if (esLoginCliente) return redirectTo("/entradas");
     return NextResponse.next();
   }
 
@@ -44,58 +56,65 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // getSession lee la sesión de la COOKIE (sin viaje a Supabase Auth) y solo
-  // refresca contra el server cuando el token venció. Antes se usaba
-  // getUser(), que valida contra Auth en CADA navegación del panel:
-  // ~100-300ms de latencia fija por click, duplicada porque cada página
-  // vuelve a validar. Acá el middleware solo RUTEA; la autorización real la
-  // hace cada página y cada API con getUser() + rol (defensa en profundidad
-  // ya existente), así que una cookie adulterada rebota igual en la página.
+  // getSession lee de la cookie (sin viaje a Auth salvo refresh). El
+  // middleware solo RUTEA; la autorización real la reafirma cada página/API
+  // con getUser()+rol (defensa en profundidad), así que una cookie adulterada
+  // rebota igual más adentro.
   const {
     data: { session },
   } = await supabase.auth.getSession();
   const user = session?.user ?? null;
 
-  const path = request.nextUrl.pathname;
-  const isLogin = path === "/admin/login";
-  const needsAuth = path.startsWith("/admin") || path.startsWith("/moderador");
-
-  function redirectTo(pathname: string) {
-    const url = request.nextUrl.clone();
-    url.pathname = pathname;
-    return NextResponse.redirect(url);
+  // Sin sesión en una ruta protegida (que no sea un login) -> al login que toca.
+  if (!user) {
+    if (esTienda) return redirectTo("/ingresar");
+    if (esPanel && !esLoginAdmin) return redirectTo("/admin/login");
+    return response;
   }
 
-  // Sin sesión en una ruta protegida (que no sea el login) -> al login.
-  if (!user && needsAuth && !isLogin) {
-    return redirectTo("/admin/login");
+  const rol = getRol(user);
+
+  // Sesión sin rol (cuenta creada por fuera): se corta y afuera. Se cierra la
+  // sesión para que el login no la recicle en loop.
+  if (rol == null) {
+    if (esLogin) return response; // dejar re-loguear
+    await supabase.auth.signOut();
+    return redirectTo(esPanel ? "/admin/login" : "/ingresar");
   }
 
-  if (user) {
-    const rol = getRol(user);
-
-    // Sesión sin rol del panel (cuenta creada por fuera): afuera. Se corta
-    // la sesión para que el login no la recicle en loop.
-    if (!esStaff(rol) && !isLogin) {
-      await supabase.auth.signOut();
-      return redirectTo("/admin/login");
-    }
-
-    // Ya logueado y entrando al login -> a su módulo.
-    if (isLogin && esStaff(rol)) {
-      return redirectTo(rol === "moderador" ? "/moderador" : "/admin");
-    }
-
-    // Moderador en el panel de administración -> a su módulo, con una
-    // excepción: /admin/cuenta (cambiar su propia contraseña) es para todos.
-    if (rol === "moderador" && path.startsWith("/admin") && path !== "/admin/cuenta") {
-      return redirectTo("/moderador");
-    }
+  // Ya logueado y entrando a CUALQUIER login -> a su lugar.
+  if (esLogin) {
+    return redirectTo(
+      rol === "administrador"
+        ? "/admin"
+        : rol === "moderador"
+          ? "/moderador"
+          : "/entradas"
+    );
   }
 
+  // Cliente: solo la tienda. El panel lo manda a las entradas.
+  if (rol === "cliente") {
+    if (esPanel) return redirectTo("/entradas");
+    return response;
+  }
+
+  // Moderador en el panel de administración -> a su módulo, con la excepción
+  // de /admin/cuenta (cambiar su propia contraseña).
+  if (rol === "moderador" && path.startsWith("/admin") && path !== "/admin/cuenta") {
+    return redirectTo("/moderador");
+  }
+
+  // Staff en la tienda: permitido (además de su panel).
   return response;
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/moderador/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/moderador/:path*",
+    "/entradas/:path*",
+    "/buscar",
+    "/ingresar",
+  ],
 };

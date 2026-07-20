@@ -128,6 +128,39 @@ const en = {
   siguiente: "Next →",
   pagina: (a: number, b: number) => `Page ${a} of ${b}`,
   mesTBC: "TBC",
+
+  // landing pública (/): capta clientes y toma la solicitud de acceso.
+  lp: {
+    navIngresar: "Log in",
+    heroEyebrow: "Access by request",
+    heroTitle1: "The events everyone wants,",
+    heroTitle2: "in one place",
+    heroP:
+      "World Cup 2026, Euro 2028, Formula 1 and the most wanted matches — with real availability and clear pricing. Request access and browse the full catalogue.",
+    ctaSolicitar: "Request access",
+    ctaIngresar: "I already have access",
+    beneficios: [
+      ["Real availability", "Stock and prices synced from the source, updated every few minutes."],
+      ["Clear pricing", "Every ticket in US dollars (USD). No surprises at checkout."],
+      ["Direct support", "A real person on WhatsApp helps you book — never a bot."],
+    ] as [string, string][],
+    formEyebrow: "Request access",
+    formTitle: "Create your access request",
+    formP:
+      "Leave your details and our team will review it. Once approved, we'll send you a username and password to browse every available ticket.",
+    fNombre: "Full name",
+    fEmail: "Email",
+    fTelefono: "Phone / WhatsApp (optional)",
+    fMensaje: "Anything you're looking for? (optional)",
+    fMensajePh: "e.g. World Cup final, F1 Monza, a specific match…",
+    enviar: "Send request",
+    enviando: "Sending…",
+    okTitle: "Request received!",
+    okP: "Our team will review it shortly and get back to you with your access. Keep an eye on your email and WhatsApp.",
+    okOtra: "Send another request",
+    errGeneric: "We couldn't send your request. Please try again.",
+    footTagline: "Tickets for the events that matter.",
+  },
 };
 
 const es: typeof en = {
@@ -245,6 +278,38 @@ const es: typeof en = {
   siguiente: "Siguientes →",
   pagina: (a, b) => `Página ${a} de ${b}`,
   mesTBC: "A confirmar",
+
+  lp: {
+    navIngresar: "Ingresar",
+    heroEyebrow: "Acceso por solicitud",
+    heroTitle1: "Los eventos que todos quieren,",
+    heroTitle2: "en un solo lugar",
+    heroP:
+      "Mundial 2026, Euro 2028, Fórmula 1 y los partidos más buscados — con disponibilidad real y precio claro. Pedí acceso y mirá todo el catálogo.",
+    ctaSolicitar: "Solicitar acceso",
+    ctaIngresar: "Ya tengo acceso",
+    beneficios: [
+      ["Disponibilidad real", "Stock y precios sincronizados desde la fuente, actualizados cada pocos minutos."],
+      ["Precio claro", "Cada entrada en dólares (USD). Sin sorpresas al momento de cerrar."],
+      ["Atención directa", "Una persona real te ayuda por WhatsApp a reservar, nunca un bot."],
+    ],
+    formEyebrow: "Solicitar acceso",
+    formTitle: "Creá tu solicitud de acceso",
+    formP:
+      "Dejanos tus datos y nuestro equipo la revisa. Una vez aprobada, te enviamos un usuario y contraseña para ver todas las entradas disponibles.",
+    fNombre: "Nombre y apellido",
+    fEmail: "Email",
+    fTelefono: "Teléfono / WhatsApp (opcional)",
+    fMensaje: "¿Buscás algo en particular? (opcional)",
+    fMensajePh: "ej: final del Mundial, F1 Monza, un partido puntual…",
+    enviar: "Enviar solicitud",
+    enviando: "Enviando…",
+    okTitle: "¡Solicitud recibida!",
+    okP: "Nuestro equipo la revisa a la brevedad y te contacta con tu acceso. Estate atento a tu email y WhatsApp.",
+    okOtra: "Enviar otra solicitud",
+    errGeneric: "No pudimos enviar tu solicitud. Probá de nuevo.",
+    footTagline: "Entradas para los eventos que importan.",
+  },
 };
 
 export const TX: Record<Lang, typeof en> = { en, es };
