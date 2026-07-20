@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LANGS, TX, type Lang } from "@/lib/tienda-i18n";
-import { PAISES, PAIS_DEFAULT, dialDe } from "@/lib/paises";
+import { PAISES, PAIS_DEFAULT, dialDe, nombrePais } from "@/lib/paises";
 
 function useLang() {
   const [lang, setLang] = useState<Lang>("en");
@@ -189,7 +189,7 @@ export function Landing() {
                     >
                       {PAISES.map((p) => (
                         <option key={p.iso} value={p.iso}>
-                          {p.dial} · {p.nombre}
+                          {p.dial} · {nombrePais(p, lang)}
                         </option>
                       ))}
                     </select>
