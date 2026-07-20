@@ -729,6 +729,7 @@
   margin: 0; font-size: 14px; font-weight: 600; color: var(--ok);
   border-left: 3px solid var(--ok); padding-left: 12px;
 }
+.lp-cuenta-wa { margin-top: 14px; max-width: 460px; }
 .lp-cuenta-logout { margin-top: 20px; }
 
 /* Estado de éxito tras enviar. */
