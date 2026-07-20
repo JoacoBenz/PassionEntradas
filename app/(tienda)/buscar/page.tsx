@@ -2,12 +2,15 @@ import { Suspense } from "react";
 import { fetchConfigTienda, fetchTickets } from "@/lib/supabase/public";
 import { normalizarPreciosUsd } from "@/lib/tickets";
 import { StorefrontCatalog } from "@/components/tienda/Storefront";
+import { requireAccesoTienda } from "@/lib/tienda-guard";
 
-// Igual que la home: revalidatePath cubre los cambios del panel al instante;
-// esto es solo la red de seguridad de fondo.
-export const revalidate = 600;
+// Catálogo de la tienda: zona logueada. Igual que /entradas, el acceso se
+// reafirma en el servidor (staff o cliente aprobado), así que es dinámica.
+export const dynamic = "force-dynamic";
 
 export default async function BuscarPage() {
+  await requireAccesoTienda();
+
   let rows: Awaited<ReturnType<typeof fetchTickets>> = [];
   let cfg = { eurUsd: 1.08, portalActivo: true };
   try {
