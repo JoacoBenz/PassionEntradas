@@ -6,14 +6,12 @@ import type { Lang } from "@/lib/tienda-i18n";
 // El nombre viene en inglés y español (sigue el idioma de la tienda).
 export type Pais = { iso: string; dial: string; en: string; es: string };
 
-// Estados Unidos primero (default). Cubre Latinoamérica, Norteamérica, Europa
-// y los mercados más habituales; ampliable a gusto.
+// Argentina primero (default). Cubre Latinoamérica, Norteamérica, Europa y los
+// mercados más habituales; ampliable a gusto.
 export const PAISES: Pais[] = [
-  { iso: "US", dial: "+1", en: "United States", es: "Estados Unidos" },
   { iso: "AR", dial: "+54", en: "Argentina", es: "Argentina" },
   { iso: "BO", dial: "+591", en: "Bolivia", es: "Bolivia" },
   { iso: "BR", dial: "+55", en: "Brazil", es: "Brasil" },
-  { iso: "CA", dial: "+1", en: "Canada", es: "Canadá" },
   { iso: "CL", dial: "+56", en: "Chile", es: "Chile" },
   { iso: "CO", dial: "+57", en: "Colombia", es: "Colombia" },
   { iso: "CR", dial: "+506", en: "Costa Rica", es: "Costa Rica" },
@@ -30,6 +28,8 @@ export const PAISES: Pais[] = [
   { iso: "DO", dial: "+1", en: "Dominican Republic", es: "República Dominicana" },
   { iso: "UY", dial: "+598", en: "Uruguay", es: "Uruguay" },
   { iso: "VE", dial: "+58", en: "Venezuela", es: "Venezuela" },
+  { iso: "US", dial: "+1", en: "United States", es: "Estados Unidos" },
+  { iso: "CA", dial: "+1", en: "Canada", es: "Canadá" },
   { iso: "ES", dial: "+34", en: "Spain", es: "España" },
   { iso: "PT", dial: "+351", en: "Portugal", es: "Portugal" },
   { iso: "FR", dial: "+33", en: "France", es: "Francia" },
@@ -61,10 +61,10 @@ export const PAISES: Pais[] = [
   { iso: "MA", dial: "+212", en: "Morocco", es: "Marruecos" },
 ];
 
-export const PAIS_DEFAULT = "US";
+export const PAIS_DEFAULT = "AR";
 
 export function dialDe(iso: string): string {
-  return PAISES.find((p) => p.iso === iso)?.dial ?? "+1";
+  return PAISES.find((p) => p.iso === iso)?.dial ?? "+54";
 }
 
 // Nombre del país en el idioma de la tienda.
