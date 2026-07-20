@@ -49,6 +49,7 @@ export function Landing() {
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [direccion, setDireccion] = useState("");
   const [mensaje, setMensaje] = useState("");
   // Honeypot: un bot rellena todo; un humano no ve este campo.
   const [empresa, setEmpresa] = useState("");
@@ -64,7 +65,7 @@ export function Landing() {
       const res = await fetch("/api/acceso/solicitar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, email, telefono, mensaje, empresa }),
+        body: JSON.stringify({ nombre, email, telefono, direccion, mensaje, empresa }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -83,6 +84,7 @@ export function Landing() {
     setNombre("");
     setEmail("");
     setTelefono("");
+    setDireccion("");
     setMensaje("");
     setEstado("idle");
     setError(null);
@@ -181,8 +183,20 @@ export function Landing() {
                 type="tel"
                 name="telefono"
                 autoComplete="tel"
+                required
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
+              />
+            </label>
+            <label className="lp-field">
+              <span>{lp.fDireccion}</span>
+              <input
+                type="text"
+                name="direccion"
+                autoComplete="street-address"
+                required
+                value={direccion}
+                onChange={(e) => setDireccion(e.target.value)}
               />
             </label>
             <label className="lp-field">

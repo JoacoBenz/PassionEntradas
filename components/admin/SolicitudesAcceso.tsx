@@ -187,6 +187,9 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
                       {s.telefono && (
                         <p className="text-xs text-muted">{s.telefono}</p>
                       )}
+                      {s.direccion && (
+                        <p className="text-xs text-muted">{s.direccion}</p>
+                      )}
                     </div>
                     <span className="shrink-0 font-mono text-[11px] text-muted">
                       {fmtFecha(s.created_at)}

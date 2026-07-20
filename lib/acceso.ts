@@ -9,6 +9,7 @@ export type SolicitudAcceso = {
   nombre: string;
   email: string;
   telefono: string | null;
+  direccion: string | null;
   mensaje: string | null;
   estado: EstadoSolicitud;
   user_id: string | null;
@@ -18,11 +19,13 @@ export type SolicitudAcceso = {
   updated_at: string;
 };
 
-// Lo que entra desde el formulario público, ya saneado.
+// Lo que entra desde el formulario público, ya saneado. Nombre, email,
+// teléfono y dirección son obligatorios; el mensaje es lo único opcional.
 export type SolicitudInput = {
   nombre: string;
   email: string;
-  telefono: string | null;
+  telefono: string;
+  direccion: string;
   mensaje: string | null;
 };
 
@@ -34,16 +37,20 @@ export function validarSolicitud(raw: {
   nombre?: unknown;
   email?: unknown;
   telefono?: unknown;
+  direccion?: unknown;
   mensaje?: unknown;
 }): { ok: true; value: SolicitudInput } | { ok: false; error: string } {
   const nombre = String(raw.nombre ?? "").trim().slice(0, 120);
   const email = String(raw.email ?? "").trim().toLowerCase().slice(0, 160);
-  const telefono = String(raw.telefono ?? "").trim().slice(0, 40) || null;
+  const telefono = String(raw.telefono ?? "").trim().slice(0, 40);
+  const direccion = String(raw.direccion ?? "").trim().slice(0, 200);
   const mensaje = String(raw.mensaje ?? "").trim().slice(0, 1000) || null;
 
   if (nombre.length < 2) return { ok: false, error: "Ingresá tu nombre" };
   if (!EMAIL_RE.test(email)) return { ok: false, error: "Ingresá un email válido" };
-  return { ok: true, value: { nombre, email, telefono, mensaje } };
+  if (telefono.length < 6) return { ok: false, error: "Ingresá un teléfono válido" };
+  if (direccion.length < 4) return { ok: false, error: "Ingresá tu dirección" };
+  return { ok: true, value: { nombre, email, telefono, direccion, mensaje } };
 }
 
 // Contraseña legible pero fuerte: 4 bloques de 3 (sin caracteres ambiguos).

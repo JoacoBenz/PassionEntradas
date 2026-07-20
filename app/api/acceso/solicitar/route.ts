@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  const { nombre, email, telefono, mensaje } = parsed.value;
+  const { nombre, email, telefono, direccion, mensaje } = parsed.value;
 
   if (isMock()) {
     const r = mockCrearSolicitud(parsed.value);
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   const admin = createAdminSupabase();
   const { error } = await admin
     .from("solicitudes_acceso")
-    .insert({ nombre, email, telefono, mensaje });
+    .insert({ nombre, email, telefono, direccion, mensaje });
 
   if (error) {
     // 23505 = unique_violation: ya hay una solicitud PENDIENTE con ese email.
