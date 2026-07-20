@@ -179,6 +179,13 @@ const en = {
     cuentaErrGeneric: "Couldn't save the password. Please try again.",
     cuentaVolver: "← Back to tickets",
     cuentaSalir: "Log out",
+    cuentaPerfilH: "Profile",
+    cuentaGuardarPerfil: "Save changes",
+    cuentaPerfilOk: "Profile saved.",
+    cuentaIdioma: "Language",
+    cuentaWhatsapp: "Message us on WhatsApp",
+    cuentaWaMsg: (nombre: string) =>
+      `Hi! I'm ${nombre || "a member"} — I'd like to ask about tickets.`,
   },
   auth: {
     loginTitle: "Sign in",
@@ -377,6 +384,13 @@ const es: typeof en = {
     cuentaErrGeneric: "No se pudo guardar la contraseña. Probá de nuevo.",
     cuentaVolver: "← Volver a las entradas",
     cuentaSalir: "Salir",
+    cuentaPerfilH: "Perfil",
+    cuentaGuardarPerfil: "Guardar cambios",
+    cuentaPerfilOk: "Perfil guardado.",
+    cuentaIdioma: "Idioma",
+    cuentaWhatsapp: "Escribinos por WhatsApp",
+    cuentaWaMsg: (nombre: string) =>
+      `Hola! Soy ${nombre || "un miembro"} — quiero consultar por entradas.`,
   },
   auth: {
     loginTitle: "Iniciar sesión",

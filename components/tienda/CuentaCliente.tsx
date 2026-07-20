@@ -1,26 +1,23 @@
 "use client";
 
-// Mi cuenta del CLIENTE (logueado en la tienda): cambiar la propia contraseña
-// y cerrar sesión. Misma estética que la tienda; bilingüe EN/ES.
+// Mi cuenta del CLIENTE (logueado en la tienda): perfil (nombre/teléfono/
+// dirección), idioma (se guarda en la cuenta, no solo en el dispositivo),
+// contacto por WhatsApp, cambio de contraseña y cerrar sesión. Estética de la
+// tienda; bilingüe EN/ES.
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { LANGS, TX, type Lang } from "@/lib/tienda-i18n";
+import { waLink } from "@/lib/tickets";
 
-function useLang() {
-  const [lang, setLang] = useState<Lang>("en");
-  useEffect(() => {
-    const saved = localStorage.getItem("tm_lang");
-    if (saved === "en" || saved === "es") setLang(saved);
-  }, []);
-  function change(l: Lang) {
-    setLang(l);
-    localStorage.setItem("tm_lang", l);
-  }
-  return [lang, change] as const;
-}
+export type PerfilInicial = {
+  nombre: string;
+  telefono: string;
+  direccion: string;
+  lang: Lang | null;
+};
 
 function LangToggle({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => void }) {
   return (
@@ -28,6 +25,7 @@ function LangToggle({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => voi
       {LANGS.map((l) => (
         <button
           key={l}
+          type="button"
           className={`lang-btn ${l === lang ? "active" : ""}`}
           onClick={() => onChange(l)}
           aria-pressed={l === lang}
@@ -41,56 +39,109 @@ function LangToggle({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => voi
 
 type Estado = "idle" | "saving" | "ok";
 
-export function CuentaCliente({ mock }: { mock: boolean }) {
+export function CuentaCliente({ mock, perfil }: { mock: boolean; perfil: PerfilInicial }) {
   const router = useRouter();
-  const [lang, setLang] = useLang();
+
+  // Idioma: arranca del que guardó la cuenta (si hay); si no, del dispositivo.
+  const [lang, setLang] = useState<Lang>(perfil.lang ?? "en");
+  useEffect(() => {
+    if (perfil.lang) {
+      localStorage.setItem("tm_lang", perfil.lang);
+      return;
+    }
+    const saved = localStorage.getItem("tm_lang");
+    if (saved === "en" || saved === "es") setLang(saved);
+  }, [perfil.lang]);
   const lp = TX[lang].lp;
 
+  async function cambiarIdioma(l: Lang) {
+    setLang(l);
+    localStorage.setItem("tm_lang", l);
+    if (!mock) {
+      const supabase = createClient();
+      await supabase.auth.updateUser({ data: { lang: l } });
+    }
+  }
+
+  // Perfil.
+  const [nombre, setNombre] = useState(perfil.nombre);
+  const [telefono, setTelefono] = useState(perfil.telefono);
+  const [direccion, setDireccion] = useState(perfil.direccion);
+  const [perfilEstado, setPerfilEstado] = useState<Estado>("idle");
+  const [perfilError, setPerfilError] = useState<string | null>(null);
+
+  async function guardarPerfil(e: React.FormEvent) {
+    e.preventDefault();
+    if (perfilEstado === "saving") return;
+    setPerfilError(null);
+    if (mock) {
+      setPerfilError("Demo mode: no hay cuentas reales.");
+      return;
+    }
+    setPerfilEstado("saving");
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.updateUser({
+        data: { nombre, telefono, direccion },
+      });
+      if (error) {
+        setPerfilError(lp.cuentaErrGeneric);
+        setPerfilEstado("idle");
+        return;
+      }
+      setPerfilEstado("ok");
+      router.refresh();
+    } catch {
+      setPerfilError(lp.cuentaErrGeneric);
+      setPerfilEstado("idle");
+    }
+  }
+
+  // Contraseña.
   const [clave, setClave] = useState("");
   const [repetir, setRepetir] = useState("");
-  const [estado, setEstado] = useState<Estado>("idle");
-  const [error, setError] = useState<string | null>(null);
+  const [claveEstado, setClaveEstado] = useState<Estado>("idle");
+  const [claveError, setClaveError] = useState<string | null>(null);
 
-  async function onSubmit(e: React.FormEvent) {
+  async function guardarClave(e: React.FormEvent) {
     e.preventDefault();
-    if (estado === "saving") return;
-    setError(null);
+    if (claveEstado === "saving") return;
+    setClaveError(null);
     if (clave.length < 8) {
-      setError(lp.cuentaErrCorta);
+      setClaveError(lp.cuentaErrCorta);
       return;
     }
     if (clave !== repetir) {
-      setError(lp.cuentaErrMatch);
+      setClaveError(lp.cuentaErrMatch);
       return;
     }
     if (mock) {
-      setError("Demo mode: no hay cuentas reales.");
+      setClaveError("Demo mode: no hay cuentas reales.");
       return;
     }
-    setEstado("saving");
+    setClaveEstado("saving");
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.updateUser({ password: clave });
       if (error) {
-        setError(lp.cuentaErrGeneric);
-        setEstado("idle");
+        setClaveError(lp.cuentaErrGeneric);
+        setClaveEstado("idle");
         return;
       }
       setClave("");
       setRepetir("");
-      setEstado("ok");
+      setClaveEstado("ok");
       router.refresh();
     } catch {
-      setError(lp.cuentaErrGeneric);
-      setEstado("idle");
+      setClaveError(lp.cuentaErrGeneric);
+      setClaveEstado("idle");
     }
   }
 
   async function logout() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.replace("/ingresar");
-    router.refresh();
+    window.location.assign("/ingresar");
   }
 
   return (
@@ -100,22 +151,79 @@ export function CuentaCliente({ mock }: { mock: boolean }) {
           <Link className="wm" href="/entradas">
             <span className="ticketmark">▚</span> TICKET<em>MIRROR</em>
           </Link>
-          <div className="mast-right">
-            <LangToggle lang={lang} onChange={setLang} />
-            <Link className="back" href="/entradas">
-              {lp.cuentaVolver}
-            </Link>
-          </div>
+          <Link className="back" href="/entradas">
+            {lp.cuentaVolver}
+          </Link>
         </div>
       </header>
 
+      {/* Perfil + idioma + WhatsApp */}
       <section className="block">
         <div className="section-h">
           <span className="sh-eyebrow">{lp.navCuenta}</span>
-          <h2>{lp.cuentaPassH}</h2>
+          <h2>{lp.cuentaPerfilH}</h2>
         </div>
 
-        <form className="lp-form lp-cuenta-form" onSubmit={onSubmit} noValidate>
+        <form className="lp-form lp-cuenta-form" onSubmit={guardarPerfil} noValidate>
+          <label className="lp-field">
+            <span>{lp.fNombre}</span>
+            <input
+              type="text"
+              autoComplete="name"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+            />
+          </label>
+          <label className="lp-field">
+            <span>{lp.fTelefono}</span>
+            <input
+              type="tel"
+              autoComplete="tel"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+            />
+          </label>
+          <label className="lp-field">
+            <span>{lp.fDireccion}</span>
+            <input
+              type="text"
+              autoComplete="street-address"
+              value={direccion}
+              onChange={(e) => setDireccion(e.target.value)}
+            />
+          </label>
+
+          <div className="lp-field">
+            <span>{lp.cuentaIdioma}</span>
+            <LangToggle lang={lang} onChange={cambiarIdioma} />
+          </div>
+
+          {perfilEstado === "ok" && <p className="lp-ok-msg">{lp.cuentaPerfilOk}</p>}
+          {perfilError && <p className="lp-err">{perfilError}</p>}
+
+          <button className="btn-primary lp-submit" type="submit" disabled={perfilEstado === "saving"}>
+            {perfilEstado === "saving" ? lp.cuentaGuardando : lp.cuentaGuardarPerfil}
+          </button>
+        </form>
+
+        <div className="lp-cuenta-wa">
+          <a
+            className="btn-ghost"
+            href={waLink(lp.cuentaWaMsg(nombre))}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {lp.cuentaWhatsapp}
+          </a>
+        </div>
+      </section>
+
+      {/* Contraseña */}
+      <section className="block">
+        <div className="section-h">
+          <h2>{lp.cuentaPassH}</h2>
+        </div>
+        <form className="lp-form lp-cuenta-form" onSubmit={guardarClave} noValidate>
           <label className="lp-field">
             <span>{lp.cuentaNueva}</span>
             <input
@@ -136,20 +244,20 @@ export function CuentaCliente({ mock }: { mock: boolean }) {
             />
           </label>
 
-          {estado === "ok" && <p className="lp-ok-msg">{lp.cuentaOk}</p>}
-          {error && <p className="lp-err">{error}</p>}
+          {claveEstado === "ok" && <p className="lp-ok-msg">{lp.cuentaOk}</p>}
+          {claveError && <p className="lp-err">{claveError}</p>}
 
-          <button className="btn-primary lp-submit" type="submit" disabled={estado === "saving"}>
-            {estado === "saving" ? lp.cuentaGuardando : lp.cuentaGuardar}
+          <button className="btn-primary lp-submit" type="submit" disabled={claveEstado === "saving"}>
+            {claveEstado === "saving" ? lp.cuentaGuardando : lp.cuentaGuardar}
           </button>
         </form>
-
-        <div className="lp-cuenta-logout">
-          <button className="back" onClick={logout}>
-            {lp.cuentaSalir}
-          </button>
-        </div>
       </section>
+
+      <div className="lp-cuenta-logout">
+        <button className="back" onClick={logout}>
+          {lp.cuentaSalir}
+        </button>
+      </div>
     </>
   );
 }

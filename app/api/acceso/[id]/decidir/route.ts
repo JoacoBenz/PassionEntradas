@@ -82,7 +82,7 @@ export async function POST(
 
   const { data: sol, error: solErr } = await admin
     .from("solicitudes_acceso")
-    .select("id, nombre, email, estado")
+    .select("id, nombre, email, telefono, direccion, estado")
     .eq("id", id)
     .single();
   if (solErr || !sol) {
@@ -113,6 +113,8 @@ export async function POST(
     password,
     email_confirm: true,
     app_metadata: { role: "cliente" },
+    // Precarga el perfil con lo que dejó en la solicitud (editable en /cuenta).
+    user_metadata: { nombre: sol.nombre, telefono: sol.telefono, direccion: sol.direccion },
   });
   if (createErr || !created?.user) {
     // Email ya registrado u otro fallo de Auth: no marcamos aprobada.
