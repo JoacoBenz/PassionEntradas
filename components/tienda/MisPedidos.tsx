@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import AutoRefresh from "@/components/AutoRefresh";
 import { LANGS, LOCALE, TX, type Lang } from "@/lib/tienda-i18n";
 import type { Estado } from "@/lib/operaciones";
 
@@ -19,6 +20,8 @@ export type PedidoView = {
   fecha_evento: string | null;
   created_at: string;
   estado: Estado;
+  // Factura emitida para este pedido (si el staff ya la generó).
+  facturaId: string | null;
 };
 
 // Color del chip de estado, alineado con el agrupado del panel.
@@ -65,6 +68,9 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
 
   return (
     <>
+      {/* La página se actualiza sola: cuando el staff avanza la operación, el
+          estado acá se refresca sin recargar. */}
+      <AutoRefresh intervalMs={20000} />
       <header className="masthead masthead--cat">
         <div className="toprow">
           <Link className="wm" href="/entradas">
@@ -140,7 +146,31 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
                     <dd>{fmtDate(p.created_at, lang, true)}</dd>
                   </div>
                 </dl>
-                <span className="mp-code">N.º {p.code}</span>
+                <div className="mp-foot">
+                  <span className="mp-code">N.º {p.code}</span>
+                  <span className="mp-links">
+                    {/* Link público de seguimiento (mismo que comparte el staff). */}
+                    <a
+                      className="mp-link"
+                      href={`/op/${p.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {mp.verSeguimiento}
+                    </a>
+                    {/* Factura: solo si el staff ya la emitió. */}
+                    {p.facturaId && (
+                      <a
+                        className="mp-link mp-link--factura"
+                        href={`/factura/${p.facturaId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {mp.verFactura}
+                      </a>
+                    )}
+                  </span>
+                </div>
               </li>
             ))}
           </ul>

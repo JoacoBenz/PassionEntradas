@@ -246,6 +246,8 @@ const en = {
     sectorLabel: "Section",
     fechaLabel: "Event date",
     creado: "Requested",
+    verSeguimiento: "Track status ↗",
+    verFactura: "View invoice ↗",
     estados: {
       esperando: "Received — a seller will reach out",
       entrada_recibida: "In progress",
@@ -515,6 +517,8 @@ const es: typeof en = {
     sectorLabel: "Sector",
     fechaLabel: "Fecha del evento",
     creado: "Solicitado",
+    verSeguimiento: "Ver seguimiento ↗",
+    verFactura: "Ver factura ↗",
     estados: {
       esperando: "Recibido — un vendedor te contacta",
       entrada_recibida: "En curso",
