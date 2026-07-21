@@ -3,6 +3,7 @@ import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server
 import { getRol, puedeVerTienda, nombreDe } from "@/lib/auth";
 import { formatUSD, generateCode, type TipoOperacion } from "@/lib/operaciones";
 import { notificarVendedores } from "@/lib/whatsapp";
+import { notificarVendedoresEmail } from "@/lib/email";
 import { isMock, mockCreateOp, MOCK_USER } from "@/lib/mock-db";
 
 // POST /api/pedidos — el cliente hace un PEDIDO o una CONSULTA sobre una
@@ -136,7 +137,9 @@ export async function POST(request: Request) {
     opCode = inserted.code;
   }
 
-  // 2) Aviso a los vendedores por WhatsApp (best-effort).
+  // 2) Aviso a los vendedores por WhatsApp Y por email (best-effort, en
+  // paralelo). Cualquiera que falle o no esté configurado no corta el flujo:
+  // el pedido ya quedó registrado arriba.
   const lineaMonto = monto > 0 ? `\nPrecio de referencia: ${formatUSD(monto)}` : "";
   const mensaje =
     `🎟️ Nuev${esPedido ? "o PEDIDO" : "a CONSULTA"} en la tienda\n` +
@@ -146,15 +149,24 @@ export async function POST(request: Request) {
     `\nCliente: ${ctx.comprador}` +
     (ctx.cliente_email ? ` (${ctx.cliente_email})` : "") +
     `\nCode: ${opCode}\nAccioná la operación desde el panel.`;
+  const asunto = `🎟️ ${esPedido ? "Nuevo pedido" : "Nueva consulta"} — ${evento}`;
 
-  const wa = await notificarVendedores(mensaje);
+  const [wa, mail] = await Promise.all([
+    notificarVendedores(mensaje),
+    notificarVendedoresEmail(asunto, mensaje),
+  ]);
 
   return NextResponse.json(
     {
       id: opId,
       code: opCode,
       tipo,
-      whatsapp: wa.ok ? { ok: true, enviados: wa.enviados } : { ok: false, noConfigurado: wa.noConfigurado ?? false },
+      whatsapp: wa.ok
+        ? { ok: true, enviados: wa.enviados }
+        : { ok: false, noConfigurado: wa.noConfigurado ?? false },
+      email: mail.ok
+        ? { ok: true }
+        : { ok: false, noConfigurado: mail.noConfigurado ?? false },
     },
     { status: 201 }
   );
