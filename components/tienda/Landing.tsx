@@ -10,6 +10,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { LANGS, TX, type Lang } from "@/lib/tienda-i18n";
 import { PAISES, PAIS_DEFAULT, dialDe, nombrePais } from "@/lib/paises";
+import { LegalLinks } from "@/components/tienda/LegalLinks";
 
 // La landing es estática, pero si el visitante ya tiene sesión mostramos
 // accesos de logueado (Mi cuenta / Ver entradas) en vez de "Ingresar". Se
@@ -312,9 +313,10 @@ export function Landing() {
         </div>
       </section>
 
-      <footer className="foot">
+      <footer className="foot foot--legal">
         <span>TicketMirror</span>
         <span>{lp.footTagline}</span>
+        <LegalLinks lang={lang} />
       </footer>
     </>
   );

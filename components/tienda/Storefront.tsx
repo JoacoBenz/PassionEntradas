@@ -21,6 +21,7 @@ import {
 } from "@/lib/tickets";
 import { LANGS, mesLabelLang, TX, type Lang } from "@/lib/tienda-i18n";
 import { useCart } from "@/components/tienda/Cart";
+import { LegalLinks } from "@/components/tienda/LegalLinks";
 
 // Idioma elegido: default inglés; se recuerda entre visitas.
 function useLang() {
@@ -197,9 +198,10 @@ function WaFloat({ lang }: { lang: Lang }) {
 function Foot({ lang }: { lang: Lang }) {
   const t = TX[lang];
   return (
-    <footer className="foot">
+    <footer className="foot foot--legal">
       <span>TicketMirror</span>
       <span>{t.footSync}</span>
+      <LegalLinks lang={lang} />
     </footer>
   );
 }
