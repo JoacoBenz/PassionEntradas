@@ -305,6 +305,12 @@
 .seat-act.go:hover { background: var(--cobalt-d); }
 .seat-act.ask { background: transparent; color: var(--ink); }
 .seat-act.ask:hover { background: var(--ink); color: var(--field); }
+/* Botón de pedido/consulta: registra la operación (no es un link). */
+.seat-act { cursor: pointer; }
+.seat-act:disabled { cursor: default; }
+.seat-act.sending { opacity: .7; }
+.seat-act.done, .seat-act.done:hover { background: var(--ok); border-color: var(--ok); color: #fff; }
+.seat-act.err, .seat-act.err:hover { background: transparent; border-color: var(--flare); color: var(--flare); }
 
 /* stub (perforated side) */
 .ticket-stub {
@@ -869,3 +875,47 @@
   .mapa-frame { padding: 8px; }
   .mapa-ev { flex-direction: column; align-items: flex-start; gap: 8px; }
 }
+
+/* ============ mis pedidos (cliente) ============ */
+.mp-wrap { padding-top: 28px; }
+.mp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.mp-item {
+  background: var(--field); border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink); padding: 16px 18px;
+}
+.mp-item-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mp-tipo {
+  font-family: var(--font-mono), monospace; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em; padding: 3px 8px; border: 1px solid var(--ink);
+}
+.mp-tipo--pedido { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
+.mp-tipo--consulta { background: transparent; color: var(--ink); }
+.mp-estado {
+  font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+}
+.mp-estado::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.mp-e-abierta { color: #b07a14; background: #f7efd8; }
+.mp-e-curso { color: var(--cobalt); background: #e6e9fb; }
+.mp-e-cerrada { color: var(--ok); background: #dcefe3; }
+.mp-e-cancelada { color: var(--mute); background: #e9e8e2; }
+.mp-evento { margin: 12px 0 0; font-size: 18px; font-weight: 700; line-height: 1.25; }
+.mp-meta {
+  margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 6px 24px;
+}
+.mp-meta > div { display: flex; flex-direction: column; gap: 1px; }
+.mp-meta dt {
+  font-family: var(--font-mono), monospace; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--mute);
+}
+.mp-meta dd { margin: 0; font-size: 14px; }
+.mp-code {
+  display: inline-block; margin-top: 12px; font-family: var(--font-mono), monospace;
+  font-size: 11px; color: var(--mute); letter-spacing: .04em;
+}
+.mp-empty {
+  text-align: center; background: var(--field); border: 1.5px dashed var(--ink);
+  padding: 40px 24px; box-shadow: 4px 4px 0 var(--ink);
+}
+.mp-empty h3 { margin: 0 0 8px; font-size: 20px; font-weight: 700; }
+.mp-empty p { margin: 0 auto 18px; max-width: 42ch; color: var(--mute); font-size: 14.5px; line-height: 1.55; }

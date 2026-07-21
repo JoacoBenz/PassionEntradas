@@ -11,6 +11,7 @@ import {
   formatFecha,
   quienDe,
   whatsappMessage,
+  TIPO_LABEL,
   type Operacion,
   type StatusAction,
 } from "@/lib/operaciones";
@@ -128,6 +129,19 @@ export default function OperacionCard({
             {op.fecha_evento ? ` · ${fechaCorta(op.fecha_evento)}` : ""}
           </span>
         </span>
+        {op.tipo !== "operacion" && (
+          // Origen: pedido/consulta del cliente desde la tienda.
+          <span
+            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+            style={
+              op.tipo === "pedido"
+                ? { color: "#1F33E0", backgroundColor: "#1F33E014" }
+                : { color: "#B07A14", backgroundColor: "#B07A1414" }
+            }
+          >
+            {TIPO_LABEL[op.tipo]}
+          </span>
+        )}
         <span className="whitespace-nowrap font-display text-sm font-bold tabular-nums">
           {formatUSD(op.monto)}
         </span>
@@ -162,7 +176,18 @@ export default function OperacionCard({
               </span>
               {op.comprador_alias && (
                 <span>
-                  Comprador <span className="font-medium text-body">{op.comprador_alias}</span>
+                  {op.tipo === "operacion" ? "Comprador" : "Cliente"}{" "}
+                  <span className="font-medium text-body">{op.comprador_alias}</span>
+                </span>
+              )}
+              {op.cliente_email && op.cliente_email !== op.comprador_alias && (
+                <span>
+                  <span className="font-medium text-body">{op.cliente_email}</span>
+                </span>
+              )}
+              {op.sector && (
+                <span>
+                  Sector <span className="font-medium text-body">{op.sector}</span>
                 </span>
               )}
               {op.vendedor_alias && (

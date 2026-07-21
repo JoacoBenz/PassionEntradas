@@ -57,7 +57,7 @@ export default async function AdminPage() {
     const { data } = await createAdminSupabase()
       .from("operaciones")
       .select(
-        "id, code, evento, comprador_alias, vendedor_alias, monto, fee, cuenta_debitar, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, entrada_recibida_por, pago_confirmado_por, cerrada_por, fecha_evento, notas, ticket_id, created_at, updated_at"
+        "id, code, evento, comprador_alias, vendedor_alias, monto, fee, cuenta_debitar, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, entrada_recibida_por, pago_confirmado_por, cerrada_por, fecha_evento, notas, ticket_id, tipo, cliente_id, cliente_email, sector, created_at, updated_at"
       )
       .order("created_at", { ascending: false })
       .limit(1000);

@@ -12,6 +12,10 @@ export type Status =
   | "confirmada"
   | "cancelada";
 
+// Origen de la operación: carga interna del staff, o pedido/consulta hecho por
+// un cliente desde la tienda sobre una entrada del catálogo.
+export type TipoOperacion = "operacion" | "pedido" | "consulta";
+
 export type Operacion = {
   id: string;
   code: string;
@@ -39,8 +43,22 @@ export type Operacion = {
   notas: string | null;
   // Entrada del catálogo de la tienda que originó la operación (opcional).
   ticket_id: string | null;
+  // Origen: 'operacion' (staff) | 'pedido' | 'consulta' (cliente en la tienda).
+  tipo: TipoOperacion;
+  // Cliente que originó el pedido/consulta (null en cargas internas del staff).
+  cliente_id: string | null;
+  cliente_email: string | null;
+  // Sector/categoría de la entrada pedida, tal como se ve en la tienda.
+  sector: string | null;
   created_at: string;
   updated_at: string;
+};
+
+// Etiquetas del origen para el panel.
+export const TIPO_LABEL: Record<TipoOperacion, string> = {
+  operacion: "Operación",
+  pedido: "Pedido",
+  consulta: "Consulta",
 };
 
 // Vista pública: subconjunto seguro de campos (sin datos de contacto y sin

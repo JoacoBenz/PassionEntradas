@@ -260,6 +260,10 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
         fecha_evento: form.fecha_evento || null,
         notas: form.notas.trim() || null,
         ticket_id: ticketId,
+        tipo: "operacion",
+        cliente_id: null,
+        cliente_email: null,
+        sector: null,
         created_at: now,
         updated_at: now,
       });

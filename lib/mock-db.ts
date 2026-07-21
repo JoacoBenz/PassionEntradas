@@ -61,6 +61,10 @@ function seed(): MockDB {
       notas: "Vendedor manda el QR el jueves.",
       cuenta_debitar: "admintickets.mp",
       ticket_id: "3001::1",
+      tipo: "operacion",
+      cliente_id: null,
+      cliente_email: null,
+      sector: null,
       created_at: iso(60 * 26),
       updated_at: iso(90),
     },
@@ -83,6 +87,11 @@ function seed(): MockDB {
       notas: null,
       cuenta_debitar: null,
       ticket_id: "manual::demo-1",
+      // Pedido de un cliente desde la tienda (para la vista "Mis pedidos").
+      tipo: "pedido",
+      cliente_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      cliente_email: "demo@passion.local",
+      sector: "Platea Media",
       created_at: iso(60 * 3),
       updated_at: iso(60 * 3),
     },
@@ -105,6 +114,10 @@ function seed(): MockDB {
       notas: null,
       cuenta_debitar: null,
       ticket_id: null,
+      tipo: "operacion",
+      cliente_id: null,
+      cliente_email: null,
+      sector: null,
       created_at: iso(60 * 24 * 4),
       updated_at: iso(60 * 24 * 2),
     },
@@ -211,12 +224,20 @@ export function mockCreateOp(input: {
   fecha_evento: string | null;
   notas: string | null;
   cuenta_debitar: string | null;
+  tipo?: Operacion["tipo"];
+  cliente_id?: string | null;
+  cliente_email?: string | null;
+  sector?: string | null;
 }): Operacion {
   const now = new Date().toISOString();
   const op: Operacion = {
     id: crypto.randomUUID(),
     code: generateCode(),
     ...input,
+    tipo: input.tipo ?? "operacion",
+    cliente_id: input.cliente_id ?? null,
+    cliente_email: input.cliente_email ?? null,
+    sector: input.sector ?? null,
     status: "esperando_entrada",
     entrada_recibida_at: null,
     pago_confirmado_at: null,
@@ -229,6 +250,19 @@ export function mockCreateOp(input: {
   };
   db().ops.unshift(op);
   return op;
+}
+
+// "Mis pedidos" del cliente: pedidos/consultas que originó (por cliente_id, o
+// por email cuando no hay id de usuario en mock). Más nuevos primero.
+export function mockListPedidosCliente(clienteId: string | null, email: string | null): Operacion[] {
+  return db()
+    .ops.filter(
+      (o) =>
+        (o.tipo === "pedido" || o.tipo === "consulta") &&
+        ((clienteId && o.cliente_id === clienteId) ||
+          (email && o.cliente_email?.toLowerCase() === email.toLowerCase()))
+    )
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 export function mockApplyAction(
