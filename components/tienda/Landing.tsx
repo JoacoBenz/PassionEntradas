@@ -79,6 +79,8 @@ export function Landing() {
   const [telefono, setTelefono] = useState("");
   const [direccion, setDireccion] = useState("");
   const [mensaje, setMensaje] = useState("");
+  // Consentimiento de términos: obligatorio para poder enviar la solicitud.
+  const [acepto, setAcepto] = useState(false);
   // Honeypot: un bot rellena todo; un humano no ve este campo.
   const [empresa, setEmpresa] = useState("");
   const [estado, setEstado] = useState<Estado>("idle");
@@ -87,6 +89,12 @@ export function Landing() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (estado === "sending") return;
+    // Sin consentimiento no se envía (además la API lo revalida).
+    if (!acepto) {
+      setError(lp.consentError);
+      setEstado("error");
+      return;
+    }
     setEstado("sending");
     setError(null);
     try {
@@ -95,7 +103,7 @@ export function Landing() {
       const res = await fetch("/api/acceso/solicitar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, email, telefono: telefonoCompleto, direccion, mensaje, empresa }),
+        body: JSON.stringify({ nombre, email, telefono: telefonoCompleto, direccion, mensaje, empresa, acepto }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -117,6 +125,7 @@ export function Landing() {
     setTelefono("");
     setDireccion("");
     setMensaje("");
+    setAcepto(false);
     setEstado("idle");
     setError(null);
   }
@@ -285,9 +294,35 @@ export function Landing() {
                   </label>
                 </div>
 
+                {/* Consentimiento obligatorio de términos y condiciones. */}
+                <label className="lp-consent">
+                  <input
+                    type="checkbox"
+                    name="acepto"
+                    checked={acepto}
+                    onChange={(e) => setAcepto(e.target.checked)}
+                    required
+                  />
+                  <span>
+                    {lp.consentPre}
+                    <Link href="/legal/terminos" target="_blank" rel="noopener noreferrer">
+                      {t.legal.docs.terminos.title}
+                    </Link>
+                    {lp.consentMid}
+                    <Link href="/legal/privacidad" target="_blank" rel="noopener noreferrer">
+                      {t.legal.docs.privacidad.title}
+                    </Link>
+                    .
+                  </span>
+                </label>
+
                 {estado === "error" && error && <p className="lp-err">{error}</p>}
 
-                <button className="btn-primary lp-submit" type="submit" disabled={estado === "sending"}>
+                <button
+                  className="btn-primary lp-submit"
+                  type="submit"
+                  disabled={estado === "sending" || !acepto}
+                >
                   {estado === "sending" ? lp.enviando : lp.enviar}
                 </button>
               </form>

@@ -19,6 +19,8 @@ export type SolicitudAcceso = {
   // cliente perdió el acceso hasta que se reactive.
   revocada_at: string | null;
   revocada_por: string | null;
+  // Consentimiento de términos aceptado al solicitar (created_at = momento).
+  acepto_terminos: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -31,6 +33,8 @@ export type SolicitudInput = {
   telefono: string;
   direccion: string;
   mensaje: string | null;
+  // Consentimiento de términos y condiciones (obligatorio para solicitar).
+  acepto: boolean;
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -43,18 +47,23 @@ export function validarSolicitud(raw: {
   telefono?: unknown;
   direccion?: unknown;
   mensaje?: unknown;
+  acepto?: unknown;
 }): { ok: true; value: SolicitudInput } | { ok: false; error: string } {
   const nombre = String(raw.nombre ?? "").trim().slice(0, 120);
   const email = String(raw.email ?? "").trim().toLowerCase().slice(0, 160);
   const telefono = String(raw.telefono ?? "").trim().slice(0, 40);
   const direccion = String(raw.direccion ?? "").trim().slice(0, 200);
   const mensaje = String(raw.mensaje ?? "").trim().slice(0, 1000) || null;
+  const acepto = raw.acepto === true;
 
   if (nombre.length < 2) return { ok: false, error: "Ingresá tu nombre" };
   if (!EMAIL_RE.test(email)) return { ok: false, error: "Ingresá un email válido" };
   if (telefono.length < 6) return { ok: false, error: "Ingresá un teléfono válido" };
   if (direccion.length < 4) return { ok: false, error: "Ingresá tu dirección" };
-  return { ok: true, value: { nombre, email, telefono, direccion, mensaje } };
+  // El consentimiento es obligatorio: sin aceptar los términos no hay solicitud.
+  if (!acepto)
+    return { ok: false, error: "Tenés que aceptar los términos y condiciones para continuar" };
+  return { ok: true, value: { nombre, email, telefono, direccion, mensaje, acepto } };
 }
 
 // Contraseña legible pero fuerte: 4 bloques de 3 (sin caracteres ambiguos).

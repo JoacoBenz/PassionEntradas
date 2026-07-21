@@ -730,6 +730,18 @@
 .lp-submit { margin-top: 4px; width: 100%; }
 .lp-submit:disabled { opacity: .6; cursor: default; transform: none; box-shadow: 4px 4px 0 var(--ink); }
 
+/* Consentimiento de términos (checkbox obligatorio del form de solicitud). */
+.lp-consent {
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 13px; line-height: 1.5; color: var(--ink); margin-top: 2px;
+}
+.lp-consent input {
+  flex: 0 0 auto; width: 17px; height: 17px; margin-top: 2px;
+  accent-color: var(--cobalt); cursor: pointer;
+}
+.lp-consent a { color: var(--cobalt); text-decoration: underline; font-weight: 600; }
+.lp-consent a:hover { color: var(--cobalt-d); }
+
 .lp-err {
   margin: 0; font-size: 13.5px; color: var(--flare); font-weight: 600;
   border-left: 3px solid var(--flare); padding-left: 12px;

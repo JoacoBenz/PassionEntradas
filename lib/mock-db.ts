@@ -164,6 +164,7 @@ function seed(): MockDB {
       decidida_at: null,
       revocada_at: null,
       revocada_por: null,
+      acepto_terminos: true,
       created_at: iso(40),
       updated_at: iso(40),
     },
@@ -180,6 +181,7 @@ function seed(): MockDB {
       decidida_at: iso(60 * 20),
       revocada_at: null,
       revocada_por: null,
+      acepto_terminos: true,
       created_at: iso(60 * 22),
       updated_at: iso(60 * 20),
     },
@@ -483,6 +485,7 @@ export function mockCrearSolicitud(input: SolicitudInput): { ok: true } | { ok: 
     decidida_at: null,
     revocada_at: null,
     revocada_por: null,
+    acepto_terminos: input.acepto,
     created_at: now,
     updated_at: now,
   });
