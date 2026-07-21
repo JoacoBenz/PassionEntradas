@@ -889,10 +889,17 @@
 }
 
 /* ============ header pegajoso (nav siempre a la vista) ============ */
-/* Catálogo / listados: el header compacto queda fijo arriba mientras se
-   scrollea toda la página (su contenedor es toda la app). Así Mis pedidos,
-   Mi cuenta y el mapa quedan siempre accesibles a la derecha. */
-.tienda .masthead--cat {
+/* MISMO header en toda la tienda: barra fija arriba con la nav a la derecha
+   (Mis pedidos, Mi cuenta, mapa). En catálogo/listados el contenedor es toda
+   la app, así que queda fija en toda la página; en home/landing queda fija
+   mientras el hero está en pantalla. El look (padding, línea, fondo) es
+   idéntico en ambos para que no cambie entre secciones. */
+.tienda .masthead--home {
+  /* sin el padding-top del masthead: el header arranca al ras, como catálogo */
+  padding-top: 0;
+}
+.tienda .masthead--cat,
+.tienda .masthead--home .toprow {
   position: sticky;
   top: 0;
   z-index: 50;
@@ -901,16 +908,6 @@
   margin: 0 -20px;
   padding: 12px 20px;
   border-bottom: 2px solid var(--ink);
-}
-/* Home / landing (con hero): la barra superior queda fija mientras el hero
-   está en pantalla. */
-.tienda .masthead--home .toprow {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: var(--paper);
-  margin: 0 -20px;
-  padding: 10px 20px;
 }
 
 /* ============ mis pedidos (cliente) ============ */
