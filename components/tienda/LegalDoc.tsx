@@ -27,7 +27,8 @@ function useLang(): [Lang, (l: Lang) => void] {
 export function LegalDoc({ slug }: { slug: LegalSlug }) {
   const [lang, setLang] = useLang();
   const l = TX[lang].legal;
-  const title = l.docs[slug];
+  const doc = l.docs[slug];
+  const title = doc.title;
 
   return (
     <>
@@ -65,8 +66,7 @@ export function LegalDoc({ slug }: { slug: LegalSlug }) {
         </div>
 
         <div className="legal-body">
-          <p className="legal-intro">{l.intro}</p>
-          {l.sections.map(([h, body]) => (
+          {doc.sections.map(([h, body]) => (
             <section key={h}>
               <h3>{h}</h3>
               <p>{body}</p>

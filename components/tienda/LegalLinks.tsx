@@ -13,7 +13,7 @@ export function LegalLinks({ lang, className }: { lang: Lang; className?: string
     <nav className={`legal-links ${className ?? ""}`} aria-label={l.footerHeading}>
       {LEGAL_DOCS.map((slug) => (
         <Link key={slug} href={`/legal/${slug}`}>
-          {l.docs[slug]}
+          {l.docs[slug].title}
         </Link>
       ))}
     </nav>

@@ -262,28 +262,72 @@ const en = {
       cancelada: "Cancelled",
     } as Record<string, string>,
   },
-  // Documentos legales (marcadores de posición hasta tener el texto final).
+  // Documentos legales. Texto genérico (no es asesoramiento legal): sirve como
+  // base y debería revisarse con un profesional antes de producción real.
   legal: {
     eyebrow: "Legal",
     volver: "← Back home",
-    updated: "Placeholder — pending publication",
-    intro:
-      "This document is a placeholder. The final text is being prepared and will be published here.",
-    contents: "Contents",
-    sections: [
-      ["1. Overview", "Placeholder text. This section will describe the scope of this document."],
-      ["2. Definitions", "Placeholder text. The key terms used throughout will be defined here."],
-      ["3. Your rights and obligations", "Placeholder text. To be completed before launch."],
-      ["4. Contact", "Placeholder text. Contact details for legal enquiries will be added here."],
-    ] as [string, string][],
+    updated: "Last updated: July 2026",
     footerHeading: "Legal",
     docs: {
-      terminos: "Terms & Conditions",
-      privacidad: "Privacy Policy",
-      cookies: "Cookie Policy",
-      reembolsos: "Refund & Cancellation Policy",
-      aviso: "Legal Notice",
-    } as Record<string, string>,
+      terminos: {
+        title: "Terms & Conditions",
+        sections: [
+          ["1. Acceptance of these terms", "By requesting access to or using TicketMirror, you agree to these Terms & Conditions. If you do not agree with them, please do not use the platform."],
+          ["2. Access by request", "Access is granted individually and by approval. We may accept or decline any access request at our discretion. Access is personal and non-transferable."],
+          ["3. Your account", "You are responsible for keeping your credentials secure and for all activity carried out under your account. Notify us promptly of any unauthorised use."],
+          ["4. Acceptable use", "You agree to use the platform lawfully, not to disrupt its operation, and not to attempt to access areas or data you are not authorised to use."],
+          ["5. Information on the platform", "We aim to keep the information shown accurate and up to date, but we do not warrant that it is free of errors or continuously available."],
+          ["6. Limitation of liability", "To the extent permitted by applicable law, TicketMirror shall not be liable for indirect or incidental damages arising from the use of the platform."],
+          ["7. Changes to these terms", "We may update these terms from time to time. Your continued use of the platform after any change takes effect constitutes acceptance of the revised terms."],
+          ["8. Contact", "For any questions about these terms, please contact us through the channels listed on the site."],
+        ] as [string, string][],
+      },
+      privacidad: {
+        title: "Privacy Policy",
+        sections: [
+          ["1. Information we collect", "We collect the information you provide when requesting access or using your account — such as your name, contact details and preferences — along with basic technical data from your visit."],
+          ["2. How we use your information", "We use your information to review access requests, operate and improve the service, respond to your enquiries and keep you informed about your requests."],
+          ["3. Sharing with third parties", "We do not sell your personal data. We may share it with service providers that help us operate the platform, always under appropriate confidentiality obligations."],
+          ["4. Data retention", "We keep your information for as long as necessary to provide the service and to meet applicable legal or accounting obligations."],
+          ["5. Your rights", "Subject to applicable law, you may request access to, correction of, or deletion of your personal data. Contact us to exercise these rights."],
+          ["6. Security", "We apply reasonable technical and organisational measures to protect your information, although no method of transmission or storage is completely secure."],
+          ["7. Contact", "For any privacy questions or requests, please contact us through the channels listed on the site."],
+        ] as [string, string][],
+      },
+      cookies: {
+        title: "Cookie Policy",
+        sections: [
+          ["1. What cookies are", "Cookies are small files stored on your device that help a website function correctly and remember your preferences."],
+          ["2. Cookies we use", "We use essential cookies required for the site to work — such as keeping your session and language preference — and may use basic analytics to understand usage."],
+          ["3. Third-party cookies", "Some features may rely on third-party services that set their own cookies, governed by their respective policies."],
+          ["4. Managing cookies", "You can control or delete cookies through your browser settings. Disabling essential cookies may affect how the site works."],
+          ["5. Changes", "We may update this cookie policy as our use of cookies evolves. The latest version will always be available on this page."],
+        ] as [string, string][],
+      },
+      reembolsos: {
+        title: "Refund & Cancellation Policy",
+        sections: [
+          ["1. Scope", "This policy explains how cancellations and refunds are handled for requests made through the platform."],
+          ["2. Cancellations", "You may request the cancellation of a pending request before it has been confirmed by our team. Confirmed operations may be subject to specific conditions."],
+          ["3. Refunds", "Where a refund applies, it will be issued using the original payment method whenever possible."],
+          ["4. Timeframes", "Refunds are processed within a reasonable period after approval. Actual processing times may vary depending on the payment provider."],
+          ["5. How to request one", "To request a cancellation or refund, contact us through the channels listed on the site and include your operation code."],
+          ["6. Contact", "For any questions about cancellations or refunds, please reach out through the channels listed on the site."],
+        ] as [string, string][],
+      },
+      aviso: {
+        title: "Legal Notice",
+        sections: [
+          ["1. Site owner", "This site is operated by TicketMirror. Contact details are available through the channels listed on the site."],
+          ["2. Purpose", "This legal notice governs access to and use of this website and its content."],
+          ["3. Conditions of use", "By using the site you agree to do so in good faith and in accordance with the law, these conditions and any applicable policies."],
+          ["4. Intellectual property", "The content, design and marks shown on the site are protected and may not be reproduced without prior authorisation."],
+          ["5. Liability", "We are not responsible for any misuse of the site or for the content of third-party sites linked from here."],
+          ["6. Governing law", "This notice is governed by the applicable law of our place of operation, and any dispute shall be subject to the competent courts."],
+        ] as [string, string][],
+      },
+    },
   },
   auth: {
     loginTitle: "Sign in",
@@ -564,23 +608,66 @@ const es: typeof en = {
   legal: {
     eyebrow: "Legal",
     volver: "← Volver al inicio",
-    updated: "Marcador — pendiente de publicación",
-    intro:
-      "Este documento es un marcador de posición. El texto final está en preparación y se publicará acá.",
-    contents: "Contenido",
-    sections: [
-      ["1. Alcance", "Texto de ejemplo. Esta sección describirá el alcance del documento."],
-      ["2. Definiciones", "Texto de ejemplo. Acá se definirán los términos clave utilizados."],
-      ["3. Tus derechos y obligaciones", "Texto de ejemplo. Se completará antes del lanzamiento."],
-      ["4. Contacto", "Texto de ejemplo. Se agregarán los datos de contacto para consultas legales."],
-    ],
+    updated: "Última actualización: julio de 2026",
     footerHeading: "Legal",
     docs: {
-      terminos: "Términos y Condiciones",
-      privacidad: "Política de Privacidad",
-      cookies: "Política de Cookies",
-      reembolsos: "Política de Reembolsos y Cancelaciones",
-      aviso: "Aviso Legal",
+      terminos: {
+        title: "Términos y Condiciones",
+        sections: [
+          ["1. Aceptación de los términos", "Al solicitar acceso o usar TicketMirror, aceptás estos Términos y Condiciones. Si no estás de acuerdo con ellos, por favor no uses la plataforma."],
+          ["2. Acceso por solicitud", "El acceso se otorga de forma individual y por aprobación. Podemos aceptar o rechazar cualquier solicitud a nuestro criterio. El acceso es personal e intransferible."],
+          ["3. Tu cuenta", "Sos responsable de mantener seguras tus credenciales y de toda la actividad realizada con tu cuenta. Avisanos de inmediato ante cualquier uso no autorizado."],
+          ["4. Uso aceptable", "Te comprometés a usar la plataforma de forma lícita, a no interferir con su funcionamiento y a no intentar acceder a áreas o datos para los que no tenés autorización."],
+          ["5. Información de la plataforma", "Procuramos que la información mostrada sea precisa y esté actualizada, pero no garantizamos que esté libre de errores ni disponible de forma continua."],
+          ["6. Limitación de responsabilidad", "En la medida en que lo permita la ley aplicable, TicketMirror no será responsable por daños indirectos o incidentales derivados del uso de la plataforma."],
+          ["7. Cambios en los términos", "Podemos actualizar estos términos cada tanto. El uso continuado de la plataforma luego de que un cambio entre en vigencia implica que aceptás los términos revisados."],
+          ["8. Contacto", "Ante cualquier duda sobre estos términos, escribinos por los canales indicados en el sitio."],
+        ] as [string, string][],
+      },
+      privacidad: {
+        title: "Política de Privacidad",
+        sections: [
+          ["1. Datos que recopilamos", "Recopilamos la información que nos brindás al solicitar acceso o usar tu cuenta —como nombre, datos de contacto y preferencias— junto con datos técnicos básicos de tu visita."],
+          ["2. Cómo usamos tus datos", "Usamos tus datos para revisar solicitudes de acceso, operar y mejorar el servicio, responder tus consultas y mantenerte al tanto de tus pedidos."],
+          ["3. Compartir con terceros", "No vendemos tus datos personales. Podemos compartirlos con proveedores que nos ayudan a operar la plataforma, siempre bajo las obligaciones de confidencialidad correspondientes."],
+          ["4. Conservación de los datos", "Conservamos tu información por el tiempo necesario para prestar el servicio y para cumplir obligaciones legales o contables aplicables."],
+          ["5. Tus derechos", "Sujeto a la ley aplicable, podés solicitar el acceso, la rectificación o la eliminación de tus datos personales. Escribinos para ejercer estos derechos."],
+          ["6. Seguridad", "Aplicamos medidas técnicas y organizativas razonables para proteger tu información, aunque ningún método de transmisión o almacenamiento es completamente seguro."],
+          ["7. Contacto", "Ante cualquier duda o pedido sobre privacidad, escribinos por los canales indicados en el sitio."],
+        ] as [string, string][],
+      },
+      cookies: {
+        title: "Política de Cookies",
+        sections: [
+          ["1. Qué son las cookies", "Las cookies son pequeños archivos que se guardan en tu dispositivo y ayudan a que un sitio funcione correctamente y recuerde tus preferencias."],
+          ["2. Cookies que usamos", "Usamos cookies esenciales necesarias para que el sitio funcione —como mantener tu sesión y tu idioma— y podemos usar analítica básica para entender el uso."],
+          ["3. Cookies de terceros", "Algunas funciones pueden depender de servicios de terceros que instalan sus propias cookies, regidas por sus respectivas políticas."],
+          ["4. Cómo gestionarlas", "Podés controlar o eliminar las cookies desde la configuración de tu navegador. Desactivar las esenciales puede afectar el funcionamiento del sitio."],
+          ["5. Cambios", "Podemos actualizar esta política a medida que cambie nuestro uso de cookies. La versión vigente estará siempre disponible en esta página."],
+        ] as [string, string][],
+      },
+      reembolsos: {
+        title: "Política de Reembolsos y Cancelaciones",
+        sections: [
+          ["1. Alcance", "Esta política explica cómo se manejan las cancelaciones y los reembolsos de los pedidos realizados a través de la plataforma."],
+          ["2. Cancelaciones", "Podés solicitar la cancelación de un pedido pendiente antes de que nuestro equipo lo confirme. Las operaciones confirmadas pueden estar sujetas a condiciones particulares."],
+          ["3. Reembolsos", "Cuando corresponda un reembolso, se emitirá por el mismo medio de pago original siempre que sea posible."],
+          ["4. Plazos", "Los reembolsos se procesan dentro de un plazo razonable luego de su aprobación. Los tiempos reales pueden variar según el proveedor de pago."],
+          ["5. Cómo solicitarlo", "Para pedir una cancelación o reembolso, escribinos por los canales indicados en el sitio e incluí el código de tu operación."],
+          ["6. Contacto", "Ante cualquier duda sobre cancelaciones o reembolsos, escribinos por los canales indicados en el sitio."],
+        ] as [string, string][],
+      },
+      aviso: {
+        title: "Aviso Legal",
+        sections: [
+          ["1. Titular del sitio", "Este sitio es operado por TicketMirror. Los datos de contacto están disponibles a través de los canales indicados en el sitio."],
+          ["2. Objeto", "Este aviso legal regula el acceso y el uso de este sitio web y de su contenido."],
+          ["3. Condiciones de uso", "Al usar el sitio te comprometés a hacerlo de buena fe y conforme a la ley, a estas condiciones y a las políticas aplicables."],
+          ["4. Propiedad intelectual", "El contenido, el diseño y las marcas que se muestran en el sitio están protegidos y no pueden reproducirse sin autorización previa."],
+          ["5. Responsabilidad", "No nos responsabilizamos por el uso indebido del sitio ni por el contenido de sitios de terceros enlazados desde acá."],
+          ["6. Ley aplicable", "Este aviso se rige por la ley aplicable de nuestro lugar de operación, y toda controversia se someterá a los tribunales competentes."],
+        ] as [string, string][],
+      },
     },
   },
   auth: {
