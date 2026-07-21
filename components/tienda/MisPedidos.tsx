@@ -17,6 +17,7 @@ export type PedidoView = {
   tipo: "pedido" | "consulta";
   evento: string;
   sector: string | null;
+  cantidad: number;
   fecha_evento: string | null;
   created_at: string;
   estado: Estado;
@@ -132,7 +133,10 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
                   {p.sector && (
                     <div>
                       <dt>{mp.sectorLabel}</dt>
-                      <dd>{p.sector}</dd>
+                      <dd>
+                        {p.sector}
+                        {p.cantidad > 1 ? ` ×${p.cantidad}` : ""}
+                      </dd>
                     </div>
                   )}
                   {p.fecha_evento && (

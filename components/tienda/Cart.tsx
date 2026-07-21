@@ -22,7 +22,9 @@ export type CartItem = {
   evento: string;
   comp: string;
   sector: string;
-  monto: number; // 0 en consultas / sin precio
+  monto: number; // precio UNITARIO (0 en consultas / sin precio)
+  cantidad: number; // cuántas entradas de este sector
+  maxStock: number; // tope por stock de la tienda (0 = sin tope conocido)
   tipo: "pedido" | "consulta";
   fecha_evento: string | null;
 };
@@ -32,6 +34,7 @@ type CartCtx = {
   count: number;
   has: (key: string) => boolean;
   add: (item: CartItem) => void;
+  setQty: (key: string, cantidad: number) => void;
   remove: (key: string) => void;
   clear: () => void;
 };
@@ -75,6 +78,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const add = useCallback((item: CartItem) => {
     setItems((prev) => (prev.some((i) => i.key === item.key) ? prev : [...prev, item]));
   }, []);
+  // Cambia la cantidad de una línea, topeada por su stock. Bajar de 1 la quita.
+  const setQty = useCallback((key: string, cantidad: number) => {
+    setItems((prev) => {
+      if (cantidad < 1) return prev.filter((i) => i.key !== key);
+      return prev.map((i) => {
+        if (i.key !== key) return i;
+        const max = i.maxStock > 0 ? i.maxStock : 99;
+        return { ...i, cantidad: Math.min(Math.trunc(cantidad), max) };
+      });
+    });
+  }, []);
   const remove = useCallback((key: string) => {
     setItems((prev) => prev.filter((i) => i.key !== key));
   }, []);
@@ -82,7 +96,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const has = useCallback((key: string) => items.some((i) => i.key === key), [items]);
 
   return (
-    <Ctx.Provider value={{ items, count: items.length, has, add, remove, clear }}>
+    <Ctx.Provider value={{ items, count: items.length, has, add, setQty, remove, clear }}>
       {children}
     </Ctx.Provider>
   );
@@ -103,14 +117,15 @@ type Estado = "idle" | "sending" | "done" | "err";
 // Barra flotante + hoja de revisión. Se renderiza una vez, a nivel layout de
 // la tienda; se muestra sola cuando hay entradas en el carrito.
 export function CartBar() {
-  const { items, count, remove, clear } = useCart();
+  const { items, count, setQty, remove, clear } = useCart();
   const lang = useLang();
   const c = TX[lang].carrito;
   const [open, setOpen] = useState(false);
   const [estado, setEstado] = useState<Estado>("idle");
   const [error, setError] = useState("");
 
-  const total = items.reduce((a, i) => a + (i.monto || 0), 0);
+  // Total = suma de (precio unitario × cantidad) de cada línea.
+  const total = items.reduce((a, i) => a + (i.monto || 0) * i.cantidad, 0);
 
   function cerrar() {
     setOpen(false);
@@ -134,7 +149,8 @@ export function CartBar() {
             ticket_id: i.ticket_id,
             evento: i.evento,
             sector: i.sector,
-            monto: i.monto,
+            monto: i.monto, // precio unitario; el server calcula el total
+            cantidad: i.cantidad,
             fecha_evento: i.fecha_evento,
           })),
         }),
@@ -208,9 +224,36 @@ export function CartBar() {
                           <span>{i.sector}</span>
                           {i.comp && <span>· {i.comp}</span>}
                         </div>
+                        {/* Cantidad solo en pedidos (la consulta es por una);
+                            topeada por el stock del sector. */}
+                        {i.tipo === "pedido" && (
+                          <div className="cart-qty" role="group" aria-label={c.cantidad}>
+                            <button
+                              type="button"
+                              onClick={() => setQty(i.key, i.cantidad - 1)}
+                              aria-label={c.menos}
+                            >
+                              −
+                            </button>
+                            <span className="cart-qty-n" aria-live="polite">
+                              {i.cantidad}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setQty(i.key, i.cantidad + 1)}
+                              disabled={i.maxStock > 0 && i.cantidad >= i.maxStock}
+                              aria-label={c.mas}
+                            >
+                              +
+                            </button>
+                            {i.maxStock > 0 && (
+                              <span className="cart-qty-max">{c.stock(i.maxStock)}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <span className="cart-it-price">
-                        {i.monto > 0 ? fmtPrice(i.monto, lang) : c.aConsultar}
+                        {i.monto > 0 ? fmtPrice(i.monto * i.cantidad, lang) : c.aConsultar}
                       </span>
                       <button
                         type="button"

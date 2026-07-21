@@ -49,6 +49,7 @@ function seed(): MockDB {
       comprador_alias: "compra_marce",
       vendedor_alias: "vende_lucho",
       monto: 850000,
+      cantidad: 1,
       fee: 60000,
       status: "entrada_recibida",
       entrada_recibida_at: iso(90),
@@ -75,6 +76,7 @@ function seed(): MockDB {
       comprador_alias: "juanma_ok",
       vendedor_alias: null,
       monto: 300000,
+      cantidad: 2,
       fee: 25000,
       status: "esperando_entrada",
       entrada_recibida_at: null,
@@ -102,6 +104,7 @@ function seed(): MockDB {
       comprador_alias: "f1fan",
       vendedor_alias: "scuderia_ar",
       monto: 500000,
+      cantidad: 1,
       fee: 40000,
       status: "confirmada",
       entrada_recibida_at: iso(60 * 24 * 3),
@@ -228,12 +231,14 @@ export function mockCreateOp(input: {
   cliente_id?: string | null;
   cliente_email?: string | null;
   sector?: string | null;
+  cantidad?: number;
 }): Operacion {
   const now = new Date().toISOString();
   const op: Operacion = {
     id: crypto.randomUUID(),
     code: generateCode(),
     ...input,
+    cantidad: input.cantidad ?? 1,
     tipo: input.tipo ?? "operacion",
     cliente_id: input.cliente_id ?? null,
     cliente_email: input.cliente_email ?? null,

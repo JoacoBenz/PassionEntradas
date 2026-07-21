@@ -22,6 +22,7 @@ type OpRow = {
   tipo: string;
   evento: string;
   sector: string | null;
+  cantidad: number | null;
   fecha_evento: string | null;
   created_at: string;
   status: any;
@@ -37,6 +38,7 @@ function toView(o: OpRow, facturaId: string | null): PedidoView {
     tipo: o.tipo === "consulta" ? "consulta" : "pedido",
     evento: o.evento,
     sector: o.sector ?? null,
+    cantidad: o.cantidad ?? 1,
     fecha_evento: o.fecha_evento ?? null,
     created_at: o.created_at,
     estado: estadoDe(o),
@@ -68,7 +70,7 @@ export default async function MisPedidosPage() {
     const { data } = await admin
       .from("operaciones")
       .select(
-        "id, code, tipo, evento, sector, fecha_evento, created_at, status, entrada_recibida_at, pago_confirmado_at, cerrada_at"
+        "id, code, tipo, evento, sector, cantidad, fecha_evento, created_at, status, entrada_recibida_at, pago_confirmado_at, cerrada_at"
       )
       .eq("cliente_id", user.id)
       .in("tipo", ["pedido", "consulta"])

@@ -65,7 +65,7 @@ export default async function ModeradorPage({
       admin
         .from("operaciones")
         .select(
-          "id, code, evento, comprador_alias, vendedor_alias, monto, fee, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, ticket_id, created_at, updated_at"
+          "id, code, evento, comprador_alias, vendedor_alias, monto, cantidad, fee, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, ticket_id, tipo, cliente_email, sector, created_at, updated_at"
         )
         .order("created_at", { ascending: false })
         .limit(10),
@@ -78,6 +78,7 @@ export default async function ModeradorPage({
       ...o,
       notas: null,
       cuenta_debitar: null,
+      cliente_id: null,
     })) as Operacion[];
     const m = (agregados.data ?? {}) as Record<string, number | null>;
     const plataMovida = Number(m.plata_movida ?? 0);

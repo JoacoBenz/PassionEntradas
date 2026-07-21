@@ -21,7 +21,9 @@ export default function FacturaModal({
 }) {
   const [nombre, setNombre] = useState(op.comprador_alias ?? "");
   const [contacto, setContacto] = useState("");
-  const [cantidad, setCantidad] = useState("1");
+  // Cantidad del pedido (topeada por el stock en la tienda). Arranca de la
+  // operación; si ya hay factura emitida, gana su snapshot (efecto de más abajo).
+  const [cantidad, setCantidad] = useState(String(op.cantidad || 1));
   const [metodo, setMetodo] = useState("Bank transfer (USD)");
   const [idioma, setIdioma] = useState<"en" | "es">("en");
   const [existente, setExistente] = useState<Factura | null>(null);

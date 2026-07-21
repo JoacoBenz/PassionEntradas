@@ -249,6 +249,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
         vendedor_alias: form.vendedor_alias.trim() || null,
         cuenta_debitar: null,
         monto: Math.trunc(Number(form.monto || 0)),
+        cantidad: 1,
         fee: Math.trunc(Number(form.fee || 0)),
         status: "esperando_entrada",
         entrada_recibida_at: null,

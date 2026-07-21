@@ -22,7 +22,11 @@ export type Operacion = {
   evento: string;
   comprador_alias: string | null;
   vendedor_alias: string | null;
+  // Total de la línea (precio unitario × cantidad). El unitario se deriva
+  // como monto / cantidad.
   monto: number;
+  // Cantidad de entradas del sector (>= 1). Topeada por el stock en la tienda.
+  cantidad: number;
   fee: number;
   // Cuenta (alias/CBU) de la que se debita la plata. Dato interno del
   // panel — nunca se muestra en el link público.

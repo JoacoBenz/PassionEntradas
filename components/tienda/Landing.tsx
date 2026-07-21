@@ -7,8 +7,31 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import { LANGS, TX, type Lang } from "@/lib/tienda-i18n";
 import { PAISES, PAIS_DEFAULT, dialDe, nombrePais } from "@/lib/paises";
+
+// La landing es estática, pero si el visitante ya tiene sesión mostramos
+// accesos de logueado (Mi cuenta / Ver entradas) en vez de "Ingresar". Se
+// chequea en el cliente para no volver dinámica toda la página.
+function useLogueado(): boolean {
+  const [logueado, setLogueado] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const { data } = await createClient().auth.getSession();
+        if (vivo) setLogueado(!!data.session);
+      } catch {
+        /* sin cliente / sin sesión: se queda como visitante */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
+  return logueado;
+}
 
 function useLang() {
   const [lang, setLang] = useState<Lang>("en");
@@ -46,6 +69,7 @@ export function Landing() {
   const [lang, setLang] = useLang();
   const t = TX[lang];
   const lp = t.lp;
+  const logueado = useLogueado();
 
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
@@ -105,9 +129,20 @@ export function Landing() {
           </span>
           <div className="mast-right">
             <LangToggle lang={lang} onChange={setLang} />
-            <Link className="lp-nav-login" href="/ingresar">
-              {lp.navIngresar}
-            </Link>
+            {logueado ? (
+              <>
+                <Link className="lp-nav-login" href="/mis-pedidos">
+                  {lp.navPedidos}
+                </Link>
+                <Link className="lp-nav-login" href="/cuenta">
+                  {lp.navCuenta}
+                </Link>
+              </>
+            ) : (
+              <Link className="lp-nav-login" href="/ingresar">
+                {lp.navIngresar}
+              </Link>
+            )}
           </div>
         </div>
 
@@ -127,12 +162,20 @@ export function Landing() {
               ))}
             </ul>
             <div className="cta-row">
-              <a className="btn-primary lp-hero-cta" href="#solicitar">
-                {lp.ctaSolicitar}
-              </a>
-              <Link className="btn-ghost" href="/ingresar">
-                {lp.ctaIngresar}
-              </Link>
+              {logueado ? (
+                <Link className="btn-primary lp-hero-cta" href="/entradas">
+                  {lp.irEntradas}
+                </Link>
+              ) : (
+                <>
+                  <a className="btn-primary lp-hero-cta" href="#solicitar">
+                    {lp.ctaSolicitar}
+                  </a>
+                  <Link className="btn-ghost" href="/ingresar">
+                    {lp.ctaIngresar}
+                  </Link>
+                </>
+              )}
             </div>
           </div>
 

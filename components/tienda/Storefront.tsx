@@ -219,22 +219,23 @@ function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang 
   const low = stk > 0 && stk <= 2;
   const sector = u.categoria || t.entradaGeneral;
   const tipo: "pedido" | "consulta" = bookable ? "pedido" : "consulta";
-  const inCart = cart.has(u.id);
+  const item = cart.items.find((i) => i.key === u.id);
+  const inCart = !!item;
+  // Precio unitario redondeado, igual que el que se muestra (fmtPrice usa
+  // round): lo guardado debe coincidir con lo que vio el cliente, no truncar.
+  const unit = bookable && hasPrice ? Math.round(Number(u.precio_final)) : 0;
 
-  function toggle() {
-    if (inCart) {
-      cart.remove(u.id);
-      return;
-    }
+  function agregar() {
     cart.add({
       key: u.id,
       ticket_id: u.id,
       evento: ev.evento,
       comp: ev.comp,
       sector,
-      // Redondeado, igual que el precio que se muestra (fmtPrice usa round):
-      // el monto guardado debe coincidir con lo que vio el cliente, no truncar.
-      monto: bookable && hasPrice ? Math.round(Number(u.precio_final)) : 0,
+      monto: unit,
+      cantidad: 1,
+      // Solo los pedidos con stock permiten más de una; el stepper se topea acá.
+      maxStock: bookable ? stk : 0,
       tipo,
       fecha_evento: ev.fecha ? ev.fecha.slice(0, 10) : null,
     });
@@ -264,14 +265,41 @@ function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang 
           </>
         )}
       </span>
-      <button
-        type="button"
-        className={`seat-act ${inCart ? "done" : bookable ? "go" : "ask"}`}
-        onClick={toggle}
-        aria-pressed={inCart}
-      >
-        {inCart ? t.agregado : bookable ? t.pedir : t.consultar}
-      </button>
+      {!inCart ? (
+        <button
+          type="button"
+          className={`seat-act ${bookable ? "go" : "ask"}`}
+          onClick={agregar}
+        >
+          {bookable ? t.pedir : t.consultar}
+        </button>
+      ) : bookable ? (
+        // En el carrito: stepper de cantidad topeado por el stock del sector.
+        <span className="seat-qty" role="group" aria-label={t.carrito.cantidad}>
+          <button
+            type="button"
+            onClick={() => cart.setQty(u.id, (item?.cantidad ?? 1) - 1)}
+            aria-label={t.carrito.menos}
+          >
+            −
+          </button>
+          <span className="seat-qty-n" aria-live="polite">
+            {item?.cantidad ?? 1}
+          </span>
+          <button
+            type="button"
+            onClick={() => cart.setQty(u.id, (item?.cantidad ?? 1) + 1)}
+            disabled={stk > 0 && (item?.cantidad ?? 1) >= stk}
+            aria-label={t.carrito.mas}
+          >
+            +
+          </button>
+        </span>
+      ) : (
+        <button type="button" className="seat-act done" onClick={() => cart.remove(u.id)}>
+          {t.agregado}
+        </button>
+      )}
     </li>
   );
 }

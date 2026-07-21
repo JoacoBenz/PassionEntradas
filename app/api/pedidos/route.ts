@@ -68,7 +68,8 @@ export async function POST(request: Request) {
     evento: string;
     sector: string | null;
     ticket_id: string | null;
-    monto: number;
+    monto: number; // total de la línea (unitario × cantidad)
+    cantidad: number;
     fecha_evento: string | null;
   };
   const parsed: Parsed[] = [];
@@ -83,15 +84,23 @@ export async function POST(request: Request) {
     }
     const sector = it?.sector ? String(it.sector).trim().slice(0, 200) : null;
     const ticket_id = it?.ticket_id ? String(it.ticket_id).slice(0, 200) : null;
-    // En una consulta el precio puede no estar; el pedido suele traerlo. Se
-    // guarda si es válido, si no queda en 0 (el monto final lo cierra el staff).
-    // Redondeo (no truncado) para que coincida con el precio mostrado en la
-    // tienda (fmtPrice usa Math.round) y con lo que después ve la factura.
-    const montoRaw = Math.round(Number(it?.monto));
-    const monto = Number.isFinite(montoRaw) && montoRaw > 0 ? montoRaw : 0;
+    // Cantidad: solo un pedido puede pedir más de una; la consulta es siempre
+    // por una. El tope real por stock lo aplica la tienda; acá se acota a un
+    // rango sano (1..99) para no guardar valores absurdos.
+    const cantRaw = Math.trunc(Number(it?.cantidad));
+    const cantidad =
+      tipo === "pedido" && Number.isFinite(cantRaw) && cantRaw > 0
+        ? Math.min(cantRaw, 99)
+        : 1;
+    // Precio unitario: redondeo (no truncado) para que coincida con el precio
+    // mostrado en la tienda (fmtPrice usa Math.round). `monto` guardado = total
+    // de la línea = unitario × cantidad; la factura deriva el unitario de vuelta.
+    const unitRaw = Math.round(Number(it?.monto));
+    const unit = Number.isFinite(unitRaw) && unitRaw > 0 ? unitRaw : 0;
+    const monto = unit * cantidad;
     const fechaRaw = it?.fecha_evento ? String(it.fecha_evento).slice(0, 10) : null;
     const fecha_evento = fechaRaw && /^\d{4}-\d{2}-\d{2}$/.test(fechaRaw) ? fechaRaw : null;
-    parsed.push({ tipo, evento, sector, ticket_id, monto, fecha_evento });
+    parsed.push({ tipo, evento, sector, ticket_id, monto, cantidad, fecha_evento });
   }
 
   const notasDe = (p: Parsed) =>
@@ -100,7 +109,7 @@ export async function POST(request: Request) {
     (ctx.cliente_email ? ` (${ctx.cliente_email})` : "");
 
   // 1) Registro en la app: una operación por entrada.
-  type Creada = { id: string; code: string; evento: string; sector: string | null; tipo: string; monto: number };
+  type Creada = { id: string; code: string; evento: string; sector: string | null; tipo: string; monto: number; cantidad: number };
   let creadas: Creada[] = [];
 
   if (isMock()) {
@@ -110,6 +119,7 @@ export async function POST(request: Request) {
         comprador_alias: ctx.comprador,
         vendedor_alias: null,
         monto: p.monto,
+        cantidad: p.cantidad,
         fee: 0,
         ticket_id: p.ticket_id,
         fecha_evento: p.fecha_evento,
@@ -120,7 +130,7 @@ export async function POST(request: Request) {
         cliente_email: ctx.cliente_email,
         sector: p.sector,
       });
-      return { id: op.id, code: op.code, evento: op.evento, sector: op.sector, tipo: op.tipo, monto: op.monto };
+      return { id: op.id, code: op.code, evento: op.evento, sector: op.sector, tipo: op.tipo, monto: op.monto, cantidad: op.cantidad };
     });
   } else {
     const admin = createAdminSupabase();
@@ -132,6 +142,7 @@ export async function POST(request: Request) {
         evento: p.evento,
         comprador_alias: ctx.comprador,
         monto: p.monto,
+        cantidad: p.cantidad,
         fee: 0,
         ticket_id: p.ticket_id,
         fecha_evento: p.fecha_evento,
@@ -144,7 +155,7 @@ export async function POST(request: Request) {
       const { data, error } = await admin
         .from("operaciones")
         .insert(rows)
-        .select("id, code, evento, sector, tipo, monto");
+        .select("id, code, evento, sector, tipo, monto, cantidad");
       if (!error && data) {
         creadas = data as Creada[];
         break;
@@ -167,9 +178,10 @@ export async function POST(request: Request) {
   const n = creadas.length;
   const lineas = creadas
     .map((c, i) => {
+      const cant = c.cantidad > 1 ? ` ×${c.cantidad}` : "";
       const monto = c.monto > 0 ? ` — ${formatUSD(c.monto)}` : "";
       const tag = c.tipo === "pedido" ? "PEDIDO" : "CONSULTA";
-      return `${i + 1}) ${c.evento}${c.sector ? ` — ${c.sector}` : ""}${monto} [${tag}] · ${c.code}`;
+      return `${i + 1}) ${c.evento}${c.sector ? ` — ${c.sector}` : ""}${cant}${monto} [${tag}] · ${c.code}`;
     })
     .join("\n");
   const mensaje =

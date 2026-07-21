@@ -142,8 +142,15 @@ export default function OperacionCard({
             {TIPO_LABEL[op.tipo]}
           </span>
         )}
-        <span className="whitespace-nowrap font-display text-sm font-bold tabular-nums">
-          {formatUSD(op.monto)}
+        <span className="flex flex-col items-end leading-none">
+          <span className="whitespace-nowrap font-display text-sm font-bold tabular-nums">
+            {formatUSD(op.monto)}
+          </span>
+          {op.cantidad > 1 && (
+            <span className="mt-0.5 font-mono text-[10px] text-muted">
+              ×{op.cantidad} · {formatUSD(Math.round(op.monto / op.cantidad))} c/u
+            </span>
+          )}
         </span>
         <svg
           className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
