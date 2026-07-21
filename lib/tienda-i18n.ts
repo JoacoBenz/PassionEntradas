@@ -139,6 +139,9 @@ const en = {
     sinUbicar: (n: number) => `+ ${n} without a pinned venue`,
     elegi: "Tap a dot or a city to see its events.",
     verCatalogo: "Open in catalogue →",
+    zoomMas: "Zoom in",
+    zoomMenos: "Zoom out",
+    zoomReset: "Reset view",
   },
 
   // landing pública (/): capta clientes y toma la solicitud de acceso.
@@ -358,6 +361,9 @@ const es: typeof en = {
     sinUbicar: (n) => `+ ${n} sin sede ubicada`,
     elegi: "Tocá un punto o una ciudad para ver sus eventos.",
     verCatalogo: "Ver en el catálogo →",
+    zoomMas: "Acercar",
+    zoomMenos: "Alejar",
+    zoomReset: "Vista completa",
   },
 
   lp: {

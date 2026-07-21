@@ -114,6 +114,37 @@ export const ESTADO_COLOR: Record<Estado, string> = {
   cancelada: "#D14D68", // rosa
 };
 
+// Grupo de estado para leer de un vistazo (el punto de cada operación):
+// ABIERTA (recién entra) · EN CURSO (con hitos, sin cerrar) · CERRADA ·
+// CANCELADA. Los seis estados finos se agrupan en estos colores.
+export type EstadoGrupo = "abierta" | "en_curso" | "cerrada" | "cancelada";
+
+export function estadoGrupo(estado: Estado): EstadoGrupo {
+  if (estado === "cancelada") return "cancelada";
+  if (estado === "cerrada") return "cerrada";
+  if (estado === "esperando") return "abierta";
+  return "en_curso";
+}
+
+export const ESTADO_GRUPO_COLOR: Record<EstadoGrupo, string> = {
+  abierta: "#E0A100", // amarillo: abierta, falta todo
+  en_curso: "#1F33E0", // cobalto: en progreso
+  cerrada: "#1F8A4C", // verde: cerrada / entregada
+  cancelada: "#9AA0AE", // gris: cancelada
+};
+
+export const ESTADO_GRUPO_LABEL: Record<EstadoGrupo, string> = {
+  abierta: "Abierta",
+  en_curso: "En curso",
+  cerrada: "Cerrada",
+  cancelada: "Cancelada",
+};
+
+// Color del punto de la operación, según el grupo.
+export function estadoDotColor(estado: Estado): string {
+  return ESTADO_GRUPO_COLOR[estadoGrupo(estado)];
+}
+
 // Colores de cada hito individual (botones y pasos).
 export const HITO_COLOR = {
   entrada: "#B07A14",

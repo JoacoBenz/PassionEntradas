@@ -723,14 +723,22 @@
   .lp-auth-card { box-shadow: 4px 4px 0 var(--ink); padding: 22px 18px; }
 }
 
-/* Mi cuenta del cliente: form acotado + mensaje de éxito + logout. */
-.lp-cuenta-form { max-width: 460px; }
+/* Mi cuenta del cliente: perfil y contraseña en UNA línea (lado a lado en
+   desktop, apiladas en mobile). */
+.lp-cuenta-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;
+}
+.lp-cuenta-grid .lp-form { max-width: none; }
+@media (max-width: 760px) { .lp-cuenta-grid { grid-template-columns: 1fr; } }
+
 .lp-ok-msg {
   margin: 0; font-size: 14px; font-weight: 600; color: var(--ok);
   border-left: 3px solid var(--ok); padding-left: 12px;
 }
-.lp-cuenta-wa { margin-top: 14px; max-width: 460px; }
-.lp-cuenta-logout { margin-top: 20px; }
+/* Contacto separado del botón de guardar por un divisor (no pegados). */
+.lp-cuenta-wa { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--hair); }
+.lp-cuenta-wa .btn-ghost { display: inline-block; }
+.lp-cuenta-logout { margin-top: 22px; }
 
 /* Estado de éxito tras enviar. */
 .lp-ok {
@@ -777,16 +785,37 @@
 /* Marco del mapa: tarjeta con borde e ink-shadow, tierra en tinta sobre
    papel de ticket; los puntos cobalto saltan a la vista. */
 .mapa-frame {
+  position: relative;
   border: 1.5px solid var(--ink); background: var(--field);
   box-shadow: 6px 6px 0 var(--ink); padding: 12px;
 }
-.mapa-svg { display: block; width: 100%; height: auto; }
+.mapa-svg { display: block; width: 100%; height: auto; cursor: grab; }
+.mapa-svg:active { cursor: grabbing; }
 .mapa-land { fill: var(--ink); opacity: .88; }
 .mapa-dot { cursor: pointer; }
-.mapa-punto { fill: var(--cobalt); stroke: var(--field); stroke-width: 1.4; transition: .12s; }
-.mapa-dot:hover .mapa-punto { fill: var(--cobalt-d); }
+.mapa-punto { fill: var(--cobalt); stroke: var(--field); stroke-width: 1.4; transition: fill .12s; }
+.mapa-dot:hover .mapa-punto,
+.mapa-dot.hov .mapa-punto { fill: var(--cobalt-d); }
 .mapa-dot.sel .mapa-punto { fill: var(--flare); }
 .mapa-ring { fill: none; stroke: var(--flare); stroke-width: 1.4; }
+.mapa-ring--hov { stroke: var(--cobalt-d); }
+
+/* Chip resaltado cuando el mouse está sobre su punto del mapa. */
+.mapa-chip-hov { background: var(--ink); color: var(--field); }
+.mapa-chip-hov small { color: var(--paper); }
+
+/* Controles de zoom (rueda en desktop; botones también para touch). */
+.mapa-zoom {
+  position: absolute; top: 20px; right: 20px; display: grid; gap: 6px;
+}
+.mapa-zoom button {
+  width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--field); border: 1px solid var(--ink); color: var(--ink); cursor: pointer;
+  font-family: var(--font-mono), monospace; font-size: 15px; font-weight: 700; line-height: 1;
+  transition: .12s;
+}
+.mapa-zoom button:hover:not(:disabled) { background: var(--ink); color: var(--field); }
+.mapa-zoom button:disabled { opacity: .35; cursor: default; }
 
 .mapa-meta {
   margin: 12px 0 0; font-family: var(--font-mono), monospace; font-size: 12px;

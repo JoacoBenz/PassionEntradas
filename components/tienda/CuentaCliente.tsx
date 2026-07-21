@@ -157,107 +157,114 @@ export function CuentaCliente({ mock, perfil }: { mock: boolean; perfil: PerfilI
         </div>
       </header>
 
-      {/* Perfil + idioma + WhatsApp */}
+      {/* Un solo encabezado; las dos secciones (perfil y contraseña) van en
+          UNA línea (lado a lado en desktop, apiladas en mobile), cada una con
+          su título compacto adentro de la tarjeta. */}
       <section className="block">
         <div className="section-h">
-          <span className="sh-eyebrow">{lp.navCuenta}</span>
-          <h2>{lp.cuentaPerfilH}</h2>
+          <span className="sh-eyebrow">TicketMirror</span>
+          <h2>{lp.navCuenta}</h2>
         </div>
 
-        <form className="lp-form lp-cuenta-form" onSubmit={guardarPerfil} noValidate>
-          <label className="lp-field">
-            <span>{lp.fNombre}</span>
-            <input
-              type="text"
-              autoComplete="name"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-            />
-          </label>
-          <label className="lp-field">
-            <span>{lp.fTelefono}</span>
-            <input
-              type="tel"
-              autoComplete="tel"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-            />
-          </label>
-          <label className="lp-field">
-            <span>{lp.fDireccion}</span>
-            <input
-              type="text"
-              autoComplete="street-address"
-              value={direccion}
-              onChange={(e) => setDireccion(e.target.value)}
-            />
-          </label>
+        <div className="lp-cuenta-grid">
+          {/* Perfil + idioma + WhatsApp */}
+          <form className="lp-form" onSubmit={guardarPerfil} noValidate>
+            <div className="lp-form-head">
+              <h2>{lp.cuentaPerfilH}</h2>
+            </div>
+            <label className="lp-field">
+              <span>{lp.fNombre}</span>
+              <input
+                type="text"
+                autoComplete="name"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+              />
+            </label>
+            <label className="lp-field">
+              <span>{lp.fTelefono}</span>
+              <input
+                type="tel"
+                autoComplete="tel"
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+              />
+            </label>
+            <label className="lp-field">
+              <span>{lp.fDireccion}</span>
+              <input
+                type="text"
+                autoComplete="street-address"
+                value={direccion}
+                onChange={(e) => setDireccion(e.target.value)}
+              />
+            </label>
 
-          <div className="lp-field">
-            <span>{lp.cuentaIdioma}</span>
-            <LangToggle lang={lang} onChange={cambiarIdioma} />
-          </div>
+            <div className="lp-field">
+              <span>{lp.cuentaIdioma}</span>
+              <LangToggle lang={lang} onChange={cambiarIdioma} />
+            </div>
 
-          {perfilEstado === "ok" && <p className="lp-ok-msg">{lp.cuentaPerfilOk}</p>}
-          {perfilError && <p className="lp-err">{perfilError}</p>}
+            {perfilEstado === "ok" && <p className="lp-ok-msg">{lp.cuentaPerfilOk}</p>}
+            {perfilError && <p className="lp-err">{perfilError}</p>}
 
-          <button className="btn-primary lp-submit" type="submit" disabled={perfilEstado === "saving"}>
-            {perfilEstado === "saving" ? lp.cuentaGuardando : lp.cuentaGuardarPerfil}
+            <button className="btn-primary lp-submit" type="submit" disabled={perfilEstado === "saving"}>
+              {perfilEstado === "saving" ? lp.cuentaGuardando : lp.cuentaGuardarPerfil}
+            </button>
+
+            {/* Contacto, separado del guardar por un divisor (no pegado). */}
+            <div className="lp-cuenta-wa">
+              <a
+                className="btn-ghost"
+                href={waLink(lp.cuentaWaMsg(nombre))}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {lp.cuentaWhatsapp}
+              </a>
+            </div>
+          </form>
+
+          {/* Contraseña */}
+          <form className="lp-form" onSubmit={guardarClave} noValidate>
+            <div className="lp-form-head">
+              <h2>{lp.cuentaPassH}</h2>
+            </div>
+            <label className="lp-field">
+              <span>{lp.cuentaNueva}</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                placeholder={lp.cuentaMin}
+                value={clave}
+                onChange={(e) => setClave(e.target.value)}
+              />
+            </label>
+            <label className="lp-field">
+              <span>{lp.cuentaRepetir}</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={repetir}
+                onChange={(e) => setRepetir(e.target.value)}
+              />
+            </label>
+
+            {claveEstado === "ok" && <p className="lp-ok-msg">{lp.cuentaOk}</p>}
+            {claveError && <p className="lp-err">{claveError}</p>}
+
+            <button className="btn-primary lp-submit" type="submit" disabled={claveEstado === "saving"}>
+              {claveEstado === "saving" ? lp.cuentaGuardando : lp.cuentaGuardar}
+            </button>
+          </form>
+        </div>
+
+        <div className="lp-cuenta-logout">
+          <button className="back" onClick={logout}>
+            {lp.cuentaSalir}
           </button>
-        </form>
-
-        <div className="lp-cuenta-wa">
-          <a
-            className="btn-ghost"
-            href={waLink(lp.cuentaWaMsg(nombre))}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {lp.cuentaWhatsapp}
-          </a>
         </div>
       </section>
-
-      {/* Contraseña */}
-      <section className="block">
-        <div className="section-h">
-          <h2>{lp.cuentaPassH}</h2>
-        </div>
-        <form className="lp-form lp-cuenta-form" onSubmit={guardarClave} noValidate>
-          <label className="lp-field">
-            <span>{lp.cuentaNueva}</span>
-            <input
-              type="password"
-              autoComplete="new-password"
-              placeholder={lp.cuentaMin}
-              value={clave}
-              onChange={(e) => setClave(e.target.value)}
-            />
-          </label>
-          <label className="lp-field">
-            <span>{lp.cuentaRepetir}</span>
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={repetir}
-              onChange={(e) => setRepetir(e.target.value)}
-            />
-          </label>
-
-          {claveEstado === "ok" && <p className="lp-ok-msg">{lp.cuentaOk}</p>}
-          {claveError && <p className="lp-err">{claveError}</p>}
-
-          <button className="btn-primary lp-submit" type="submit" disabled={claveEstado === "saving"}>
-            {claveEstado === "saving" ? lp.cuentaGuardando : lp.cuentaGuardar}
-          </button>
-        </form>
-      </section>
-
-      <div className="lp-cuenta-logout">
-        <button className="back" onClick={logout}>
-          {lp.cuentaSalir}
-        </button>
-      </div>
     </>
   );
 }
