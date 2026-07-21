@@ -60,14 +60,13 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // getSession lee de la cookie (sin viaje a Auth salvo refresh). El
-  // middleware solo RUTEA; la autorización real la reafirma cada página/API
-  // con getUser()+rol (defensa en profundidad), así que una cookie adulterada
-  // rebota igual más adentro.
+  // getUser() valida el token contra el servidor de Auth (no confía en la
+  // cookie): es lo que recomienda Supabase para el middleware. Además de rutear,
+  // así una cookie adulterada rebota ya en el borde. Cada página/API igual
+  // reafirma con getUser()+rol (defensa en profundidad).
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const user = session?.user ?? null;
+    data: { user },
+  } = await supabase.auth.getUser();
 
   // Sin sesión: la tienda y el panel van al login único. /admin/login es solo
   // un alias, así que también se resuelve acá (evita depender del redirect de
