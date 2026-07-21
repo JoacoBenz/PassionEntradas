@@ -909,6 +909,13 @@
   padding: 12px 20px;
   border-bottom: 2px solid var(--ink);
 }
+/* El masthead--cat es flex con un solo hijo (toprow): sin esto el toprow no
+   se estira y su space-between colapsa, dejando la nav pegada al logo en vez
+   de a la derecha (como en el home). */
+.tienda .masthead--cat > .toprow {
+  flex: 1;
+  min-width: 0;
+}
 
 /* ============ mis pedidos (cliente) ============ */
 .mp-wrap { padding-top: 28px; }
