@@ -3,9 +3,10 @@
 // Mapa mundial del catálogo (/mapa): cada ciudad con eventos es un punto
 // sobre una silueta del mundo (SVG propio, sin librerías de mapas). Tocar un
 // punto —o su chip— lista los eventos de esa ciudad con link al catálogo.
-// Estética de la tienda; bilingüe EN/ES.
+// Interacción: hover sincronizado chip↔punto, zoom con rueda/botones y paneo
+// arrastrando (viewBox dinámico). Estética de la tienda; bilingüe EN/ES.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   buildEvents,
@@ -56,11 +57,86 @@ type Ciudad = {
   eventos: EventoAgrupado[];
 };
 
+const RATIO = MAPA_H / MAPA_W;
+const ZOOM_MAX = 8; // ancho mínimo del viewBox = MAPA_W / 8
+
+type ViewBox = { x: number; y: number; w: number };
+
+function clampVb(x: number, y: number, w: number): ViewBox {
+  w = Math.max(MAPA_W / ZOOM_MAX, Math.min(MAPA_W, w));
+  const h = w * RATIO;
+  return {
+    x: Math.max(0, Math.min(MAPA_W - w, x)),
+    y: Math.max(0, Math.min(MAPA_H - h, y)),
+    w,
+  };
+}
+
 export function MapaEventos({ rows }: { rows: Ticket[] }) {
   const [lang, setLang] = useLang();
   const t = TX[lang];
   const [sel, setSel] = useState<string | null>(null);
+  const [hov, setHov] = useState<string | null>(null);
 
+  // --- zoom / paneo -----------------------------------------------------------
+  const [vb, setVb] = useState<ViewBox>({ x: 0, y: 0, w: MAPA_W });
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const drag = useRef<{ px: number; py: number; vx: number; vy: number; moved: boolean } | null>(null);
+  // Un paneo no debe disparar el click del punto donde terminó el arrastre.
+  const arrastrado = useRef(false);
+  const zoom = vb.w < MAPA_W - 1;
+  const k = vb.w / MAPA_W; // factor para que los puntos mantengan tamaño en pantalla
+
+  // Rueda del mouse: zoom hacia el cursor. Listener manual (passive: false)
+  // porque el onWheel de React no puede prevenir el scroll de la página.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const r = svg.getBoundingClientRect();
+      setVb((v) => {
+        const mx = v.x + ((e.clientX - r.left) / r.width) * v.w;
+        const my = v.y + ((e.clientY - r.top) / r.height) * (v.w * RATIO);
+        const w = v.w * (e.deltaY > 0 ? 1.25 : 0.8);
+        return clampVb(mx - (mx - v.x) * (w / v.w), my - (my - v.y) * (w / v.w), w);
+      });
+    };
+    svg.addEventListener("wheel", onWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", onWheel);
+  }, []);
+
+  function zoomCentro(f: number) {
+    setVb((v) => {
+      const cx = v.x + v.w / 2;
+      const cy = v.y + (v.w * RATIO) / 2;
+      const w = v.w * f;
+      return clampVb(cx - (cx - v.x) * (w / v.w), cy - (cy - v.y) * (w / v.w), w);
+    });
+  }
+
+  function onPointerDown(e: React.PointerEvent<SVGSVGElement>) {
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    drag.current = { px: e.clientX, py: e.clientY, vx: vb.x, vy: vb.y, moved: false };
+    arrastrado.current = false;
+  }
+  function onPointerMove(e: React.PointerEvent<SVGSVGElement>) {
+    const d = drag.current;
+    const svg = svgRef.current;
+    if (!d || !svg) return;
+    const dx = e.clientX - d.px;
+    const dy = e.clientY - d.py;
+    if (Math.abs(dx) + Math.abs(dy) > 5) d.moved = true;
+    if (!d.moved) return;
+    const r = svg.getBoundingClientRect();
+    setVb((v) => clampVb(d.vx - dx * (v.w / r.width), d.vy - dy * (v.w / r.width), v.w));
+  }
+  function onPointerUp() {
+    arrastrado.current = drag.current?.moved ?? false;
+    drag.current = null;
+  }
+
+  // --- datos -----------------------------------------------------------------
   const { ciudades, sinUbicar, totalUbicados } = useMemo(() => {
     const events = buildEvents(rows);
     const porCiudad = new Map<string, Ciudad>();
@@ -96,6 +172,11 @@ export function MapaEventos({ rows }: { rows: Ticket[] }) {
     });
   }, [seleccionada]);
 
+  function elegir(label: string) {
+    if (arrastrado.current) return; // fue un paneo, no un click
+    setSel((s) => (s === label ? null : label));
+  }
+
   // Radio según cantidad de eventos (clampado: Londres no debe tapar Europa).
   const radio = (n: number) => Math.min(9, 3.5 + Math.sqrt(n) * 1.7);
 
@@ -124,29 +205,72 @@ export function MapaEventos({ rows }: { rows: Ticket[] }) {
 
         <div className="mapa-frame">
           <svg
-            className="mapa-svg"
-            viewBox={`0 0 ${MAPA_W} ${MAPA_H}`}
+            ref={svgRef}
+            className={`mapa-svg ${zoom ? "is-zoom" : ""}`}
+            viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.w * RATIO}`}
             role="img"
             aria-label={t.mapa.h2}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            // Sin zoom: el swipe vertical sigue scrolleando la página (mobile).
+            // Con zoom: el dedo panea el mapa.
+            style={{ touchAction: zoom ? "none" : "pan-y" }}
           >
             <path className="mapa-land" d={WORLD_PATH} />
             {/* Más eventos primero: los puntos chicos quedan clickeables arriba. */}
             {ciudades.map((c) => {
-              const r = radio(c.eventos.length);
+              const r = radio(c.eventos.length) * k;
               const activa = sel === c.label;
+              const hovered = hov === c.label;
               return (
                 <g
                   key={c.label}
-                  className={`mapa-dot ${activa ? "sel" : ""}`}
-                  onClick={() => setSel(activa ? null : c.label)}
+                  className={`mapa-dot ${activa ? "sel" : ""} ${hovered ? "hov" : ""}`}
+                  onClick={() => elegir(c.label)}
+                  onMouseEnter={() => setHov(c.label)}
+                  onMouseLeave={() => setHov(null)}
                 >
-                  {activa && <circle className="mapa-ring" cx={c.x} cy={c.y} r={r + 4.5} />}
-                  <circle className="mapa-punto" cx={c.x} cy={c.y} r={r} />
+                  {(activa || hovered) && (
+                    <circle
+                      className={`mapa-ring ${activa ? "" : "mapa-ring--hov"}`}
+                      cx={c.x}
+                      cy={c.y}
+                      r={r + 4.5 * k}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                  <circle
+                    className="mapa-punto"
+                    cx={c.x}
+                    cy={c.y}
+                    r={r}
+                    vectorEffect="non-scaling-stroke"
+                  />
                   <title>{`${c.label} — ${c.eventos.length}`}</title>
                 </g>
               );
             })}
           </svg>
+
+          {/* Controles de zoom (también para touch, donde no hay rueda). */}
+          <div className="mapa-zoom">
+            <button onClick={() => zoomCentro(0.66)} title={t.mapa.zoomMas} aria-label={t.mapa.zoomMas}>
+              +
+            </button>
+            <button onClick={() => zoomCentro(1.5)} title={t.mapa.zoomMenos} aria-label={t.mapa.zoomMenos}>
+              −
+            </button>
+            <button
+              onClick={() => setVb({ x: 0, y: 0, w: MAPA_W })}
+              title={t.mapa.zoomReset}
+              aria-label={t.mapa.zoomReset}
+              disabled={!zoom}
+            >
+              ⟲
+            </button>
+          </div>
         </div>
 
         <p className="mapa-meta">
@@ -155,13 +279,18 @@ export function MapaEventos({ rows }: { rows: Ticket[] }) {
         </p>
 
         {/* Chips de ciudades: selección precisa (los puntos de Europa quedan
-            pegados entre sí, y en mobile el dedo no da esa precisión). */}
+            pegados entre sí, y en mobile el dedo no da esa precisión). El
+            hover del chip resalta su punto en el mapa, y viceversa. */}
         <div className="catstrip mapa-chips">
           {ciudades.map((c) => (
             <button
               key={c.label}
-              className={`catlink ${sel === c.label ? "catlink--all" : ""}`}
+              className={`catlink ${sel === c.label ? "catlink--all" : ""} ${
+                hov === c.label && sel !== c.label ? "mapa-chip-hov" : ""
+              }`}
               onClick={() => setSel(sel === c.label ? null : c.label)}
+              onMouseEnter={() => setHov(c.label)}
+              onMouseLeave={() => setHov(null)}
             >
               {c.label}
               <small>{c.eventos.length}</small>

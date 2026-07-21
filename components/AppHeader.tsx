@@ -8,13 +8,11 @@ type Props = {
   // Muestra las tabs de sección en desktop (md+). En móvil la navegación
   // vive en la BottomNav; el moderador puro no lleva navegación.
   nav?: boolean;
-  // Acción destacada opcional (ej: "Ver tienda").
-  action?: { href: string; label: string };
 };
 
 // Header mínimo: identidad y sesión. En desktop, si nav está activo, las
 // secciones aparecen como tabs junto a la marca.
-export default function AppHeader({ subtitle, email, nav = false, action }: Props) {
+export default function AppHeader({ subtitle, email, nav = false }: Props) {
   return (
     <header className="surface-ink pt-[env(safe-area-inset-top)] text-white">
       {/* flex-wrap: si la marca + acciones no entran (Safari mide las fuentes
@@ -57,17 +55,18 @@ export default function AppHeader({ subtitle, email, nav = false, action }: Prop
               {email}
             </span>
           )}
-          {action && (
-            // <a> y no <Link>: la acción suele llevar a la tienda (CSS propio,
-            // no Tailwind). Un soft-nav cruzaría stylesheets y renderizaría sin
-            // estilos hasta refrescar; una carga completa trae el CSS correcto.
-            <a
-              href={action.href}
-              className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-xl bg-cobalt px-3.5 text-xs font-semibold text-white transition-colors hover:bg-cobalt-deep md:h-9"
-            >
-              {action.label}
-            </a>
-          )}
+          {/* Ver la tienda desde el panel: SIEMPRE presente. Abre en una
+              pestaña nueva (target=_blank) para no cerrar el panel, y como
+              carga completa trae el CSS de la tienda (no el Tailwind del
+              panel). */}
+          <a
+            href="/entradas"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-xl bg-cobalt px-3.5 text-xs font-semibold text-white transition-colors hover:bg-cobalt-deep md:h-9"
+          >
+            Tienda ↗
+          </a>
           <Link
             href="/admin/cuenta"
             title="Mi cuenta"

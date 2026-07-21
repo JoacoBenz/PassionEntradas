@@ -103,12 +103,7 @@ export default async function AdminEntradasPage() {
 
   return (
     <main className="min-h-svh pb-16 md:pb-10">
-      <AppHeader
-        subtitle="Entradas de la tienda"
-        email={email}
-        nav
-        action={{ href: "/entradas", label: "Ver tienda" }}
-      />
+      <AppHeader subtitle="Entradas de la tienda" email={email} nav />
       <TicketsPanel
         initial={manual}
         syncRuns={syncRuns}

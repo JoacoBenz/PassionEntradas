@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import {
-  ESTADO_COLOR,
   ESTADO_LABEL,
   HITO_COLOR,
   diasHastaEvento,
   estadoDe,
+  estadoDotColor,
   formatUSD,
   formatFecha,
   quienDe,
@@ -78,7 +78,9 @@ export default function OperacionCard({
 }: Props) {
   const link = `${baseUrl}/op/${op.id}`;
   const estado = estadoDe(op);
-  const color = ESTADO_COLOR[estado];
+  // Punto de la fila: color por GRUPO (abierta / en curso / cerrada /
+  // cancelada), para leer el estado de un vistazo.
+  const color = estadoDotColor(estado);
   const cancelada = estado === "cancelada";
   const cerrada = estado === "cerrada";
   const entrada = !!op.entrada_recibida_at;

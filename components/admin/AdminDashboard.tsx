@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   diasHastaEvento,
   estadoDe,
+  ESTADO_GRUPO_COLOR,
+  ESTADO_GRUPO_LABEL,
   type Operacion,
   type StatusAction,
 } from "@/lib/operaciones";
@@ -254,6 +256,20 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
             </button>
           );
         })}
+      </div>
+
+      {/* Leyenda del punto de estado (abierta / en curso / cerrada / cancelada). */}
+      <div className="mb-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 px-1 text-[11px] text-muted">
+        {(["abierta", "en_curso", "cerrada", "cancelada"] as const).map((g) => (
+          <span key={g} className="inline-flex items-center gap-1.5">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: ESTADO_GRUPO_COLOR[g] }}
+              aria-hidden
+            />
+            {ESTADO_GRUPO_LABEL[g]}
+          </span>
+        ))}
       </div>
 
       <div className="space-y-2">
