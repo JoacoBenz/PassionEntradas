@@ -232,7 +232,9 @@ function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang 
       evento: ev.evento,
       comp: ev.comp,
       sector,
-      monto: bookable && hasPrice ? Number(u.precio_final) : 0,
+      // Redondeado, igual que el precio que se muestra (fmtPrice usa round):
+      // el monto guardado debe coincidir con lo que vio el cliente, no truncar.
+      monto: bookable && hasPrice ? Math.round(Number(u.precio_final)) : 0,
       tipo,
       fecha_evento: ev.fecha ? ev.fecha.slice(0, 10) : null,
     });

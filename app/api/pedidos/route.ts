@@ -85,7 +85,9 @@ export async function POST(request: Request) {
     const ticket_id = it?.ticket_id ? String(it.ticket_id).slice(0, 200) : null;
     // En una consulta el precio puede no estar; el pedido suele traerlo. Se
     // guarda si es válido, si no queda en 0 (el monto final lo cierra el staff).
-    const montoRaw = Math.trunc(Number(it?.monto));
+    // Redondeo (no truncado) para que coincida con el precio mostrado en la
+    // tienda (fmtPrice usa Math.round) y con lo que después ve la factura.
+    const montoRaw = Math.round(Number(it?.monto));
     const monto = Number.isFinite(montoRaw) && montoRaw > 0 ? montoRaw : 0;
     const fechaRaw = it?.fecha_evento ? String(it.fecha_evento).slice(0, 10) : null;
     const fecha_evento = fechaRaw && /^\d{4}-\d{2}-\d{2}$/.test(fechaRaw) ? fechaRaw : null;
