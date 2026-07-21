@@ -52,104 +52,130 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const tipo = String(body.tipo ?? "") as TipoOperacion;
-  if (tipo !== "pedido" && tipo !== "consulta") {
-    return NextResponse.json({ error: "Tipo inválido (pedido o consulta)" }, { status: 400 });
+  // El carrito manda { items: [...] }; se acepta también un item suelto
+  // (compat: { tipo, evento, ... }) envolviéndolo en un array.
+  const raw = Array.isArray(body.items) ? body.items : [body];
+  if (raw.length === 0) {
+    return NextResponse.json({ error: "El pedido está vacío" }, { status: 400 });
   }
-  const evento = String(body.evento ?? "").trim();
-  if (!evento) {
-    return NextResponse.json({ error: "Falta el evento" }, { status: 400 });
+  if (raw.length > 50) {
+    return NextResponse.json({ error: "Demasiadas entradas en un pedido" }, { status: 400 });
   }
-  const sector = body.sector ? String(body.sector).trim().slice(0, 200) : null;
-  const ticket_id = body.ticket_id ? String(body.ticket_id).slice(0, 200) : null;
-  // En una consulta el precio puede no estar; el pedido suele traerlo. Se
-  // guarda si es válido, si no queda en 0 (el monto final lo cierra el staff).
-  const montoRaw = Math.trunc(Number(body.monto));
-  const monto = Number.isFinite(montoRaw) && montoRaw > 0 ? montoRaw : 0;
-  const fechaRaw = body.fecha_evento ? String(body.fecha_evento).slice(0, 10) : null;
-  const fecha_evento = fechaRaw && /^\d{4}-\d{2}-\d{2}$/.test(fechaRaw) ? fechaRaw : null;
 
-  const esPedido = tipo === "pedido";
-  const notas =
-    `${esPedido ? "Pedido" : "Consulta"} desde la tienda por ${ctx.comprador}` +
-    (sector ? ` — ${sector}` : "") +
+  // Validación + normalización de cada entrada.
+  type Parsed = {
+    tipo: TipoOperacion;
+    evento: string;
+    sector: string | null;
+    ticket_id: string | null;
+    monto: number;
+    fecha_evento: string | null;
+  };
+  const parsed: Parsed[] = [];
+  for (const it of raw) {
+    const tipo = String(it?.tipo ?? "") as TipoOperacion;
+    if (tipo !== "pedido" && tipo !== "consulta") {
+      return NextResponse.json({ error: "Tipo inválido (pedido o consulta)" }, { status: 400 });
+    }
+    const evento = String(it?.evento ?? "").trim();
+    if (!evento) {
+      return NextResponse.json({ error: "Falta el evento en una entrada" }, { status: 400 });
+    }
+    const sector = it?.sector ? String(it.sector).trim().slice(0, 200) : null;
+    const ticket_id = it?.ticket_id ? String(it.ticket_id).slice(0, 200) : null;
+    // En una consulta el precio puede no estar; el pedido suele traerlo. Se
+    // guarda si es válido, si no queda en 0 (el monto final lo cierra el staff).
+    const montoRaw = Math.trunc(Number(it?.monto));
+    const monto = Number.isFinite(montoRaw) && montoRaw > 0 ? montoRaw : 0;
+    const fechaRaw = it?.fecha_evento ? String(it.fecha_evento).slice(0, 10) : null;
+    const fecha_evento = fechaRaw && /^\d{4}-\d{2}-\d{2}$/.test(fechaRaw) ? fechaRaw : null;
+    parsed.push({ tipo, evento, sector, ticket_id, monto, fecha_evento });
+  }
+
+  const notasDe = (p: Parsed) =>
+    `${p.tipo === "pedido" ? "Pedido" : "Consulta"} desde la tienda por ${ctx.comprador}` +
+    (p.sector ? ` — ${p.sector}` : "") +
     (ctx.cliente_email ? ` (${ctx.cliente_email})` : "");
 
-  // 1) Registro en la app.
-  let opId: string;
-  let opCode: string;
+  // 1) Registro en la app: una operación por entrada.
+  type Creada = { id: string; code: string; evento: string; sector: string | null; tipo: string; monto: number };
+  let creadas: Creada[] = [];
+
   if (isMock()) {
-    const op = mockCreateOp({
-      evento,
-      comprador_alias: ctx.comprador,
-      vendedor_alias: null,
-      monto,
-      fee: 0,
-      ticket_id,
-      fecha_evento,
-      notas,
-      cuenta_debitar: null,
-      tipo,
-      cliente_id: ctx.cliente_id,
-      cliente_email: ctx.cliente_email,
-      sector,
+    creadas = parsed.map((p) => {
+      const op = mockCreateOp({
+        evento: p.evento,
+        comprador_alias: ctx.comprador,
+        vendedor_alias: null,
+        monto: p.monto,
+        fee: 0,
+        ticket_id: p.ticket_id,
+        fecha_evento: p.fecha_evento,
+        notas: notasDe(p),
+        cuenta_debitar: null,
+        tipo: p.tipo,
+        cliente_id: ctx.cliente_id,
+        cliente_email: ctx.cliente_email,
+        sector: p.sector,
+      });
+      return { id: op.id, code: op.code, evento: op.evento, sector: op.sector, tipo: op.tipo, monto: op.monto };
     });
-    opId = op.id;
-    opCode = op.code;
   } else {
     const admin = createAdminSupabase();
-    let inserted: { id: string; code: string } | null = null;
+    // Inserción en lote; si algún code colisiona (23505) se reintenta el lote
+    // entero con codes nuevos (muy improbable).
     for (let attempt = 0; attempt < 5; attempt++) {
-      const code = generateCode();
+      const rows = parsed.map((p) => ({
+        code: generateCode(),
+        evento: p.evento,
+        comprador_alias: ctx.comprador,
+        monto: p.monto,
+        fee: 0,
+        ticket_id: p.ticket_id,
+        fecha_evento: p.fecha_evento,
+        notas: notasDe(p),
+        tipo: p.tipo,
+        cliente_id: ctx.cliente_id,
+        cliente_email: ctx.cliente_email,
+        sector: p.sector,
+      }));
       const { data, error } = await admin
         .from("operaciones")
-        .insert({
-          code,
-          evento,
-          comprador_alias: ctx.comprador,
-          monto,
-          fee: 0,
-          ticket_id,
-          fecha_evento,
-          notas,
-          tipo,
-          cliente_id: ctx.cliente_id,
-          cliente_email: ctx.cliente_email,
-          sector,
-        })
-        .select("id, code")
-        .single();
+        .insert(rows)
+        .select("id, code, evento, sector, tipo, monto");
       if (!error && data) {
-        inserted = data;
+        creadas = data as Creada[];
         break;
       }
       if (error && (error as any).code !== "23505") {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     }
-    if (!inserted) {
+    if (creadas.length === 0) {
       return NextResponse.json(
         { error: "No se pudo registrar el pedido, reintentá" },
         { status: 500 }
       );
     }
-    opId = inserted.id;
-    opCode = inserted.code;
   }
 
-  // 2) Aviso a los vendedores por WhatsApp Y por email (best-effort, en
-  // paralelo). Cualquiera que falle o no esté configurado no corta el flujo:
-  // el pedido ya quedó registrado arriba.
-  const lineaMonto = monto > 0 ? `\nPrecio de referencia: ${formatUSD(monto)}` : "";
+  // 2) Un solo aviso a los vendedores (WhatsApp + email) con todas las
+  // entradas del pedido. Best-effort: si falla o no está configurado, las
+  // operaciones ya quedaron registradas arriba.
+  const n = creadas.length;
+  const lineas = creadas
+    .map((c, i) => {
+      const monto = c.monto > 0 ? ` — ${formatUSD(c.monto)}` : "";
+      const tag = c.tipo === "pedido" ? "PEDIDO" : "CONSULTA";
+      return `${i + 1}) ${c.evento}${c.sector ? ` — ${c.sector}` : ""}${monto} [${tag}] · ${c.code}`;
+    })
+    .join("\n");
   const mensaje =
-    `🎟️ Nuev${esPedido ? "o PEDIDO" : "a CONSULTA"} en la tienda\n` +
-    `Evento: ${evento}` +
-    (sector ? `\nSector: ${sector}` : "") +
-    lineaMonto +
-    `\nCliente: ${ctx.comprador}` +
-    (ctx.cliente_email ? ` (${ctx.cliente_email})` : "") +
-    `\nCode: ${opCode}\nAccioná la operación desde el panel.`;
-  const asunto = `🎟️ ${esPedido ? "Nuevo pedido" : "Nueva consulta"} — ${evento}`;
+    `🎟️ Nuevo pedido en la tienda (${n} ${n === 1 ? "entrada" : "entradas"})\n` +
+    `Cliente: ${ctx.comprador}${ctx.cliente_email ? ` (${ctx.cliente_email})` : ""}\n\n` +
+    lineas +
+    `\n\nAccioná las operaciones desde el panel.`;
+  const asunto = `🎟️ Nuevo pedido (${n}) — ${ctx.comprador}`;
 
   const [wa, mail] = await Promise.all([
     notificarVendedores(mensaje),
@@ -158,9 +184,9 @@ export async function POST(request: Request) {
 
   return NextResponse.json(
     {
-      id: opId,
-      code: opCode,
-      tipo,
+      ok: true,
+      count: n,
+      items: creadas.map((c) => ({ id: c.id, code: c.code })),
       whatsapp: wa.ok
         ? { ok: true, enviados: wa.enviados }
         : { ok: false, noConfigurado: wa.noConfigurado ?? false },

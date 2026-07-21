@@ -20,6 +20,7 @@ import {
   type Ticket,
 } from "@/lib/tickets";
 import { LANGS, mesLabelLang, TX, type Lang } from "@/lib/tienda-i18n";
+import { useCart } from "@/components/tienda/Cart";
 
 // Idioma elegido: default inglés; se recuerda entre visitas.
 function useLang() {
@@ -204,68 +205,38 @@ function Foot({ lang }: { lang: Lang }) {
 }
 
 // ---- fila de sector dentro de la card ----------------------------------------
-// La acción registra un PEDIDO (o CONSULTA) sobre esta entrada: crea la
-// operación en la app y dispara el aviso a los vendedores por WhatsApp
-// (server-side). Si el registro falla, cae al chat de WhatsApp para no dejar
-// al cliente sin poder pedir.
-type EnvioEstado = "idle" | "sending" | "done" | "err";
-
+// La acción agrega la entrada al carrito (pedido si tiene precio/stock,
+// consulta si no). El cliente junta varias y las envía todas juntas desde la
+// barra del carrito; recién ahí se crean las operaciones y se avisa a los
+// vendedores.
 function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang }) {
   const t = TX[lang];
+  const cart = useCart();
   const hasPrice = u.precio_final != null && Number(u.precio_final) > 0;
   const precio = hasPrice ? fmtPrice(u.precio_final, lang) : null;
   const stk = u.stock ?? 0;
   const bookable = stk > 0 && u.estado === "book" && hasPrice;
   const low = stk > 0 && stk <= 2;
   const sector = u.categoria || t.entradaGeneral;
-  const link = eventoLink(ev.evento, ev.comp);
   const tipo: "pedido" | "consulta" = bookable ? "pedido" : "consulta";
-  const [estado, setEstado] = useState<EnvioEstado>("idle");
+  const inCart = cart.has(u.id);
 
-  async function enviar() {
-    if (estado === "sending" || estado === "done") return;
-    setEstado("sending");
-    try {
-      const res = await fetch("/api/pedidos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tipo,
-          ticket_id: u.id,
-          evento: ev.evento,
-          sector,
-          monto: bookable && hasPrice ? Number(u.precio_final) : 0,
-          fecha_evento: ev.fecha ? ev.fecha.slice(0, 10) : null,
-        }),
-      });
-      setEstado(res.ok ? "done" : "err");
-    } catch {
-      setEstado("err");
+  function toggle() {
+    if (inCart) {
+      cart.remove(u.id);
+      return;
     }
+    cart.add({
+      key: u.id,
+      ticket_id: u.id,
+      evento: ev.evento,
+      comp: ev.comp,
+      sector,
+      monto: bookable && hasPrice ? Number(u.precio_final) : 0,
+      tipo,
+      fecha_evento: ev.fecha ? ev.fecha.slice(0, 10) : null,
+    });
   }
-
-  const cls =
-    estado === "done"
-      ? "done"
-      : estado === "err"
-      ? "err"
-      : estado === "sending"
-      ? `${bookable ? "go" : "ask"} sending`
-      : bookable
-      ? "go"
-      : "ask";
-  const label =
-    estado === "sending"
-      ? t.enviandoPedido
-      : estado === "done"
-      ? bookable
-        ? t.pedidoOk
-        : t.consultaOk
-      : estado === "err"
-      ? t.pedidoWa
-      : bookable
-      ? t.pedir
-      : t.consultar;
 
   return (
     <li className={`seat ${bookable ? "" : "seat--req"}`}>
@@ -291,31 +262,14 @@ function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang 
           </>
         )}
       </span>
-      {estado === "err" ? (
-        // Fallback: si no se pudo registrar, el cliente igual pide por WhatsApp.
-        <a
-          className="seat-act err"
-          href={waLink(
-            bookable
-              ? t.msgReservar(ev.evento, sector, precio ?? "", link)
-              : t.msgConsultar(ev.evento, sector, link)
-          )}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {label}
-        </a>
-      ) : (
-        <button
-          type="button"
-          className={`seat-act ${cls}`}
-          onClick={enviar}
-          disabled={estado === "sending" || estado === "done"}
-          title={estado === "done" ? t.pedidoOkHint : undefined}
-        >
-          {label}
-        </button>
-      )}
+      <button
+        type="button"
+        className={`seat-act ${inCart ? "done" : bookable ? "go" : "ask"}`}
+        onClick={toggle}
+        aria-pressed={inCart}
+      >
+        {inCart ? t.agregado : bookable ? t.pedir : t.consultar}
+      </button>
     </li>
   );
 }

@@ -78,8 +78,9 @@ const en = {
   precio: "price",
   consultar: "Ask",
   reservar: "Book",
-  // Acción de la fila: registra el pedido/consulta + avisa a los vendedores.
-  pedir: "Order",
+  // Acción de la fila: agrega la entrada al carrito (pedido/consulta).
+  pedir: "Add",
+  agregado: "In order ✓",
   enviandoPedido: "Sending…",
   pedidoOk: "Order sent ✓",
   consultaOk: "Sent ✓",
@@ -134,6 +135,27 @@ const en = {
   siguiente: "Next →",
   pagina: (a: number, b: number) => `Page ${a} of ${b}`,
   mesTBC: "TBC",
+
+  // carrito: junta varias entradas y las envía todas juntas a revisión.
+  carrito: {
+    revisar: "Review order",
+    titulo: "Your order",
+    sub: "Review your tickets and send them for review. A seller reaches out to close each one.",
+    quitar: "Remove",
+    aConsultar: "Ask",
+    total: "Estimated total",
+    seguir: "Keep browsing",
+    enviar: "Send for review",
+    enviando: "Sending…",
+    pedidoTag: "Order",
+    consultaTag: "Inquiry",
+    okTitulo: "Order sent ✓",
+    okP: "We got your tickets — a seller will reach out to close each one. Track them in My orders.",
+    okCta: "Go to My orders",
+    cerrar: "Close",
+    errGeneric: "Couldn't send your order. Please try again.",
+    errRed: "Network error. Please try again.",
+  },
 
   // mapa mundial de eventos (/mapa)
   mapa: {
@@ -335,7 +357,8 @@ const es: typeof en = {
   precio: "precio",
   consultar: "Consultar",
   reservar: "Reservar",
-  pedir: "Pedir",
+  pedir: "Agregar",
+  agregado: "En el pedido ✓",
   enviandoPedido: "Enviando…",
   pedidoOk: "Pedido enviado ✓",
   consultaOk: "Enviado ✓",
@@ -386,6 +409,26 @@ const es: typeof en = {
   siguiente: "Siguientes →",
   pagina: (a, b) => `Página ${a} de ${b}`,
   mesTBC: "A confirmar",
+
+  carrito: {
+    revisar: "Revisar pedido",
+    titulo: "Tu pedido",
+    sub: "Revisá tus entradas y enviá el pedido. Un vendedor te contacta para cerrar cada una.",
+    quitar: "Quitar",
+    aConsultar: "A consultar",
+    total: "Total estimado",
+    seguir: "Seguir viendo",
+    enviar: "Enviar pedido",
+    enviando: "Enviando…",
+    pedidoTag: "Pedido",
+    consultaTag: "Consulta",
+    okTitulo: "Pedido enviado ✓",
+    okP: "Recibimos tus entradas — un vendedor te contacta para cerrar cada una. Seguilas en Mis pedidos.",
+    okCta: "Ir a Mis pedidos",
+    cerrar: "Cerrar",
+    errGeneric: "No se pudo enviar el pedido. Probá de nuevo.",
+    errRed: "Error de red. Probá de nuevo.",
+  },
 
   mapa: {
     nav: "Mapa de eventos",

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Spline_Sans } from "next/font/google";
+import { CartProvider, CartBar } from "@/components/tienda/Cart";
 import "./tienda.css";
 
 const spline = Spline_Sans({
@@ -20,7 +21,10 @@ export const metadata: Metadata = {
 export default function TiendaLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`tienda ${spline.variable}`}>
-      <div className="tienda-app">{children}</div>
+      <CartProvider>
+        <div className="tienda-app">{children}</div>
+        <CartBar />
+      </CartProvider>
     </div>
   );
 }
