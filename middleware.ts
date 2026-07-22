@@ -17,7 +17,8 @@ export async function middleware(request: NextRequest) {
     path === "/buscar" ||
     path === "/mapa" ||
     path.startsWith("/entradas") ||
-    path.startsWith("/cuenta");
+    path.startsWith("/cuenta") ||
+    path.startsWith("/mis-pedidos");
   const esLoginAdmin = path === "/admin/login";
   const esLoginCliente = path === "/ingresar";
   const esLogin = esLoginAdmin || esLoginCliente;
@@ -120,6 +121,7 @@ export const config = {
     "/moderador/:path*",
     "/entradas/:path*",
     "/cuenta/:path*",
+    "/mis-pedidos/:path*",
     "/buscar",
     "/mapa",
     "/ingresar",
