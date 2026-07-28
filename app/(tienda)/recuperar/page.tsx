@@ -9,7 +9,7 @@ import { LANGS, TX, type Lang } from "@/lib/tienda-i18n";
 // Destino del link de recuperación (PKCE ?code=...): con esa sesión el usuario
 // setea una contraseña nueva y entra. Estética de la tienda.
 function useLang() {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useState<Lang>("es");
   useEffect(() => {
     const saved = localStorage.getItem("tm_lang");
     if (saved === "en" || saved === "es") setLang(saved);

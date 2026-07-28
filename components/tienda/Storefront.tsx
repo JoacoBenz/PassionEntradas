@@ -3,7 +3,7 @@
 // Tienda pública (TicketMirror) portada del front Vite de PassionEntradas.
 // Un solo componente cliente con las dos vistas (home y catálogo); la data
 // llega ya cargada desde el server component.
-// Bilingüe EN/ES (default inglés): los textos viven en lib/tienda-i18n.ts y
+// Bilingüe EN/ES (default español): los textos viven en lib/tienda-i18n.ts y
 // el toggle del header se recuerda en localStorage.
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -23,9 +23,9 @@ import { LANGS, mesLabelLang, TX, type Lang } from "@/lib/tienda-i18n";
 import { useCart } from "@/components/tienda/Cart";
 import { LegalLinks } from "@/components/tienda/LegalLinks";
 
-// Idioma elegido: default inglés; se recuerda entre visitas.
+// Idioma elegido: default español; se recuerda entre visitas.
 function useLang() {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useState<Lang>("es");
   useEffect(() => {
     const saved = localStorage.getItem("tm_lang");
     if (saved === "en" || saved === "es") setLang(saved);

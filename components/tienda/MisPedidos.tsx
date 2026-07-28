@@ -36,7 +36,7 @@ const ESTADO_CLASS: Record<Estado, string> = {
 };
 
 function useLang(): [Lang, (l: Lang) => void] {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useState<Lang>("es");
   useEffect(() => {
     const saved = localStorage.getItem("tm_lang");
     if (saved === "en" || saved === "es") setLang(saved);

@@ -104,7 +104,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
 // Idioma recordado (mismo criterio que el resto de la tienda).
 function useLang(): Lang {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useState<Lang>("es");
   useEffect(() => {
     const s = localStorage.getItem("tm_lang");
     if (s === "en" || s === "es") setLang(s);

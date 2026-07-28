@@ -43,7 +43,7 @@ export function CuentaCliente({ mock, perfil }: { mock: boolean; perfil: PerfilI
   const router = useRouter();
 
   // Idioma: arranca del que guardó la cuenta (si hay); si no, del dispositivo.
-  const [lang, setLang] = useState<Lang>(perfil.lang ?? "en");
+  const [lang, setLang] = useState<Lang>(perfil.lang ?? "es");
   useEffect(() => {
     if (perfil.lang) {
       localStorage.setItem("tm_lang", perfil.lang);

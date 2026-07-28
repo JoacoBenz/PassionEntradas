@@ -3,7 +3,7 @@
 // Landing pública (/) — la cara nueva de TicketMirror para captar clientes.
 // Sencilla y clara: propuesta de valor + formulario para pedir acceso. La
 // tienda de entradas dejó de ser pública; desde acá se solicita el usuario.
-// Bilingüe EN/ES (default inglés), mismo toggle/localStorage que la tienda.
+// Bilingüe EN/ES (default español), mismo toggle/localStorage que la tienda.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -35,7 +35,7 @@ function useLogueado(): boolean {
 }
 
 function useLang() {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useState<Lang>("es");
   useEffect(() => {
     const saved = localStorage.getItem("tm_lang");
     if (saved === "en" || saved === "es") setLang(saved);

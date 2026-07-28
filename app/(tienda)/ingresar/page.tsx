@@ -9,7 +9,7 @@ import { LANGS, TX, type Lang } from "@/lib/tienda-i18n";
 // Login ÚNICO y público, con la estética de la tienda. Entran staff y clientes;
 // según el rol se redirige a su lugar. Incluye el reset de contraseña.
 function useLang() {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useState<Lang>("es");
   useEffect(() => {
     const saved = localStorage.getItem("tm_lang");
     if (saved === "en" || saved === "es") setLang(saved);

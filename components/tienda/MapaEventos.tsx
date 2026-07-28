@@ -21,7 +21,7 @@ import { MAPA_H, MAPA_W, proyectar, WORLD_PATH } from "@/lib/mapa-mundo";
 import { LANGS, TX, type Lang } from "@/lib/tienda-i18n";
 
 function useLang() {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useState<Lang>("es");
   useEffect(() => {
     const saved = localStorage.getItem("tm_lang");
     if (saved === "en" || saved === "es") setLang(saved);
