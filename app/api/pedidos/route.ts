@@ -4,7 +4,17 @@ import { getRol, puedeVerTienda, nombreDe } from "@/lib/auth";
 import { formatUSD, generateCode, type TipoOperacion } from "@/lib/operaciones";
 import { notificarVendedores } from "@/lib/whatsapp";
 import { notificarVendedoresEmail } from "@/lib/email";
-import { isMock, mockCreateOp, MOCK_USER } from "@/lib/mock-db";
+import { isMock, mockCreateOp, mockListManual, MOCK_USER } from "@/lib/mock-db";
+import { fetchConfigTienda } from "@/lib/supabase/public";
+import { DEFAULT_EUR_USD } from "@/lib/tickets";
+import {
+  evaluarLimite,
+  reconciliarItem,
+  RL_MAX_VENTANA,
+  RL_VENTANA_MS,
+  type ItemPedido,
+  type TicketRef,
+} from "@/lib/pedidos";
 
 // POST /api/pedidos — el cliente hace un PEDIDO o una CONSULTA sobre una
 // entrada del catálogo. Se hacen DOS cosas por cada acción:
@@ -39,10 +49,69 @@ async function contexto(): Promise<Ctx | { error: string; status: number }> {
   };
 }
 
+// --- Anti-flood --------------------------------------------------------------
+// Sin infra nueva: se cuenta sobre `operaciones`, que es donde ya queda el
+// rastro. La decisión en sí está en lib/pedidos.ts (evaluarLimite).
+async function limiteExcedido(clienteId: string | null): Promise<string | null> {
+  // En mock no se aplica: el demo y los e2e envían pedidos seguidos.
+  if (isMock() || !clienteId) return null;
+  const desde = new Date(Date.now() - RL_VENTANA_MS).toISOString();
+  const { data, error } = await createAdminSupabase()
+    .from("operaciones")
+    .select("created_at")
+    .eq("cliente_id", clienteId)
+    .gte("created_at", desde)
+    .order("created_at", { ascending: false })
+    .limit(RL_MAX_VENTANA + 1);
+  // Ante un error de lectura no se bloquea al cliente (fail-open: perder un
+  // pedido legítimo es peor que dejar pasar un envío de más).
+  if (error) return null;
+  return evaluarLimite(
+    (data ?? []).map((r) => String(r.created_at)),
+    Date.now()
+  );
+}
+
+// --- Datos reales de la entrada ----------------------------------------------
+// Trae las filas de `tickets` contra las que se reconcilian los items del
+// carrito (la reconciliación en sí está en lib/pedidos.ts).
+async function buscarTickets(ids: string[]): Promise<Map<string, TicketRef>> {
+  const map = new Map<string, TicketRef>();
+  if (ids.length === 0) return map;
+  const guardar = (t: any) =>
+    map.set(t.id, {
+      evento: t.evento,
+      categoria: t.categoria ?? null,
+      precio_final: t.precio_final ?? null,
+      stock: t.stock ?? null,
+      fecha: t.fecha ?? null,
+      source: t.source === "manual" ? "manual" : "portal",
+    });
+
+  if (isMock()) {
+    const { MOCK_TICKETS } = await import("@/lib/mock-tickets");
+    for (const t of [...MOCK_TICKETS, ...mockListManual()]) {
+      if (ids.includes(t.id)) guardar(t);
+    }
+    return map;
+  }
+  const { data } = await createAdminSupabase()
+    .from("tickets")
+    .select("id, evento, categoria, precio_final, stock, fecha, source")
+    .in("id", ids);
+  for (const t of (data ?? []) as any[]) guardar(t);
+  return map;
+}
+
 export async function POST(request: Request) {
   const ctx = await contexto();
   if ("error" in ctx) {
     return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+  }
+
+  const limite = await limiteExcedido(ctx.cliente_id);
+  if (limite) {
+    return NextResponse.json({ error: limite }, { status: 429 });
   }
 
   let body: any;
@@ -63,15 +132,7 @@ export async function POST(request: Request) {
   }
 
   // Validación + normalización de cada entrada.
-  type Parsed = {
-    tipo: TipoOperacion;
-    evento: string;
-    sector: string | null;
-    ticket_id: string | null;
-    monto: number; // total de la línea (unitario × cantidad)
-    cantidad: number;
-    fecha_evento: string | null;
-  };
+  type Parsed = ItemPedido;
   const parsed: Parsed[] = [];
   for (const it of raw) {
     const tipo = String(it?.tipo ?? "") as TipoOperacion;
@@ -101,6 +162,29 @@ export async function POST(request: Request) {
     const fechaRaw = it?.fecha_evento ? String(it.fecha_evento).slice(0, 10) : null;
     const fecha_evento = fechaRaw && /^\d{4}-\d{2}-\d{2}$/.test(fechaRaw) ? fechaRaw : null;
     parsed.push({ tipo, evento, sector, ticket_id, monto, cantidad, fecha_evento });
+  }
+
+  // Los items vinculados a una entrada del catálogo se reconcilian contra la
+  // fila real: evento, sector, fecha y PRECIO salen de la base, no del cliente.
+  // La cantidad se topea por el stock conocido (la tienda ya lo limita; un
+  // desvío significa carrito viejo o manipulación). Los que no matchean quedan
+  // como vinieron.
+  const refs = await buscarTickets(
+    parsed.map((p) => p.ticket_id).filter((id): id is string => !!id)
+  );
+  // La tienda muestra TODO en USD: las filas del portal están en EUR y se
+  // convierten con la cotización del panel; las propias ya están en USD. Hay que
+  // aplicar la misma conversión acá o el monto guardado quedaría por debajo del
+  // precio que vio el cliente.
+  const tasa = refs.size
+    ? await fetchConfigTienda()
+        .then((c) => (c.eurUsd > 0 ? c.eurUsd : DEFAULT_EUR_USD))
+        .catch(() => DEFAULT_EUR_USD)
+    : DEFAULT_EUR_USD;
+
+  for (let i = 0; i < parsed.length; i++) {
+    const p = parsed[i];
+    parsed[i] = reconciliarItem(p, p.ticket_id ? refs.get(p.ticket_id) : undefined, tasa);
   }
 
   const notasDe = (p: Parsed) =>

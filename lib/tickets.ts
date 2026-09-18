@@ -180,6 +180,17 @@ export function waLink(text: string): string {
   return `${base}?text=${encodeURIComponent(text)}`;
 }
 
+// El mapa de sectores termina en un <img src>. Solo se aceptan esquemas
+// seguros: http(s) y data:image (el catálogo demo usa un SVG inline). Cualquier
+// otro (javascript:, etc.) se descarta en vez de renderizarse.
+export function imagenSegura(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const s = String(url).trim();
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^data:image\/[a-z0-9.+-]+[;,]/i.test(s)) return s;
+  return null;
+}
+
 // ---- agrupado por evento --------------------------------------------------------
 export function buildEvents(rows: Ticket[]): EventoAgrupado[] {
   const map = new Map<string, EventoAgrupado>();
@@ -225,7 +236,11 @@ export function buildEvents(rows: Ticket[]): EventoAgrupado[] {
     ev.bookable = book.length;
     ev.bookStock = book.reduce((a, u) => a + (u.stock ?? 0), 0);
     ev.propias = ev.ubicaciones.some((u) => u.source === "manual");
-    ev.imagen = ev.ubicaciones.find((u) => u.imagen_url)?.imagen_url ?? null;
+    // Primer mapa USABLE: se filtra antes de elegir, no después. Si se eligiera
+    // primero y se filtrara al final, un sector con una URL inválida dejaría al
+    // evento sin mapa aunque otro sector tenga uno bueno.
+    ev.imagen =
+      ev.ubicaciones.map((u) => imagenSegura(u.imagen_url)).find((src) => src != null) ?? null;
     // "desde": menor precio real (>0). Prioriza lo reservable.
     const precioPos = (arr: Ticket[]) =>
       arr.map((u) => Number(u.precio_final)).filter((n) => Number.isFinite(n) && n > 0);

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
+import { esStaff, getRol } from "@/lib/auth";
 import { isMock, mockListOps } from "@/lib/mock-db";
 
 // GET /api/operaciones/version — versión mínima de la lista de operaciones.
@@ -20,7 +21,10 @@ export async function GET() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) {
+  // Solo staff: este endpoint delata cuántas operaciones hay y cuándo se tocó
+  // la última. Un cliente logueado no tiene por qué verlo (y no lo usa: "Mis
+  // pedidos" refresca sin consultar versión).
+  if (!user || !esStaff(getRol(user))) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
