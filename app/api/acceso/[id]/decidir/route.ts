@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol, nombreDe } from "@/lib/auth";
 import { generarPassword, mensajeCredenciales } from "@/lib/acceso";
-import { emailConfigurado } from "@/lib/email";
+import { emailConfigurado, enviarEmail } from "@/lib/email";
 import { isMock, MOCK_USER, mockDecidirSolicitud } from "@/lib/mock-db";
 
 // Aleatoriedad de calidad para la contraseña (no Math.random).
@@ -82,7 +82,7 @@ export async function POST(
 
   const { data: sol, error: solErr } = await admin
     .from("solicitudes_acceso")
-    .select("id, nombre, email, telefono, direccion, estado")
+    .select("id, nombre, email, telefono, legajo, direccion, estado")
     .eq("id", id)
     .single();
   if (solErr || !sol) {
@@ -114,7 +114,7 @@ export async function POST(
     email_confirm: true,
     app_metadata: { role: "cliente" },
     // Precarga el perfil con lo que dejó en la solicitud (editable en /cuenta).
-    user_metadata: { nombre: sol.nombre, telefono: sol.telefono, direccion: sol.direccion },
+    user_metadata: { nombre: sol.nombre, telefono: sol.telefono, legajo: sol.legajo, direccion: sol.direccion },
   });
   if (createErr || !created?.user) {
     // Email ya registrado u otro fallo de Auth: no marcamos aprobada.
@@ -152,10 +152,26 @@ export async function POST(
     urlIngreso: urlIngreso(request),
   });
 
+  // Aviso automático al agente con sus credenciales. Best-effort a propósito:
+  // el acceso YA está creado, así que un fallo del proveedor de email no puede
+  // tumbar la aprobación ni hacer que el admin la reintente (crearía un 409 por
+  // email duplicado). Si falla, el panel conserva el botón para reenviarlo a
+  // mano y el mensaje para copiar.
+  let emailEnviado = false;
+  if (emailConfigurado()) {
+    const envio = await enviarEmail({
+      to: sol.email,
+      subject: "Tu acceso a TicketMirror",
+      text: mensaje,
+    });
+    emailEnviado = envio.ok;
+  }
+
   return NextResponse.json({
     estado: "aprobada",
     credenciales: { email: sol.email, password },
     mensaje,
     emailConfigurado: emailConfigurado(),
+    emailEnviado,
   });
 }

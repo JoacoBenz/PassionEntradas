@@ -115,6 +115,8 @@ const en = {
   waDisponible: "Available now",
   waOcupado: "With a customer",
   waChat: "Chat",
+  // Un solo contacto y sin nombre propio: quién atiende es asunto del equipo.
+  waAgenteNombre: "Agent",
   waAgenteMsg: (agente: string) => `Hi ${agente}! I'd like to ask about tickets.`,
 
   // catálogo
@@ -205,6 +207,8 @@ const en = {
     fNombre: "Full name",
     fEmail: "Email",
     fTelefono: "Phone",
+    fLegajo: "Employee ID / Tax ID",
+    fLegajoPh: "e.g. 20-12345678-9",
     fDireccion: "Address",
     fMensaje: "Anything you're looking for? (optional)",
     fMensajePh: "e.g. World Cup final, F1 Monza, a specific match…",
@@ -467,6 +471,7 @@ const es: typeof en = {
   waDisponible: "Disponible ahora",
   waOcupado: "Con un cliente",
   waChat: "Chatear",
+  waAgenteNombre: "Agente",
   waAgenteMsg: (agente) => `Hola ${agente}! Quiero consultar por entradas.`,
 
   fCategoria: "Categoría",
@@ -553,6 +558,8 @@ const es: typeof en = {
     fNombre: "Nombre y apellido",
     fEmail: "Email",
     fTelefono: "Teléfono",
+    fLegajo: "Legajo / CUIL / CUIT",
+    fLegajoPh: "Ej. 20-12345678-9",
     fDireccion: "Dirección",
     fMensaje: "¿Buscás algo en particular? (opcional)",
     fMensajePh: "ej: final del Mundial, F1 Monza, un partido puntual…",

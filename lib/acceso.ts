@@ -9,6 +9,9 @@ export type SolicitudAcceso = {
   nombre: string;
   email: string;
   telefono: string | null;
+  // Dato fiscal/identificatorio del agente. Reemplaza a `direccion` en el
+  // formulario; `direccion` queda solo en las solicitudes viejas.
+  legajo: string | null;
   direccion: string | null;
   mensaje: string | null;
   estado: EstadoSolicitud;
@@ -26,12 +29,12 @@ export type SolicitudAcceso = {
 };
 
 // Lo que entra desde el formulario público, ya saneado. Nombre, email,
-// teléfono y dirección son obligatorios; el mensaje es lo único opcional.
+// teléfono y legajo son obligatorios; el mensaje es lo único opcional.
 export type SolicitudInput = {
   nombre: string;
   email: string;
   telefono: string;
-  direccion: string;
+  legajo: string;
   mensaje: string | null;
   // Consentimiento de términos y condiciones (obligatorio para solicitar).
   acepto: boolean;
@@ -45,25 +48,27 @@ export function validarSolicitud(raw: {
   nombre?: unknown;
   email?: unknown;
   telefono?: unknown;
-  direccion?: unknown;
+  legajo?: unknown;
   mensaje?: unknown;
   acepto?: unknown;
 }): { ok: true; value: SolicitudInput } | { ok: false; error: string } {
   const nombre = String(raw.nombre ?? "").trim().slice(0, 120);
   const email = String(raw.email ?? "").trim().toLowerCase().slice(0, 160);
   const telefono = String(raw.telefono ?? "").trim().slice(0, 40);
-  const direccion = String(raw.direccion ?? "").trim().slice(0, 200);
+  // Texto libre: un CUIT/CUIL puede venir con guiones o sin ellos, y "legajo"
+  // depende de cada empresa. Se valida que haya algo razonable, no el formato.
+  const legajo = String(raw.legajo ?? "").trim().slice(0, 40);
   const mensaje = String(raw.mensaje ?? "").trim().slice(0, 1000) || null;
   const acepto = raw.acepto === true;
 
   if (nombre.length < 2) return { ok: false, error: "Ingresá tu nombre" };
   if (!EMAIL_RE.test(email)) return { ok: false, error: "Ingresá un email válido" };
   if (telefono.length < 6) return { ok: false, error: "Ingresá un teléfono válido" };
-  if (direccion.length < 4) return { ok: false, error: "Ingresá tu dirección" };
+  if (legajo.length < 4) return { ok: false, error: "Ingresá tu legajo, CUIL o CUIT" };
   // El consentimiento es obligatorio: sin aceptar los términos no hay solicitud.
   if (!acepto)
     return { ok: false, error: "Tenés que aceptar los términos y condiciones para continuar" };
-  return { ok: true, value: { nombre, email, telefono, direccion, mensaje, acepto } };
+  return { ok: true, value: { nombre, email, telefono, legajo, mensaje, acepto } };
 }
 
 // Contraseña legible pero fuerte: 4 bloques de 3 (sin caracteres ambiguos).

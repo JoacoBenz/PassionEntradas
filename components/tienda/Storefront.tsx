@@ -104,14 +104,18 @@ function WcLogo({ comp }: { comp: string | null }) {
   );
 }
 
-// Widget de WhatsApp: el botón flotante abre un panel con los agentes y su
-// estado (disponible / con un cliente). Los estados rotan solos en
-// intervalos irregulares — transmite que del otro lado hay gente atendiendo.
-// Cada agente chatea desde SU número (no el general de la tienda).
-const AGENTES = [
-  { nombre: "Kiru", inicial: "K", telefono: "5492944806666" },
-  { nombre: "Nacho", inicial: "N", telefono: "5491136148053" },
-] as const;
+// Widget de WhatsApp: el botón flotante abre un panel con UN contacto y su
+// estado (disponible / con un cliente). El estado rota solo en intervalos
+// irregulares — transmite que del otro lado hay alguien atendiendo.
+//
+// Antes eran dos agentes con nombre propio (Kiru y Nacho). Ahora es un solo
+// "Agente": quién responde es asunto interno, y así sumar o sacar gente del
+// equipo no obliga a tocar la tienda.
+//
+// El número sale de NEXT_PUBLIC_WHATSAPP si está definida; el default cubre
+// el caso de que no esté cargada en el entorno (hoy no lo está en Vercel).
+const WA_AGENTE_TEL =
+  (process.env.NEXT_PUBLIC_WHATSAPP || "").replace(/\D/g, "") || "5491136148053";
 
 function waAgente(telefono: string, text: string): string {
   return `https://wa.me/${telefono}?text=${encodeURIComponent(text)}`;
@@ -122,30 +126,28 @@ type EstadoAgente = "disponible" | "ocupado";
 function WaFloat({ lang }: { lang: Lang }) {
   const t = TX[lang];
   const [abierto, setAbierto] = useState(false);
-  // Arranca con ambos disponibles (mismo HTML en server y cliente: nada de
-  // Math.random en el render inicial o rompería la hidratación). Recién
-  // montado, cada agente empieza a alternar por su cuenta.
-  const [estados, setEstados] = useState<EstadoAgente[]>(["disponible", "disponible"]);
+  // Arranca disponible (mismo HTML en server y cliente: nada de Math.random
+  // en el render inicial o rompería la hidratación). Recién montado empieza
+  // a alternar.
+  const [estado, setEstado] = useState<EstadoAgente>("disponible");
 
   useEffect(() => {
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    function programar(i: number, delay: number) {
-      timers[i] = setTimeout(() => {
-        setEstados((prev) => {
-          const nx = [...prev];
-          // Sesgo a "disponible" (65%): ocupado aparece lo justo para que
-          // se note movimiento sin espantar consultas.
-          nx[i] = Math.random() < 0.65 ? "disponible" : "ocupado";
-          return nx;
-        });
-        programar(i, 15000 + Math.random() * 35000);
+    let timer: ReturnType<typeof setTimeout>;
+    function programar(delay: number) {
+      timer = setTimeout(() => {
+        // Sesgo a "disponible" (65%): ocupado aparece lo justo para que se
+        // note movimiento sin espantar consultas.
+        setEstado(Math.random() < 0.65 ? "disponible" : "ocupado");
+        programar(15000 + Math.random() * 35000);
       }, delay);
     }
-    // Primer cambio a los pocos segundos, después cada 15-50s cada uno.
-    programar(0, 6000 + Math.random() * 10000);
-    programar(1, 12000 + Math.random() * 14000);
-    return () => timers.forEach(clearTimeout);
+    // Primer cambio a los pocos segundos, después cada 15-50s.
+    programar(6000 + Math.random() * 10000);
+    return () => clearTimeout(timer);
   }, []);
+
+  const nombre = t.waAgenteNombre;
+  const disponible = estado === "disponible";
 
   return (
     <div className="wa-widget">
@@ -155,32 +157,27 @@ function WaFloat({ lang }: { lang: Lang }) {
             <p className="wa-panel-title">{t.waTitle}</p>
             <p className="wa-panel-sub">{t.waSubtitle}</p>
           </div>
-          {AGENTES.map((a, i) => {
-            const disponible = estados[i] === "disponible";
-            return (
-              <div key={a.nombre} className="wa-agente">
-                <span className={`wa-avatar ${i === 0 ? "wa-avatar--a" : "wa-avatar--b"}`}>
-                  {a.inicial}
-                </span>
-                <span className="wa-agente-info">
-                  <span className="wa-agente-nombre">{a.nombre}</span>
-                  <span className={`wa-agente-estado ${disponible ? "on" : "off"}`}>
-                    <i aria-hidden />
-                    {disponible ? t.waDisponible : t.waOcupado}
-                  </span>
-                </span>
-                <a
-                  className="wa-agente-btn"
-                  href={waAgente(a.telefono, t.waAgenteMsg(a.nombre))}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setAbierto(false)}
-                >
-                  {t.waChat}
-                </a>
-              </div>
-            );
-          })}
+          <div className="wa-agente">
+            <span className="wa-avatar wa-avatar--a" aria-hidden>
+              {nombre.charAt(0).toUpperCase()}
+            </span>
+            <span className="wa-agente-info">
+              <span className="wa-agente-nombre">{nombre}</span>
+              <span className={`wa-agente-estado ${disponible ? "on" : "off"}`}>
+                <i aria-hidden />
+                {disponible ? t.waDisponible : t.waOcupado}
+              </span>
+            </span>
+            <a
+              className="wa-agente-btn"
+              href={waAgente(WA_AGENTE_TEL, t.waAgenteMsg(nombre))}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setAbierto(false)}
+            >
+              {t.waChat}
+            </a>
+          </div>
         </div>
       )}
       <button

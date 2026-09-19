@@ -1,0 +1,71 @@
+# Puerta de calidad: corre en cada push y en cada PR. Hasta ahora los tests y
+# el typecheck existían pero solo corrían a mano, así que "no romper nada"
+# dependía de que alguien se acordara. Esto lo vuelve verificable.
+#
+# Dos jobs en paralelo porque son dos proyectos con su propio package.json:
+# la app Next (raíz) y el worker de sincronización (worker/).
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# Un push nuevo cancela el CI anterior de la misma rama: no tiene sentido
+# esperar el resultado de un commit que ya quedó viejo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: App web (Next.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Tests
+        run: npm test
+
+      # MOCK_DATA=1: el build no necesita credenciales de Supabase, así que el
+      # CI no tiene que guardar secretos para compilar.
+      - name: Build
+        run: npm run build
+        env:
+          MOCK_DATA: "1"
+
+  worker:
+    name: Worker de sincronización
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Los tests del worker son unitarios (parser, pricing, guard anti-borrado):
+      # no abren el navegador ni tocan el portal, así que no hacen falta
+      # credenciales ni Playwright.
+      - name: Tests
+        run: npm test
