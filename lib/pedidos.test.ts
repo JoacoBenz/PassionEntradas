@@ -3,6 +3,8 @@ import {
   evaluarLimite,
   precioUsd,
   reconciliarItem,
+  resumenOperacion,
+  separarPorTipo,
   RL_MAX_VENTANA,
   RL_MIN_INTERVALO_MS,
   type ItemPedido,
@@ -211,5 +213,99 @@ describe("evaluarLimite", () => {
   // Fail-open: perder un pedido legítimo es peor que dejar pasar uno de más.
   it("una fecha ilegible no bloquea", () => {
     expect(evaluarLimite(["no-es-fecha"], AHORA)).toBeNull();
+  });
+});
+
+// Un envío del carrito arma UNA operación. Estos tests fijan cómo se resume
+// un pedido de varias entradas en una sola cabecera.
+describe("resumenOperacion", () => {
+  const linea = (over: Partial<ItemPedido> = {}): ItemPedido => ({
+    tipo: "pedido",
+    evento: "Arsenal vs Lille",
+    sector: "B",
+    ticket_id: "t1",
+    monto: 518,
+    cantidad: 1,
+    fecha_evento: "2026-11-05",
+    ...over,
+  });
+
+  it("con una sola línea el encabezado es esa línea", () => {
+    const r = resumenOperacion([linea()]);
+    expect(r.evento).toBe("Arsenal vs Lille");
+    expect(r.sector).toBe("B");
+    expect(r.ticket_id).toBe("t1");
+    expect(r.cantidad).toBe(1);
+    expect(r.monto).toBe(518);
+  });
+
+  it("con varias líneas avisa cuántas más hay", () => {
+    const r = resumenOperacion([linea(), linea({ evento: "Real Madrid vs City" })]);
+    expect(r.evento).toBe("Arsenal vs Lille +1 más");
+  });
+
+  // Sector y ticket pertenecen a la línea: ponerlos en la cabecera con varias
+  // líneas haría que la operación parezca de un solo sector.
+  it("no atribuye sector ni ticket a una operación de varias líneas", () => {
+    const r = resumenOperacion([linea(), linea({ sector: "C", ticket_id: "t2" })]);
+    expect(r.sector).toBeNull();
+    expect(r.ticket_id).toBeNull();
+  });
+
+  it("suma las entradas, no cuenta las líneas", () => {
+    const r = resumenOperacion([linea({ cantidad: 2 }), linea({ cantidad: 3 })]);
+    expect(r.cantidad).toBe(5);
+  });
+
+  it("suma los montos de las líneas", () => {
+    const r = resumenOperacion([linea({ monto: 518 }), linea({ monto: 1556 })]);
+    expect(r.monto).toBe(2074);
+  });
+
+  // La fecha de la operación marca su urgencia: manda la más próxima.
+  it("toma la fecha más próxima de todas las líneas", () => {
+    const r = resumenOperacion([
+      linea({ fecha_evento: "2027-01-10" }),
+      linea({ fecha_evento: "2026-11-05" }),
+    ]);
+    expect(r.fecha_evento).toBe("2026-11-05");
+  });
+
+  it("ignora las líneas sin fecha al elegir la más próxima", () => {
+    const r = resumenOperacion([
+      linea({ fecha_evento: null }),
+      linea({ fecha_evento: "2026-12-01" }),
+    ]);
+    expect(r.fecha_evento).toBe("2026-12-01");
+  });
+
+  it("queda sin fecha si ninguna línea la tiene", () => {
+    expect(resumenOperacion([linea({ fecha_evento: null })]).fecha_evento).toBeNull();
+  });
+});
+
+describe("separarPorTipo", () => {
+  const p = (tipo: "pedido" | "consulta"): ItemPedido => ({
+    tipo,
+    evento: "X",
+    sector: null,
+    ticket_id: null,
+    monto: tipo === "pedido" ? 100 : 0,
+    cantidad: 1,
+    fecha_evento: null,
+  });
+
+  // Carrito mixto: lo que tiene precio arma la operación, lo demás va a
+  // consultas. Es el caso que define el modelo.
+  it("parte un carrito mixto en pedidos y consultas", () => {
+    const { pedidos, consultas } = separarPorTipo([p("pedido"), p("consulta"), p("pedido")]);
+    expect(pedidos).toHaveLength(2);
+    expect(consultas).toHaveLength(1);
+  });
+
+  it("un carrito solo de consultas no deja nada para la operación", () => {
+    const { pedidos, consultas } = separarPorTipo([p("consulta"), p("consulta")]);
+    expect(pedidos).toHaveLength(0);
+    expect(consultas).toHaveLength(2);
   });
 });

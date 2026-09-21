@@ -4,12 +4,20 @@ import { getRol, puedeVerTienda, nombreDe } from "@/lib/auth";
 import { formatUSD, generateCode, type TipoOperacion } from "@/lib/operaciones";
 import { notificarVendedores } from "@/lib/whatsapp";
 import { notificarVendedoresEmail } from "@/lib/email";
-import { isMock, mockCreateOp, mockListManual, MOCK_USER } from "@/lib/mock-db";
+import {
+  isMock,
+  mockCreateOp,
+  mockCrearConsulta,
+  mockListManual,
+  MOCK_USER,
+} from "@/lib/mock-db";
 import { fetchConfigTienda } from "@/lib/supabase/public";
 import { DEFAULT_EUR_USD } from "@/lib/tickets";
 import {
   evaluarLimite,
   reconciliarItem,
+  resumenOperacion,
+  separarPorTipo,
   RL_MAX_VENTANA,
   RL_VENTANA_MS,
   type ItemPedido,
@@ -187,93 +195,191 @@ export async function POST(request: Request) {
     parsed[i] = reconciliarItem(p, p.ticket_id ? refs.get(p.ticket_id) : undefined, tasa);
   }
 
-  const notasDe = (p: Parsed) =>
-    `${p.tipo === "pedido" ? "Pedido" : "Consulta"} desde la tienda por ${ctx.comprador}` +
-    (p.sector ? ` — ${p.sector}` : "") +
-    (ctx.cliente_email ? ` (${ctx.cliente_email})` : "");
+  const quien = `${ctx.comprador}${ctx.cliente_email ? ` (${ctx.cliente_email})` : ""}`;
+  const detalle = (p: Parsed) =>
+    `${p.evento}${p.sector ? ` — ${p.sector}` : ""}${p.cantidad > 1 ? ` ×${p.cantidad}` : ""}`;
+  const notasDePedido = (ls: Parsed[]) =>
+    `Pedido desde la tienda por ${quien}\n` + ls.map((l) => `· ${detalle(l)}`).join("\n");
+  const notasDeConsulta = (l: Parsed, _c: Ctx) =>
+    `Consulta desde la tienda por ${quien} — ${detalle(l)}`;
 
-  // 1) Registro en la app: una operación por entrada.
-  type Creada = { id: string; code: string; evento: string; sector: string | null; tipo: string; monto: number; cantidad: number };
-  let creadas: Creada[] = [];
+  // 1) Registro en la app. UN envío del carrito = UNA operación con sus
+  // líneas. Lo que va "a consultar" no tiene precio cerrado, así que no es una
+  // operación: va a `consultas` y se convierte después desde el panel. Ambas
+  // comparten `envio_id` para no perder que entraron juntas.
+  const { pedidos: lineasPedido, consultas: lineasConsulta } = separarPorTipo(parsed);
+  const envioId = crypto.randomUUID();
+
+  type Creada = { id: string; code: string; evento: string; monto: number; cantidad: number };
+  let operacion: Creada | null = null;
+  const consultasCreadas: { id: string; code: string; evento: string }[] = [];
+
+  const resumen = lineasPedido.length > 0 ? resumenOperacion(lineasPedido) : null;
 
   if (isMock()) {
-    creadas = parsed.map((p) => {
+    if (resumen) {
       const op = mockCreateOp({
-        evento: p.evento,
+        evento: resumen.evento,
         comprador_alias: ctx.comprador,
         vendedor_alias: null,
-        monto: p.monto,
-        cantidad: p.cantidad,
+        monto: resumen.monto,
+        cantidad: resumen.cantidad,
         fee: 0,
-        ticket_id: p.ticket_id,
-        fecha_evento: p.fecha_evento,
-        notas: notasDe(p),
+        ticket_id: resumen.ticket_id,
+        fecha_evento: resumen.fecha_evento,
+        notas: notasDePedido(lineasPedido),
         cuenta_debitar: null,
-        tipo: p.tipo,
+        tipo: "pedido",
         cliente_id: ctx.cliente_id,
         cliente_email: ctx.cliente_email,
-        sector: p.sector,
+        sector: resumen.sector,
+        envio_id: envioId,
+        items: lineasPedido.map((l) => ({
+          ticket_id: l.ticket_id,
+          evento: l.evento,
+          sector: l.sector,
+          fecha_evento: l.fecha_evento,
+          cantidad: l.cantidad,
+          precio_unitario: l.cantidad > 0 ? l.monto / l.cantidad : 0,
+        })),
       });
-      return { id: op.id, code: op.code, evento: op.evento, sector: op.sector, tipo: op.tipo, monto: op.monto, cantidad: op.cantidad };
-    });
+      operacion = { id: op.id, code: op.code, evento: op.evento, monto: op.monto, cantidad: op.cantidad };
+    }
+    for (const l of lineasConsulta) {
+      const c = mockCrearConsulta({
+        envio_id: envioId,
+        cliente_id: ctx.cliente_id,
+        cliente_email: ctx.cliente_email,
+        comprador_alias: ctx.comprador,
+        ticket_id: l.ticket_id,
+        evento: l.evento,
+        sector: l.sector,
+        fecha_evento: l.fecha_evento,
+        cantidad: l.cantidad,
+        notas: notasDeConsulta(l, ctx),
+      });
+      consultasCreadas.push({ id: c.id, code: c.code, evento: c.evento });
+    }
   } else {
     const admin = createAdminSupabase();
-    // Inserción en lote; si algún code colisiona (23505) se reintenta el lote
-    // entero con codes nuevos (muy improbable).
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const rows = parsed.map((p) => ({
-        code: generateCode(),
-        evento: p.evento,
-        comprador_alias: ctx.comprador,
-        monto: p.monto,
-        cantidad: p.cantidad,
-        fee: 0,
-        ticket_id: p.ticket_id,
-        fecha_evento: p.fecha_evento,
-        notas: notasDe(p),
-        tipo: p.tipo,
-        cliente_id: ctx.cliente_id,
-        cliente_email: ctx.cliente_email,
-        sector: p.sector,
-      }));
-      const { data, error } = await admin
-        .from("operaciones")
-        .insert(rows)
-        .select("id, code, evento, sector, tipo, monto, cantidad");
-      if (!error && data) {
-        creadas = data as Creada[];
-        break;
+
+    if (resumen) {
+      // Reintento por colisión de code (23505); muy improbable.
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const { data, error } = await admin
+          .from("operaciones")
+          .insert({
+            code: generateCode(),
+            evento: resumen.evento,
+            comprador_alias: ctx.comprador,
+            monto: resumen.monto,
+            cantidad: resumen.cantidad,
+            fee: 0,
+            ticket_id: resumen.ticket_id,
+            fecha_evento: resumen.fecha_evento,
+            notas: notasDePedido(lineasPedido),
+            tipo: "pedido",
+            cliente_id: ctx.cliente_id,
+            cliente_email: ctx.cliente_email,
+            sector: resumen.sector,
+            envio_id: envioId,
+          })
+          .select("id, code, evento, monto, cantidad")
+          .single();
+        if (!error && data) {
+          operacion = data as Creada;
+          break;
+        }
+        if (error && (error as any).code !== "23505") {
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
       }
-      if (error && (error as any).code !== "23505") {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+      if (!operacion) {
+        return NextResponse.json(
+          { error: "No se pudo registrar el pedido, reintentá" },
+          { status: 500 }
+        );
+      }
+
+      // Las líneas. Si fallan, la operación queda sin detalle: se borra para
+      // no dejar una operación a medias en el panel.
+      const { error: errItems } = await admin.from("operacion_items").insert(
+        lineasPedido.map((l) => ({
+          operacion_id: operacion!.id,
+          ticket_id: l.ticket_id,
+          evento: l.evento,
+          sector: l.sector,
+          fecha_evento: l.fecha_evento,
+          cantidad: l.cantidad,
+          precio_unitario: l.cantidad > 0 ? l.monto / l.cantidad : 0,
+        }))
+      );
+      if (errItems) {
+        await admin.from("operaciones").delete().eq("id", operacion.id);
+        return NextResponse.json(
+          { error: "No se pudo registrar el detalle del pedido, reintentá" },
+          { status: 500 }
+        );
       }
     }
-    if (creadas.length === 0) {
-      return NextResponse.json(
-        { error: "No se pudo registrar el pedido, reintentá" },
-        { status: 500 }
-      );
+
+    for (const l of lineasConsulta) {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const { data, error } = await admin
+          .from("consultas")
+          .insert({
+            code: generateCode(),
+            envio_id: envioId,
+            cliente_id: ctx.cliente_id,
+            cliente_email: ctx.cliente_email,
+            comprador_alias: ctx.comprador,
+            ticket_id: l.ticket_id,
+            evento: l.evento,
+            sector: l.sector,
+            fecha_evento: l.fecha_evento,
+            cantidad: l.cantidad,
+            notas: notasDeConsulta(l, ctx),
+          })
+          .select("id, code, evento")
+          .single();
+        if (!error && data) {
+          consultasCreadas.push(data as { id: string; code: string; evento: string });
+          break;
+        }
+        if (error && (error as any).code !== "23505") {
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+      }
     }
   }
 
   // 2) Un solo aviso a los vendedores (WhatsApp + email) con todas las
   // entradas del pedido. Best-effort: si falla o no está configurado, las
   // operaciones ya quedaron registradas arriba.
-  const n = creadas.length;
-  const lineas = creadas
-    .map((c, i) => {
-      const cant = c.cantidad > 1 ? ` ×${c.cantidad}` : "";
-      const monto = c.monto > 0 ? ` — ${formatUSD(c.monto)}` : "";
-      const tag = c.tipo === "pedido" ? "PEDIDO" : "CONSULTA";
-      return `${i + 1}) ${c.evento}${c.sector ? ` — ${c.sector}` : ""}${cant}${monto} [${tag}] · ${c.code}`;
-    })
-    .join("\n");
+  const totalEntradas = parsed.reduce((a, p) => a + p.cantidad, 0);
+  const bloques: string[] = [];
+
+  if (operacion && resumen) {
+    const ls = lineasPedido
+      .map((l, i) => `  ${i + 1}) ${detalle(l)} — ${formatUSD(l.monto)}`)
+      .join("\n");
+    bloques.push(
+      `OPERACIÓN ${operacion.code} — ${formatUSD(resumen.monto)}\n${ls}`
+    );
+  }
+  if (consultasCreadas.length > 0) {
+    const ls = lineasConsulta
+      .map((l, i) => `  ${i + 1}) ${detalle(l)} · ${consultasCreadas[i]?.code ?? ""}`)
+      .join("\n");
+    bloques.push(`A CONSULTAR (${consultasCreadas.length})\n${ls}`);
+  }
+
   const mensaje =
-    `🎟️ Nuevo pedido en la tienda (${n} ${n === 1 ? "entrada" : "entradas"})\n` +
-    `Cliente: ${ctx.comprador}${ctx.cliente_email ? ` (${ctx.cliente_email})` : ""}\n\n` +
-    lineas +
-    `\n\nAccioná las operaciones desde el panel.`;
-  const asunto = `🎟️ Nuevo pedido (${n}) — ${ctx.comprador}`;
+    `🎟️ Nuevo pedido en la tienda (${totalEntradas} ${totalEntradas === 1 ? "entrada" : "entradas"})\n` +
+    `Cliente: ${quien}\n\n` +
+    bloques.join("\n\n") +
+    `\n\nAccionalo desde el panel.`;
+  const asunto = `🎟️ Nuevo pedido (${totalEntradas}) — ${ctx.comprador}`;
 
   const [wa, mail] = await Promise.all([
     notificarVendedores(mensaje),
@@ -283,8 +389,11 @@ export async function POST(request: Request) {
   return NextResponse.json(
     {
       ok: true,
-      count: n,
-      items: creadas.map((c) => ({ id: c.id, code: c.code })),
+      // `count` sigue siendo la cantidad de entradas del envío (lo que el
+      // carrito muestra); ahora además se devuelve qué se creó con cada una.
+      count: totalEntradas,
+      operacion: operacion ? { id: operacion.id, code: operacion.code } : null,
+      consultas: consultasCreadas.map((c) => ({ id: c.id, code: c.code })),
       whatsapp: wa.ok
         ? { ok: true, enviados: wa.enviados }
         : { ok: false, noConfigurado: wa.noConfigurado ?? false },

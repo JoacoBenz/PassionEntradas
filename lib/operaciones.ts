@@ -239,3 +239,58 @@ export function formatUSD(n: number): string {
 export function whatsappMessage(evento: string, link: string): string {
   return `Hola 👋 Soy del equipo de AdminTickets (${evento}). Seguí el estado de tu operación acá: ${link}. Se actualiza solo, no hace falta que preguntes.`;
 }
+
+// --- líneas de la operación --------------------------------------------------
+// Un pedido del carrito es UNA operación con N líneas. La operación guarda un
+// resumen (evento, sector, cantidad, monto) para que el panel y el ticket
+// tengan encabezado sin leer las líneas; el detalle real vive acá.
+export type OperacionItem = {
+  id: string;
+  operacion_id: string;
+  ticket_id: string | null;
+  evento: string;
+  sector: string | null;
+  fecha_evento: string | null;
+  cantidad: number;
+  precio_unitario: number;
+  created_at: string;
+};
+
+// Total de una línea. La operación es la suma de todas.
+export function totalItem(i: Pick<OperacionItem, "cantidad" | "precio_unitario">): number {
+  return i.cantidad * i.precio_unitario;
+}
+
+// --- consultas ---------------------------------------------------------------
+// Una consulta NO es una operación: es una entrada pedida sin precio cerrado.
+// Cuando se arregla el precio, se convierte en operación y queda apuntando a
+// ella por `operacion_id`.
+export type EstadoConsulta = "pendiente" | "convertida" | "descartada";
+
+export type Consulta = {
+  id: string;
+  code: string;
+  // Comparte valor con la operación creada en el mismo envío del carrito.
+  envio_id: string | null;
+  cliente_id: string | null;
+  cliente_email: string | null;
+  comprador_alias: string | null;
+  ticket_id: string | null;
+  evento: string;
+  sector: string | null;
+  fecha_evento: string | null;
+  cantidad: number;
+  notas: string | null;
+  estado: EstadoConsulta;
+  operacion_id: string | null;
+  resuelta_por: string | null;
+  resuelta_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const ESTADO_CONSULTA_LABEL: Record<EstadoConsulta, string> = {
+  pendiente: "Pendiente",
+  convertida: "Convertida en operación",
+  descartada: "Descartada",
+};

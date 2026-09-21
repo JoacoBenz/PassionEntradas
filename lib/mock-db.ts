@@ -2,7 +2,14 @@
 // Vive en globalThis para sobrevivir al hot-reload del dev server; se
 // resetea al reiniciar el proceso. NO usar en producción.
 
-import { generateCode, type Operacion, type OperacionPublica, type StatusAction } from "@/lib/operaciones";
+import {
+  generateCode,
+  type Consulta,
+  type Operacion,
+  type OperacionItem,
+  type OperacionPublica,
+  type StatusAction,
+} from "@/lib/operaciones";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import type { Factura, FacturaDatos } from "@/lib/factura";
 import { generarPassword, type SolicitudAcceso, type SolicitudInput } from "@/lib/acceso";
@@ -37,6 +44,8 @@ type MockDB = {
   facturas: MockFactura[];
   facturaNumero: number;
   solicitudes: SolicitudAcceso[];
+  items: OperacionItem[];
+  consultas: Consulta[];
 };
 
 function iso(minsAgo: number) {
@@ -202,6 +211,8 @@ function seed(): MockDB {
     facturas: [],
     facturaNumero: 0,
     solicitudes,
+    items: [],
+    consultas: [],
   };
 }
 
@@ -239,12 +250,16 @@ export function mockCreateOp(input: {
   cliente_email?: string | null;
   sector?: string | null;
   cantidad?: number;
+  envio_id?: string | null;
+  // Líneas del pedido: se guardan aparte, igual que en la base.
+  items?: Omit<OperacionItem, "id" | "operacion_id" | "created_at">[];
 }): Operacion {
   const now = new Date().toISOString();
+  const { items: lineas, ...campos } = input;
   const op: Operacion = {
     id: crypto.randomUUID(),
     code: generateCode(),
-    ...input,
+    ...campos,
     cantidad: input.cantidad ?? 1,
     tipo: input.tipo ?? "operacion",
     cliente_id: input.cliente_id ?? null,
@@ -260,7 +275,11 @@ export function mockCreateOp(input: {
     created_at: now,
     updated_at: now,
   };
-  db().ops.unshift(op);
+  const d = db();
+  d.ops.unshift(op);
+  for (const l of lineas ?? []) {
+    d.items.push({ id: crypto.randomUUID(), operacion_id: op.id, created_at: now, ...l });
+  }
   return op;
 }
 
@@ -575,4 +594,42 @@ export function mockRevocarSolicitud(
   }
   s.updated_at = new Date().toISOString();
   return { ok: true, solicitud: s };
+}
+
+
+// --- líneas de la operación y consultas (espejo de las tablas nuevas) -------
+export function mockListItems(operacionId: string): OperacionItem[] {
+  return db().items.filter((i) => i.operacion_id === operacionId);
+}
+
+export function mockListConsultas(): Consulta[] {
+  return db().consultas;
+}
+
+export function mockCrearConsulta(input: {
+  envio_id: string | null;
+  cliente_id: string | null;
+  cliente_email: string | null;
+  comprador_alias: string | null;
+  ticket_id: string | null;
+  evento: string;
+  sector: string | null;
+  fecha_evento: string | null;
+  cantidad: number;
+  notas: string | null;
+}): Consulta {
+  const now = new Date().toISOString();
+  const c: Consulta = {
+    id: crypto.randomUUID(),
+    code: generateCode(),
+    ...input,
+    estado: "pendiente",
+    operacion_id: null,
+    resuelta_por: null,
+    resuelta_at: null,
+    created_at: now,
+    updated_at: now,
+  };
+  db().consultas.unshift(c);
+  return c;
 }

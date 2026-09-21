@@ -98,3 +98,57 @@ export function evaluarLimite(createdAt: string[], ahora: number): string | null
   }
   return null;
 }
+
+// --- agrupado del carrito ---------------------------------------------------
+// Un envío del carrito es UNA operación, no una por entrada. Las líneas van a
+// `operacion_items`; la operación guarda un resumen para que el panel, el
+// ticket público y el CSV sigan teniendo un encabezado legible sin leer las
+// líneas.
+export type ResumenOperacion = {
+  evento: string;
+  sector: string | null;
+  ticket_id: string | null;
+  cantidad: number;
+  fecha_evento: string | null;
+  monto: number;
+};
+
+export function resumenOperacion(lineas: ItemPedido[]): ResumenOperacion {
+  const primera = lineas[0];
+  const unica = lineas.length === 1;
+
+  // Con una sola línea el encabezado es la línea. Con varias, el evento de la
+  // primera + cuántas más, para que la tarjeta del panel no mienta mostrando
+  // solo una de tres.
+  const otras = lineas.length - 1;
+  const evento = unica ? primera.evento : `${primera.evento} +${otras} más`;
+
+  // Sector y ticket solo tienen sentido si hay una sola línea: con varias
+  // pertenecen a las líneas, no a la operación.
+  const sector = unica ? primera.sector : null;
+  const ticket_id = unica ? primera.ticket_id : null;
+
+  // Total de entradas del pedido, no de líneas.
+  const cantidad = lineas.reduce((a, l) => a + l.cantidad, 0);
+
+  // La fecha más próxima: es la que marca la urgencia de la operación.
+  const fechas = lineas.map((l) => l.fecha_evento).filter((f): f is string => !!f).sort();
+  const fecha_evento = fechas[0] ?? null;
+
+  // `monto` de cada línea ya es el total de esa línea (unitario × cantidad).
+  const monto = lineas.reduce((a, l) => a + l.monto, 0);
+
+  return { evento, sector, ticket_id, cantidad, fecha_evento, monto };
+}
+
+// Separa lo que se reserva de lo que se consulta: la operación se arma solo
+// con lo que tiene precio, y las consultas van a su propia tabla.
+export function separarPorTipo(items: ItemPedido[]): {
+  pedidos: ItemPedido[];
+  consultas: ItemPedido[];
+} {
+  return {
+    pedidos: items.filter((i) => i.tipo === "pedido"),
+    consultas: items.filter((i) => i.tipo === "consulta"),
+  };
+}
