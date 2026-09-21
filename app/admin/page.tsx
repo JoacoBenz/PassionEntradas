@@ -6,8 +6,8 @@ import AdminDashboard from "@/components/admin/AdminDashboard";
 import AppHeader from "@/components/AppHeader";
 import AutoRefresh from "@/components/AutoRefresh";
 import BottomNav from "@/components/BottomNav";
-import type { Operacion } from "@/lib/operaciones";
-import { isMock, MOCK_USER, mockListOps } from "@/lib/mock-db";
+import type { Operacion, OperacionItem } from "@/lib/operaciones";
+import { isMock, MOCK_USER, mockListItems, mockListOps } from "@/lib/mock-db";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +26,12 @@ function getBaseUrl(): string {
 export default async function AdminPage() {
   let email: string | null | undefined;
   let ops: Operacion[];
+  let items: OperacionItem[] = [];
 
   if (isMock()) {
     email = MOCK_USER.email;
     ops = mockListOps();
+    items = ops.flatMap((o) => mockListItems(o.id));
   } else {
     const supabase = createServerSupabase();
     const {
@@ -62,6 +64,16 @@ export default async function AdminPage() {
       .order("created_at", { ascending: false })
       .limit(1000);
     ops = (data ?? []) as Operacion[];
+
+    // Líneas de esas operaciones, en UNA consulta para todas: una por
+    // operación sería N+1 con 1000 filas en pantalla.
+    if (ops.length > 0) {
+      const { data: filas } = await createAdminSupabase()
+        .from("operacion_items")
+        .select("id, operacion_id, ticket_id, evento, sector, fecha_evento, cantidad, precio_unitario")
+        .in("operacion_id", ops.map((o) => o.id));
+      items = (filas ?? []) as OperacionItem[];
+    }
   }
 
   return (
@@ -72,7 +84,7 @@ export default async function AdminPage() {
           server component cuando hubo cambios; el dashboard sincroniza su
           estado local cuando cambia `initial`. */}
       <AutoRefresh intervalMs={15000} versionUrl="/api/operaciones/version" />
-      <AdminDashboard initial={ops} baseUrl={getBaseUrl()} />
+      <AdminDashboard initial={ops} items={items} baseUrl={getBaseUrl()} />
       <BottomNav />
     </main>
   );

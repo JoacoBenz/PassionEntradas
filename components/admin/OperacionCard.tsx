@@ -12,6 +12,8 @@ import {
   quienDe,
   whatsappMessage,
   TIPO_LABEL,
+  totalItem,
+  type OperacionItem,
   type Operacion,
   type StatusAction,
 } from "@/lib/operaciones";
@@ -20,6 +22,9 @@ import FacturaModal from "./FacturaModal";
 
 type Props = {
   op: Operacion;
+  // Líneas de la operación. Un pedido del carrito puede traer varias entradas
+  // de sectores o eventos distintos; la cabecera solo muestra el resumen.
+  items?: OperacionItem[];
   baseUrl: string;
   busy?: boolean;
   // readOnly: modo moderador — sin botones de cambio de estado.
@@ -69,6 +74,7 @@ function fechaCorta(fecha: string): string {
 // trae los hitos, las notas y las acciones.
 export default function OperacionCard({
   op,
+  items = [],
   baseUrl,
   busy = false,
   readOnly = false,
@@ -174,6 +180,39 @@ export default function OperacionCard({
               <StatusChip estado={estado} />
               {enCurso && dias != null && dias <= 14 && <UrgenciaChip dias={dias} />}
             </div>
+
+            {/* Entradas del pedido. Con una sola línea la cabecera ya lo dice
+                todo, así que el detalle aparece recién desde dos. */}
+            {items.length > 1 && (
+              <div className="mt-3 overflow-hidden rounded-xl border border-line">
+                <p className="border-b border-line bg-canvas px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  {items.length} entradas en este pedido
+                </p>
+                <ul className="divide-y divide-line">
+                  {items.map((i) => (
+                    <li key={i.id} className="flex items-start justify-between gap-3 px-3 py-2">
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-medium">{i.evento}</span>
+                        <span className="block text-[11px] text-muted">
+                          {i.sector ?? "General"}
+                          {i.fecha_evento ? ` · ${formatFecha(i.fecha_evento)}` : ""}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block whitespace-nowrap text-xs font-semibold tabular-nums">
+                          {formatUSD(totalItem(i))}
+                        </span>
+                        {i.cantidad > 1 && (
+                          <span className="block font-mono text-[10px] text-muted">
+                            ×{i.cantidad} · {formatUSD(i.precio_unitario)} c/u
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#6A6E7E]">
               {op.fecha_evento && <span>📅 {formatFecha(op.fecha_evento)}</span>}

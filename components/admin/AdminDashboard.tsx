@@ -8,12 +8,16 @@ import {
   ESTADO_GRUPO_LABEL,
   type Operacion,
   type StatusAction,
+  type OperacionItem,
 } from "@/lib/operaciones";
 import OperacionCard from "./OperacionCard";
 import { ToastViewport, useToast } from "./Toast";
 
 type Props = {
   initial: Operacion[];
+  // Líneas de TODAS las operaciones en pantalla: se agrupan acá una vez en
+  // vez de filtrar el array entero en cada card.
+  items?: OperacionItem[];
   baseUrl: string;
 };
 
@@ -49,7 +53,19 @@ function matches(op: Operacion, filter: Filter): boolean {
 
 // Módulo del administrador: chequea la lista y actualiza estados.
 // La carga de operaciones nuevas vive en el módulo /moderador.
-export default function AdminDashboard({ initial, baseUrl }: Props) {
+export default function AdminDashboard({ initial, items = [], baseUrl }: Props) {
+  // Índice operación -> líneas, armado una vez por render en vez de filtrar
+  // el array completo dentro de cada tarjeta.
+  const itemsPorOp = useMemo(() => {
+    const m = new Map<string, OperacionItem[]>();
+    for (const i of items) {
+      const arr = m.get(i.operacion_id);
+      if (arr) arr.push(i);
+      else m.set(i.operacion_id, [i]);
+    }
+    return m;
+  }, [items]);
+
   const [ops, setOps] = useState<Operacion[]>(initial);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("todas");
@@ -284,6 +300,7 @@ export default function AdminDashboard({ initial, baseUrl }: Props) {
             <OperacionCard
               key={op.id}
               op={op}
+              items={itemsPorOp.get(op.id) ?? []}
               baseUrl={baseUrl}
               busy={busyId === op.id}
               onAction={applyAction}
