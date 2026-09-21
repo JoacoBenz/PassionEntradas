@@ -26,6 +26,19 @@ export type FacturaDatos = {
     sede: string | null;
     sector: string | null;
   };
+  // Entradas de la operación. Un pedido del carrito puede traer varias de
+  // sectores o eventos distintos, y la factura tiene que mostrarlas todas.
+  // Opcional: las facturas emitidas antes del modelo multi-línea no la
+  // tienen y se siguen renderizando con los campos sueltos de abajo.
+  items?: {
+    evento: string;
+    sector: string | null;
+    fecha: string | null;
+    cantidad: number;
+    precio_unitario: number;
+    subtotal: number;
+  }[];
+  // Resumen (y compatibilidad con las facturas viejas de una sola línea).
   cantidad: number;
   precio_unitario: number;
   subtotal: number;

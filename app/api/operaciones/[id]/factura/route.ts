@@ -5,6 +5,7 @@ import type { FacturaDatos, FacturaIdioma } from "@/lib/factura";
 import {
   isMock,
   MOCK_USER,
+  mockListItems,
   mockFacturaDeOperacion,
   mockGuardarFactura,
   mockListOps,
@@ -190,6 +191,47 @@ export async function POST(
     compradorNombre = de("nombre") || nombre;
   }
 
+  // Líneas de la operación. Si no tiene (operación vieja, anterior al modelo
+  // multi-línea), se arma una sola con el resumen para que la factura salga
+  // igual que antes.
+  let lineas: NonNullable<FacturaDatos["items"]> = [];
+  if (isMock()) {
+    lineas = mockListItems(op.id).map((i) => ({
+      evento: i.evento,
+      sector: i.sector,
+      fecha: i.fecha_evento,
+      cantidad: i.cantidad,
+      precio_unitario: i.precio_unitario,
+      subtotal: Math.round(i.cantidad * i.precio_unitario * 100) / 100,
+    }));
+  } else {
+    const { data: filas } = await createAdminSupabase()
+      .from("operacion_items")
+      .select("evento, sector, fecha_evento, cantidad, precio_unitario")
+      .eq("operacion_id", op.id)
+      .order("created_at", { ascending: true });
+    lineas = (filas ?? []).map((i: any) => ({
+      evento: i.evento,
+      sector: i.sector ?? null,
+      fecha: i.fecha_evento ?? null,
+      cantidad: Number(i.cantidad),
+      precio_unitario: Number(i.precio_unitario),
+      subtotal: Math.round(Number(i.cantidad) * Number(i.precio_unitario) * 100) / 100,
+    }));
+  }
+  if (lineas.length === 0) {
+    lineas = [
+      {
+        evento: op.evento,
+        sector: ticket?.categoria ?? null,
+        fecha: op.fecha_evento,
+        cantidad,
+        precio_unitario: Math.round((op.monto / cantidad) * 100) / 100,
+        subtotal: op.monto,
+      },
+    ];
+  }
+
   const datos: FacturaDatos = {
     idioma,
     comprador: {
@@ -207,6 +249,7 @@ export async function POST(
       sede: ticket?.ciudad ?? null,
       sector: ticket?.categoria ?? null,
     },
+    items: lineas,
     cantidad,
     precio_unitario: Math.round((op.monto / cantidad) * 100) / 100,
     subtotal: op.monto,
