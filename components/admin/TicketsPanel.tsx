@@ -89,10 +89,21 @@ const empty = {
   competicion: "",
   fecha: "",
   ciudad: "",
+  // A quién le compramos. Va por evento: las entradas de un mismo partido
+  // salen del mismo proveedor, repetirlo por sector sería carga al pedo.
+  proveedor: "",
 };
 
-type SectorForm = { categoria: string; precio: string; stock: string };
-const sectorVacio = (): SectorForm => ({ categoria: "", precio: "", stock: "1" });
+type SectorForm = {
+  categoria: string;
+  precio: string;
+  // Moneda de esta entrada: se muestra en la suya, sin convertir.
+  moneda: string;
+  // Lo que nos costó. Junto al precio de venta da el margen real por entrada.
+  costo: string;
+  stock: string;
+};
+const sectorVacio = (): SectorForm => ({ categoria: "", precio: "", moneda: "USD", costo: "", stock: "1" });
 const MAX_SECTORES = 20;
 
 // Panel de catálogo: carga de entradas propias (source=manual) junto a las
@@ -147,11 +158,14 @@ export default function TicketsPanel({
       competicion: t.competicion ?? "",
       fecha: t.fecha ? t.fecha.slice(0, 10) : "",
       ciudad: t.ciudad ?? "",
+      proveedor: t.proveedor ?? "",
     });
     setSectores([
       {
         categoria: t.categoria ?? "",
         precio: t.precio_final != null ? String(t.precio_final) : "",
+        moneda: t.moneda_final ?? "USD",
+        costo: t.precio_costo != null ? String(t.precio_costo) : "",
         stock: String(t.stock ?? 0),
       },
     ]);
@@ -454,6 +468,15 @@ export default function TicketsPanel({
                 </div>
               </div>
               <div>
+                <label className={labelCls}>Proveedor</label>
+                <input
+                  className={inputCls}
+                  value={form.proveedor}
+                  onChange={(e) => set("proveedor", e.target.value)}
+                  placeholder="A quién le compramos (opcional)"
+                />
+              </div>
+              <div>
                 <label className={labelCls}>Fecha *</label>
                 <input
                   type="date"
@@ -497,15 +520,40 @@ export default function TicketsPanel({
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className={labelCls}>Precio (USD) *</label>
+                      <label className={labelCls}>Precio de venta *</label>
+                      <div className="flex gap-2">
+                        {/* La entrada se muestra en SU moneda: no se convierte. */}
+                        <select
+                          aria-label="Moneda"
+                          className={`${inputCls} w-20 shrink-0`}
+                          value={s.moneda}
+                          onChange={(e) => setSector(i, "moneda", e.target.value)}
+                        >
+                          <option value="USD">USD</option>
+                          <option value="ARS">ARS</option>
+                          <option value="EUR">EUR</option>
+                        </select>
+                        <input
+                          type="number"
+                          min={1}
+                          step={1}
+                          className={`${inputCls} font-mono`}
+                          value={s.precio}
+                          onChange={(e) => setSector(i, "precio", e.target.value)}
+                          placeholder="120"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Precio de costo</label>
                       <input
                         type="number"
-                        min={1}
+                        min={0}
                         step={1}
                         className={`${inputCls} font-mono`}
-                        value={s.precio}
-                        onChange={(e) => setSector(i, "precio", e.target.value)}
-                        placeholder="120"
+                        value={s.costo}
+                        onChange={(e) => setSector(i, "costo", e.target.value)}
+                        placeholder="Opcional"
                       />
                     </div>
                     <div>

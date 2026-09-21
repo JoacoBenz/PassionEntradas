@@ -6,7 +6,7 @@ import ModeradorDashboard from "@/components/moderador/ModeradorDashboard";
 import AppHeader from "@/components/AppHeader";
 import BottomNav from "@/components/BottomNav";
 import type { Operacion } from "@/lib/operaciones";
-import { computeMetrics, type Metrics } from "@/lib/metrics";
+import { computeMetrics, type Metrics, metricasDominantes } from "@/lib/metrics";
 import { isMock, MOCK_USER, mockListOps } from "@/lib/mock-db";
 
 export const dynamic = "force-dynamic";
@@ -72,7 +72,7 @@ export default async function ModeradorPage({
       // Métricas agregadas en la base (RPC): antes se bajaban TODAS las
       // filas históricas para sumar en JS — la única query sin tope del
       // panel, y crecía para siempre.
-      admin.rpc("metricas_operaciones").single(),
+      admin.rpc("metricas_operaciones"),
     ]);
     ops = (recentes.data ?? []).map((o) => ({
       ...o,
@@ -80,18 +80,8 @@ export default async function ModeradorPage({
       cuenta_debitar: null,
       cliente_id: null,
     })) as Operacion[];
-    const m = (agregados.data ?? {}) as Record<string, number | null>;
-    const plataMovida = Number(m.plata_movida ?? 0);
-    const entradasVendidas = Number(m.entradas_vendidas ?? 0);
-    metrics = {
-      plataMovida,
-      comisionGanada: Number(m.comision_ganada ?? 0),
-      entradasVendidas,
-      enJuegoMonto: Number(m.en_juego_monto ?? 0),
-      enJuegoOps: Number(m.en_juego_ops ?? 0),
-      ticketPromedio:
-        entradasVendidas > 0 ? Math.round(plataMovida / entradasVendidas) : 0,
-    };
+    metrics = metricasDominantes((agregados.data ?? []) as any[]);
+
   }
 
   return (

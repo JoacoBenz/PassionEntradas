@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { Operacion } from "@/lib/operaciones";
+import type { Moneda, Operacion } from "@/lib/operaciones";
 import { parseTitle } from "@/lib/tickets";
 
 type Props = {
@@ -140,6 +140,7 @@ const empty = {
   comprador_alias: "",
   vendedor_alias: "",
   monto: "",
+  moneda: "USD",
   fee: "",
   fecha_evento: "",
   notas: "",
@@ -249,6 +250,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
         vendedor_alias: form.vendedor_alias.trim() || null,
         cuenta_debitar: null,
         monto: Math.trunc(Number(form.monto || 0)),
+        moneda: form.moneda as Moneda,
         cantidad: 1,
         fee: Math.trunc(Number(form.fee || 0)),
         status: "esperando_entrada",
@@ -375,8 +377,23 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col justify-between">
               <label htmlFor="monto" className={labelCls}>
-                Monto (USD) *
+                Monto *
               </label>
+              <div className="flex gap-2">
+                {/* La moneda es de la operación: no se convierte, se muestra
+                    en la suya. Al lado del monto para que no haya duda de en
+                    qué se está cargando. */}
+                <select
+                  id="moneda"
+                  aria-label="Moneda"
+                  className={`${inputCls} w-24 shrink-0`}
+                  value={form.moneda}
+                  onChange={(e) => set("moneda", e.target.value)}
+                >
+                  <option value="USD">USD</option>
+                  <option value="ARS">ARS</option>
+                  <option value="EUR">EUR</option>
+                </select>
               <input
                 id="monto"
                 type="number"
@@ -387,6 +404,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
                 onChange={(e) => set("monto", e.target.value)}
                 placeholder="850"
               />
+              </div>
             </div>
             <div className="flex flex-col justify-between">
               <label htmlFor="fee" className={labelCls}>

@@ -7,7 +7,7 @@ import {
   diasHastaEvento,
   estadoDe,
   estadoDotColor,
-  formatUSD,
+  formatMonto,
   formatFecha,
   quienDe,
   whatsappMessage,
@@ -150,11 +150,11 @@ export default function OperacionCard({
         )}
         <span className="flex flex-col items-end leading-none">
           <span className="whitespace-nowrap font-display text-sm font-bold tabular-nums">
-            {formatUSD(op.monto)}
+            {formatMonto(op.monto, op.moneda)}
           </span>
           {op.cantidad > 1 && (
             <span className="mt-0.5 font-mono text-[10px] text-muted">
-              ×{op.cantidad} · {formatUSD(Math.round(op.monto / op.cantidad))} c/u
+              ×{op.cantidad} · {formatMonto(op.monto / op.cantidad, op.moneda)} c/u
             </span>
           )}
         </span>
@@ -200,11 +200,11 @@ export default function OperacionCard({
                       </span>
                       <span className="shrink-0 text-right">
                         <span className="block whitespace-nowrap text-xs font-semibold tabular-nums">
-                          {formatUSD(totalItem(i))}
+                          {formatMonto(totalItem(i), op.moneda)}
                         </span>
                         {i.cantidad > 1 && (
                           <span className="block font-mono text-[10px] text-muted">
-                            ×{i.cantidad} · {formatUSD(i.precio_unitario)} c/u
+                            ×{i.cantidad} · {formatMonto(i.precio_unitario, op.moneda)} c/u
                           </span>
                         )}
                       </span>
@@ -218,7 +218,7 @@ export default function OperacionCard({
               {op.fecha_evento && <span>📅 {formatFecha(op.fecha_evento)}</span>}
               <span>
                 Comisión{" "}
-                <span className="font-semibold text-body">{formatUSD(op.fee)}</span>
+                <span className="font-semibold text-body">{formatMonto(op.fee, op.moneda)}</span>
               </span>
               {op.comprador_alias && (
                 <span>

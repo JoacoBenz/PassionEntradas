@@ -13,7 +13,13 @@ import { isMock, mockCreateManual } from "@/lib/mock-db";
 
 const MAX_SECTORES = 20;
 
-type SectorInput = { categoria: string; precio: number; stock: number };
+type SectorInput = {
+  categoria: string;
+  precio: number;
+  stock: number;
+  moneda: string;
+  costo: number | null;
+};
 
 function parseSectores(t: any): SectorInput[] | { error: string } {
   // Formato nuevo (lista) o viejo (campos planos = un sector).
@@ -35,6 +41,13 @@ function parseSectores(t: any): SectorInput[] | { error: string } {
     const categoria = String(crudos[i]?.categoria ?? "").trim();
     const precio = Number(crudos[i]?.precio);
     const stock = Math.trunc(Number(crudos[i]?.stock));
+    // Moneda de la entrada. Cualquier cosa que no sea una de las tres cae a
+    // USD, que es como se cargaban antes.
+    const monedaRaw = String(crudos[i]?.moneda ?? "USD").toUpperCase();
+    const moneda = ["ARS", "USD", "EUR"].includes(monedaRaw) ? monedaRaw : "USD";
+    // El costo es opcional: sirve para el margen, no para vender.
+    const costoRaw = Number(crudos[i]?.costo);
+    const costo = Number.isFinite(costoRaw) && costoRaw >= 0 ? costoRaw : null;
     if (!categoria) {
       return { error: `El sector es obligatorio${n}` };
     }
@@ -49,7 +62,7 @@ function parseSectores(t: any): SectorInput[] | { error: string } {
       return { error: `El sector "${categoria}" está repetido` };
     }
     vistos.add(clave);
-    sectores.push({ categoria, precio, stock });
+    sectores.push({ categoria, precio, stock, moneda, costo });
   }
   return sectores;
 }
@@ -104,6 +117,10 @@ export async function POST(request: Request) {
     );
   }
 
+  // Proveedor: va por evento, no por sector (las entradas de un mismo
+  // partido salen del mismo lado).
+  const proveedor = String(t?.proveedor ?? "").trim().slice(0, 160) || null;
+
   const sectores = parseSectores(t);
   if ("error" in sectores) {
     return NextResponse.json({ error: sectores.error }, { status: 400 });
@@ -117,12 +134,15 @@ export async function POST(request: Request) {
     fecha,
     ciudad,
     categoria: s.categoria,
-    // Las entradas propias se cargan directamente en USD (a diferencia del
-    // portal Passion, que cotiza en EUR y el worker convierte).
+    // La entrada propia se carga en la moneda que elige el admin y se muestra
+    // en esa: no se convierte. (El portal es el único que convierte, EUR->USD,
+    // y eso lo hace el worker.)
     precio_origen: s.precio,
-    moneda_origen: "USD",
+    moneda_origen: s.moneda ?? "USD",
     precio_final: s.precio,
-    moneda_final: "USD",
+    moneda_final: s.moneda ?? "USD",
+    precio_costo: s.costo ?? null,
+    proveedor,
     stock: s.stock,
     disponible: true,
     estado: "book",

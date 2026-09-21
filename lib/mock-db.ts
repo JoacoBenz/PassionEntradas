@@ -5,6 +5,7 @@
 import {
   generateCode,
   type Consulta,
+  type Moneda,
   type Operacion,
   type OperacionItem,
   type OperacionPublica,
@@ -61,6 +62,7 @@ function seed(): MockDB {
       comprador_alias: "compra_marce",
       vendedor_alias: "vende_lucho",
       monto: 850000,
+      moneda: "USD",
       cantidad: 1,
       fee: 60000,
       status: "entrada_recibida",
@@ -88,6 +90,7 @@ function seed(): MockDB {
       comprador_alias: "juanma_ok",
       vendedor_alias: null,
       monto: 300000,
+      moneda: "USD",
       cantidad: 2,
       fee: 25000,
       status: "esperando_entrada",
@@ -116,6 +119,7 @@ function seed(): MockDB {
       comprador_alias: "f1fan",
       vendedor_alias: "scuderia_ar",
       monto: 500000,
+      moneda: "USD",
       cantidad: 1,
       fee: 40000,
       status: "confirmada",
@@ -231,8 +235,8 @@ export function mockListOps(limit?: number): Operacion[] {
 export function mockOpPublica(id: string): OperacionPublica | null {
   const op = db().ops.find((o) => o.id === id);
   if (!op) return null;
-  const { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at } = op;
-  return { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at };
+  const { code, evento, comprador_alias, vendedor_alias, monto, moneda, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at } = op;
+  return { code, evento, comprador_alias, vendedor_alias, monto, moneda, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at };
 }
 
 export function mockCreateOp(input: {
@@ -250,6 +254,7 @@ export function mockCreateOp(input: {
   cliente_email?: string | null;
   sector?: string | null;
   cantidad?: number;
+  moneda?: Moneda;
   envio_id?: string | null;
   // Líneas del pedido: se guardan aparte, igual que en la base.
   items?: Omit<OperacionItem, "id" | "operacion_id" | "created_at">[];
@@ -261,6 +266,7 @@ export function mockCreateOp(input: {
     code: generateCode(),
     ...campos,
     cantidad: input.cantidad ?? 1,
+    moneda: input.moneda ?? "USD",
     tipo: input.tipo ?? "operacion",
     cliente_id: input.cliente_id ?? null,
     cliente_email: input.cliente_email ?? null,

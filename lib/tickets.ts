@@ -28,6 +28,10 @@ export type Ticket = {
 
 export type TicketFull = Ticket & {
   precio_origen: number | null;
+  // Entradas propias: lo que nos costó y a quién se la compramos. Juntos con
+  // precio_final dan el margen real por entrada.
+  precio_costo?: number | null;
+  proveedor?: string | null;
   moneda_origen: string;
   moneda_final: string | null;
   disponible: boolean;

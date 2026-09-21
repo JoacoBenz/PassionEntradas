@@ -2,7 +2,7 @@ import {
   ESTADO_COLOR,
   ESTADO_LABEL_PUBLICO,
   estadoDe,
-  formatUSD,
+  formatMonto,
   formatFecha,
   type ItemPublico,
   type OperacionPublica,
@@ -128,7 +128,7 @@ export default function StatusStub({
                       </span>
                     </span>
                     <span className="shrink-0 whitespace-nowrap font-mono text-xs text-white/70">
-                      {formatUSD(Math.round(i.cantidad * i.precio_unitario))}
+                      {formatMonto(i.cantidad * i.precio_unitario, op.moneda)}
                     </span>
                   </li>
                 ))}
@@ -178,7 +178,7 @@ export default function StatusStub({
                   Monto
                 </dt>
                 <dd className="mt-0.5 font-display text-3xl font-bold tabular-nums tracking-tight">
-                  {formatUSD(op.monto)}
+                  {formatMonto(op.monto, op.moneda)}
                 </dd>
               </div>
               {op.comprador_alias && (

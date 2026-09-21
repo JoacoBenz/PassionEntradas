@@ -14,6 +14,15 @@ export type Status =
 
 // Origen de la operación: carga interna del staff, o pedido/consulta hecho por
 // un cliente desde la tienda sobre una entrada del catálogo.
+export type Moneda = "ARS" | "USD" | "EUR";
+
+// Símbolo/prefijo por moneda para mostrar montos sin ambigüedad.
+export const MONEDA_LABEL: Record<Moneda, string> = {
+  ARS: "$",
+  USD: "US$",
+  EUR: "€",
+};
+
 export type TipoOperacion = "operacion" | "pedido" | "consulta";
 
 export type Operacion = {
@@ -25,6 +34,8 @@ export type Operacion = {
   // Total de la línea (precio unitario × cantidad). El unitario se deriva
   // como monto / cantidad.
   monto: number;
+  // Moneda de la operación. No se convierte: se muestra en la suya.
+  moneda: Moneda;
   // Cantidad de entradas del sector (>= 1). Topeada por el stock en la tienda.
   cantidad: number;
   fee: number;
@@ -74,6 +85,8 @@ export type OperacionPublica = Pick<
   | "comprador_alias"
   | "vendedor_alias"
   | "monto"
+  // El comprador tiene que ver en qué moneda está su operación.
+  | "moneda"
   | "status"
   | "entrada_recibida_at"
   | "pago_confirmado_at"
@@ -227,6 +240,20 @@ export function quienDe(valor: string | null | undefined): string | null {
 
 // Formato de moneda USD sin decimales ("US$ 1.234"): las operaciones se
 // manejan en dólares.
+// Formatea en la moneda de la operación. ARS sin decimales (los centavos no
+// existen en la práctica); USD y EUR con 2, que es lo contable.
+export function formatMonto(n: number, moneda: Moneda = "USD"): string {
+  const dec = moneda === "ARS" ? 0 : 2;
+  return (
+    MONEDA_LABEL[moneda] +
+    " " +
+    new Intl.NumberFormat("es-AR", {
+      minimumFractionDigits: dec,
+      maximumFractionDigits: dec,
+    }).format(n)
+  );
+}
+
 export function formatUSD(n: number): string {
   return new Intl.NumberFormat("es-AR", {
     style: "currency",

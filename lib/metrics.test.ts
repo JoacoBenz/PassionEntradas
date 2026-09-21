@@ -6,8 +6,7 @@ const base = {
   fee: 10_000,
   status: "esperando_entrada" as const,
   pago_confirmado_at: null as string | null,
-  cerrada_at: null as string | null,
-};
+  cerrada_at: null as string | null, moneda: "USD" as const };
 
 describe("computeMetrics", () => {
   it("suma plata, comisión y ventas solo con pago confirmado", () => {
