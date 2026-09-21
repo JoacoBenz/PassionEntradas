@@ -16,6 +16,7 @@ import {
   isWC,
   parseTitle,
   waLink,
+  zonaDelMapa,
   type EventoAgrupado,
   type Ticket,
 } from "@/lib/tickets";
@@ -217,6 +218,9 @@ function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang 
   const bookable = stk > 0 && u.estado === "book" && hasPrice;
   const low = stk > 0 && stk <= 2;
   const sector = u.categoria || t.entradaGeneral;
+  // Zona del mapa a la que pertenece este sector: el mapa ya viene con las
+  // zonas pintadas, así que alcanza con decir cuál mirar.
+  const zona = zonaDelMapa(u.zona_color);
   const tipo: "pedido" | "consulta" = bookable ? "pedido" : "consulta";
   const item = cart.items.find((i) => i.key === u.id);
   const inCart = !!item;
@@ -242,7 +246,17 @@ function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang 
 
   return (
     <li className={`seat ${bookable ? "" : "seat--req"}`}>
-      <span className="seat-name">{sector}</span>
+      <span className="seat-name">
+        {sector}
+        {zona && (
+          <span className="seat-zona" title={`Zona del mapa: ${zona.texto}`}>
+            {zona.color && (
+              <i className="seat-zona-dot" style={{ background: zona.color }} aria-hidden />
+            )}
+            {zona.texto}
+          </span>
+        )}
+      </span>
       <span className="seat-price">{precio ?? <span className="consult">{t.consultar}</span>}</span>
       <span className="seat-stat">
         {stk > 0 ? (

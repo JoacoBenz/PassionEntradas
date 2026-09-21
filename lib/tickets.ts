@@ -20,6 +20,10 @@ export type Ticket = {
   source: TicketSource;
   // Mapa de sectores del evento (URL pública del bucket `mapas`), si hay.
   imagen_url?: string | null;
+  // Zona coloreada del mapa a la que pertenece este sector. El mapa ya viene
+  // con las zonas pintadas: esto le dice al agente cuál mirar. Lo escribe el
+  // worker; puede venir como color (#E4572E, "red") o como nombre de zona.
+  zona_color?: string | null;
 };
 
 export type TicketFull = Ticket & {
@@ -260,4 +264,35 @@ export function buildEvents(rows: Ticket[]): EventoAgrupado[] {
     });
   }
   return evs;
+}
+
+
+// La zona del mapa puede llegar como color (#E4572E, "red") o como nombre
+// ("Zona Roja"). Si es un color se puede pintar una muestra; si no, se
+// muestra el texto tal cual. Se resuelve acá y no en el componente para no
+// tener que adivinar el formato en cada lugar que la use.
+const COLORES_CSS = [
+  "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown",
+  "black", "white", "grey", "gray", "cyan", "magenta", "violet", "gold",
+  "rojo", "azul", "verde", "amarillo", "naranja", "violeta", "blanca", "negra",
+];
+
+// El worker puede mandar el color en castellano; CSS solo entiende inglés.
+const ES_A_CSS: Record<string, string> = {
+  rojo: "red", azul: "blue", verde: "green", amarillo: "yellow",
+  naranja: "orange", violeta: "violet", blanca: "white", negra: "black",
+};
+const colorCss = (c: string) => ES_A_CSS[c] ?? c;
+
+export type ZonaMapa = { texto: string; color: string | null };
+
+export function zonaDelMapa(valor: string | null | undefined): ZonaMapa | null {
+  const v = String(valor ?? "").trim();
+  if (!v) return null;
+  if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v)) return { texto: v.toUpperCase(), color: v };
+  const lower = v.toLowerCase();
+  if (COLORES_CSS.includes(lower)) return { texto: v, color: colorCss(lower) };
+  // Nombre con el color adentro ("Zona Roja", "Sector Azul"): se pinta igual.
+  const encontrado = COLORES_CSS.find((c) => lower.includes(c));
+  return { texto: v, color: encontrado ? colorCss(encontrado) : null };
 }
