@@ -28,6 +28,17 @@ export const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    href: "/admin/consultas",
+    label: "Consultas",
+    icon: (
+      <svg className={ICON_CLS} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.3A8.4 8.4 0 1 1 21 11.5Z" />
+        <path d="M9.5 9.5a2.5 2.5 0 1 1 3.4 2.3c-.6.3-.9.8-.9 1.4v.3" />
+        <path d="M12 16.5h.01" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/entradas",
     label: "Entradas",
     icon: (

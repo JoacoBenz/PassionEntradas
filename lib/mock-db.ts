@@ -633,3 +633,47 @@ export function mockCrearConsulta(input: {
   db().consultas.unshift(c);
   return c;
 }
+
+// Convierte una consulta en operación (espejo de /api/consultas/[id]/convertir).
+export function mockConvertirConsulta(
+  id: string,
+  opts: { monto: number; fee: number; quien: string }
+): { op: Operacion } | null {
+  const d = db();
+  const c = d.consultas.find((x) => x.id === id);
+  if (!c || c.estado !== "pendiente") return null;
+  const cantidad = Math.max(1, c.cantidad || 1);
+  const op = mockCreateOp({
+    evento: c.evento,
+    comprador_alias: c.comprador_alias,
+    vendedor_alias: null,
+    monto: opts.monto,
+    fee: opts.fee,
+    cantidad,
+    ticket_id: c.ticket_id,
+    fecha_evento: c.fecha_evento,
+    notas: `${c.notas ?? ""}\nCargada desde consulta por ${opts.quien}.`.trim(),
+    cuenta_debitar: null,
+    tipo: "pedido",
+    cliente_id: c.cliente_id,
+    cliente_email: c.cliente_email,
+    sector: c.sector,
+    envio_id: c.envio_id,
+    items: [
+      {
+        ticket_id: c.ticket_id,
+        evento: c.evento,
+        sector: c.sector,
+        fecha_evento: c.fecha_evento,
+        cantidad,
+        precio_unitario: opts.monto / cantidad,
+      },
+    ],
+  });
+  c.estado = "convertida";
+  c.operacion_id = op.id;
+  c.resuelta_por = opts.quien;
+  c.resuelta_at = new Date().toISOString();
+  c.updated_at = c.resuelta_at;
+  return { op };
+}
