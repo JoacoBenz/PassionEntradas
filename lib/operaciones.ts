@@ -294,3 +294,13 @@ export const ESTADO_CONSULTA_LABEL: Record<EstadoConsulta, string> = {
   convertida: "Convertida en operación",
   descartada: "Descartada",
 };
+
+// Línea tal como la ve el comprador en el link público: sin ticket_id ni ids
+// internos, que no le dicen nada y son del catálogo.
+export type ItemPublico = {
+  evento: string;
+  sector: string | null;
+  fecha_evento: string | null;
+  cantidad: number;
+  precio_unitario: number;
+};

@@ -4,6 +4,7 @@ import {
   estadoDe,
   formatUSD,
   formatFecha,
+  type ItemPublico,
   type OperacionPublica,
 } from "@/lib/operaciones";
 import ProgressSteps from "./ProgressSteps";
@@ -44,7 +45,13 @@ function Microtext({ dark = false }: { dark?: boolean }) {
 // Talón / stub de entrada. El contenedor no pinta fondo: cada sección pinta
 // el suyo y enmascara medio círculo en sus juntas (.punch-*), así el
 // troquelado son agujeros de verdad a través de los que se ve la página.
-export default function StatusStub({ op }: { op: OperacionPublica }) {
+export default function StatusStub({
+  op,
+  items = [],
+}: {
+  op: OperacionPublica;
+  items?: ItemPublico[];
+}) {
   const estado = estadoDe(op);
   const color = ESTADO_COLOR[estado];
   // El sello vive sobre la sección de tinta: el color de "cerrada" ES tinta
@@ -105,6 +112,27 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
               <p className="mt-1.5 text-sm text-white/60">
                 {formatFecha(op.fecha_evento)}
               </p>
+            )}
+            {/* Entradas del pedido. Desde dos: con una sola el título ya la
+                nombra y repetirla sería ruido. */}
+            {items.length > 1 && (
+              <ul className="mt-3 space-y-1 border-t border-white/10 pt-3">
+                {items.map((i, n) => (
+                  <li key={n} className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="min-w-0">
+                      <span className="block truncate text-white/85">{i.evento}</span>
+                      <span className="block text-xs text-white/45">
+                        {i.sector ?? "General"}
+                        {i.cantidad > 1 ? ` · ×${i.cantidad}` : ""}
+                        {i.fecha_evento ? ` · ${formatFecha(i.fecha_evento)}` : ""}
+                      </span>
+                    </span>
+                    <span className="shrink-0 whitespace-nowrap font-mono text-xs text-white/70">
+                      {formatUSD(Math.round(i.cantidad * i.precio_unitario))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </div>
