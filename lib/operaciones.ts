@@ -45,12 +45,15 @@ export type Operacion = {
   status: Status;
   entrada_recibida_at: string | null;
   pago_confirmado_at: string | null;
+  // Hito interno: se le pagó al proveedor. Nunca se muestra en el ticket.
+  pago_proveedor_at: string | null;
   // Cierre explícito: con los dos hitos listos, el admin cierra la operación.
   cerrada_at: string | null;
   // Auditoría: email del admin que marcó cada paso (se limpia al desmarcar).
   // Dato interno del panel — nunca va al link público.
   entrada_recibida_por: string | null;
   pago_confirmado_por: string | null;
+  pago_proveedor_por: string | null;
   cerrada_por: string | null;
   // Fecha del evento (date, sin hora): prioriza lo urgente en el panel.
   fecha_evento: string | null;
@@ -106,19 +109,103 @@ export type Estado =
 
 type Hitos = Pick<
   Operacion,
-  "status" | "entrada_recibida_at" | "pago_confirmado_at" | "cerrada_at"
+  | "status"
+  | "entrada_recibida_at"
+  | "pago_confirmado_at"
+  | "pago_proveedor_at"
+  | "cerrada_at"
 >;
 
+// Los hitos ya NO tienen orden: pueden marcarse en cualquier secuencia. El
+// estado es una lectura de cuántos están hechos, no una posición en una fila.
 export function estadoDe(op: Hitos): Estado {
   if (op.status === "cancelada") return "cancelada";
   if (op.cerrada_at) return "cerrada";
   const entrada = !!op.entrada_recibida_at;
   const pago = !!op.pago_confirmado_at;
-  if (entrada && pago) return "lista_para_cerrar";
+  const proveedor = !!op.pago_proveedor_at;
+  // Con los tres internos hechos solo falta entregar.
+  if (entrada && pago && proveedor) return "lista_para_cerrar";
+  // Con alguno hecho, gana el que más habla del avance hacia la entrega:
+  // tener la entrada en mano pesa más que haber cobrado.
   if (entrada) return "entrada_recibida";
-  if (pago) return "pago_confirmado";
+  if (pago || proveedor) return "pago_confirmado";
   return "esperando";
 }
+
+// --- vocabulario PÚBLICO --------------------------------------------------
+// Lo que ve el comprador en su ticket es otra cosa que lo que ve el panel: de
+// los cuatro hitos internos, dos (entrada recibida del proveedor y pago al
+// proveedor) son asunto nuestro y no se muestran. Por eso es un tipo aparte y
+// no una traducción de `Estado`: si fuera lo mismo con otras etiquetas, el día
+// que se agregue un hito interno se filtraría solo al ticket.
+export type EstadoPublico = "pedido_recibido" | "pago_recibido" | "entregada" | "cancelada";
+
+type HitosPublicos = {
+  status: Status;
+  pago_confirmado_at: string | null;
+  cerrada_at: string | null;
+};
+
+export function estadoPublicoDe(op: HitosPublicos): EstadoPublico {
+  if (op.status === "cancelada") return "cancelada";
+  if (op.cerrada_at) return "entregada";
+  if (op.pago_confirmado_at) return "pago_recibido";
+  return "pedido_recibido";
+}
+
+export const ESTADO_PUBLICO_LABEL: Record<EstadoPublico, string> = {
+  pedido_recibido: "Pedido recibido",
+  pago_recibido: "Pago recibido",
+  entregada: "Entregada",
+  cancelada: "Cancelada",
+};
+
+export const ESTADO_PUBLICO_COLOR: Record<EstadoPublico, string> = {
+  pedido_recibido: "#5F6577",
+  pago_recibido: "#6C5BF2",
+  entregada: "#171B2B",
+  cancelada: "#D14D68",
+};
+
+// --- semáforo -----------------------------------------------------------
+// Verde: entregada. Rojo: sin entregar y el evento ya pasó o está encima.
+// Amarillo: sin entregar, sin urgencia de fecha, con el pago hecho.
+// Gris: el resto (y las canceladas, que quedan fuera del semáforo).
+export type Semaforo = "verde" | "amarillo" | "rojo" | "gris";
+
+// Días de antelación con los que una operación pasa a roja. Es lo único
+// configurable del semáforo; 7 por defecto.
+export const SEMAFORO_DIAS_AVISO = 7;
+
+export function semaforoDe(
+  op: Hitos & { fecha_evento: string | null },
+  diasAviso: number = SEMAFORO_DIAS_AVISO
+): Semaforo {
+  if (op.status === "cancelada") return "gris";
+  // Entregada gana siempre: una vez entregada no vuelve a ser urgente
+  // aunque el evento ya haya pasado.
+  if (op.cerrada_at) return "verde";
+  const dias = diasHastaEvento(op.fecha_evento);
+  // Sin fecha no hay contra qué medir la urgencia: nunca es roja.
+  if (dias != null && dias <= diasAviso) return "rojo";
+  if (op.pago_confirmado_at) return "amarillo";
+  return "gris";
+}
+
+export const SEMAFORO_LABEL: Record<Semaforo, string> = {
+  verde: "Entregada",
+  amarillo: "Pago hecho, falta entregar",
+  rojo: "Vencida o próxima a entregar",
+  gris: "Sin novedad",
+};
+
+export const SEMAFORO_COLOR: Record<Semaforo, string> = {
+  verde: "#0D9377",
+  amarillo: "#B07A14",
+  rojo: "#D14D68",
+  gris: "#98A0B3",
+};
 
 // Etiquetas del panel.
 export const ESTADO_LABEL: Record<Estado, string> = {
@@ -191,6 +278,7 @@ export const HITO_COLOR = {
 export type StatusAction =
   | { action: "entrada"; done: boolean }
   | { action: "pago"; done: boolean }
+  | { action: "proveedor"; done: boolean }
   | { action: "cerrar"; done: boolean }
   | { action: "cancelar" }
   | { action: "reabrir" };

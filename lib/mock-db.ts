@@ -68,9 +68,11 @@ function seed(): MockDB {
       status: "entrada_recibida",
       entrada_recibida_at: iso(90),
       pago_confirmado_at: null,
+      pago_proveedor_at: null,
       cerrada_at: null,
       entrada_recibida_por: MOCK_USER.email,
       pago_confirmado_por: null,
+      pago_proveedor_por: null,
       cerrada_por: null,
       fecha_evento: "2026-07-18",
       notas: "Vendedor manda el QR el jueves.",
@@ -96,9 +98,11 @@ function seed(): MockDB {
       status: "esperando_entrada",
       entrada_recibida_at: null,
       pago_confirmado_at: null,
+      pago_proveedor_at: null,
       cerrada_at: null,
       entrada_recibida_por: null,
       pago_confirmado_por: null,
+      pago_proveedor_por: null,
       cerrada_por: null,
       fecha_evento: "2026-07-09",
       notas: null,
@@ -125,9 +129,11 @@ function seed(): MockDB {
       status: "confirmada",
       entrada_recibida_at: iso(60 * 24 * 3),
       pago_confirmado_at: iso(60 * 24 * 2),
+      pago_proveedor_at: null,
       cerrada_at: null,
       entrada_recibida_por: MOCK_USER.email,
       pago_confirmado_por: MOCK_USER.email,
+      pago_proveedor_por: null,
       cerrada_por: null,
       fecha_evento: null,
       notas: null,
@@ -274,9 +280,11 @@ export function mockCreateOp(input: {
     status: "esperando_entrada",
     entrada_recibida_at: null,
     pago_confirmado_at: null,
+    pago_proveedor_at: null,
     cerrada_at: null,
     entrada_recibida_por: null,
     pago_confirmado_por: null,
+    pago_proveedor_por: null,
     cerrada_por: null,
     created_at: now,
     updated_at: now,
@@ -312,30 +320,27 @@ export function mockApplyAction(
 
   switch (action.action) {
     case "entrada":
-    case "pago": {
+    case "pago":
+    case "proveedor": {
       if (cancelada) {
         return { ok: false, status: 409, error: "La operación está cancelada; reabrila para editar hitos" };
       }
       if (op.cerrada_at) {
         return { ok: false, status: 409, error: "La operación está cerrada; reabrí el cierre para editar hitos" };
       }
-      if (action.action === "pago" && action.done && !op.entrada_recibida_at) {
-        return { ok: false, status: 409, error: "Primero marcá la entrada recibida: el pago se autoriza después de verificar las entradas" };
-      }
-      if (action.action === "entrada" && !action.done && op.pago_confirmado_at) {
-        return { ok: false, status: 409, error: "Hay un pago confirmado sobre esta entrada; desmarcá el pago primero" };
-      }
-      const col = action.action === "entrada" ? "entrada_recibida_at" : "pago_confirmado_at";
-      const colPor = action.action === "entrada" ? "entrada_recibida_por" : "pago_confirmado_por";
+      // Sin orden: espejo de la API y del trigger, que ya no lo imponen.
+      const COLS = {
+        entrada: ["entrada_recibida_at", "entrada_recibida_por"],
+        pago: ["pago_confirmado_at", "pago_confirmado_por"],
+        proveedor: ["pago_proveedor_at", "pago_proveedor_por"],
+      } as const;
+      const [col, colPor] = COLS[action.action];
       op[col] = action.done ? new Date().toISOString() : null;
       op[colPor] = action.done ? MOCK_USER.email : null;
       break;
     }
     case "cerrar":
       if (cancelada) return { ok: false, status: 409, error: "La operación está cancelada; no se puede cerrar" };
-      if (action.done && !(op.entrada_recibida_at && op.pago_confirmado_at)) {
-        return { ok: false, status: 409, error: "Para cerrar hacen falta la entrada recibida y el pago confirmado" };
-      }
       op.cerrada_at = action.done ? new Date().toISOString() : null;
       op.cerrada_por = action.done ? MOCK_USER.email : null;
       // Entrada propia vinculada: cerrar descuenta 1 del stock de la tienda;

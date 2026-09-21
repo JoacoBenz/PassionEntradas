@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol, puedeVerTienda } from "@/lib/auth";
-import { estadoDe } from "@/lib/operaciones";
+import { estadoPublicoDe } from "@/lib/operaciones";
 import { MisPedidos, type PedidoView } from "@/components/tienda/MisPedidos";
 import {
   isMock,
@@ -41,7 +41,7 @@ function toView(o: OpRow, facturaId: string | null): PedidoView {
     cantidad: o.cantidad ?? 1,
     fecha_evento: o.fecha_evento ?? null,
     created_at: o.created_at,
-    estado: estadoDe(o),
+    estado: estadoPublicoDe(o),
     facturaId,
   };
 }

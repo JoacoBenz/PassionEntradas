@@ -1,7 +1,7 @@
 import {
-  ESTADO_COLOR,
-  ESTADO_LABEL_PUBLICO,
-  estadoDe,
+  ESTADO_PUBLICO_COLOR,
+  ESTADO_PUBLICO_LABEL,
+  estadoPublicoDe,
   formatMonto,
   formatFecha,
   type ItemPublico,
@@ -52,24 +52,26 @@ export default function StatusStub({
   op: OperacionPublica;
   items?: ItemPublico[];
 }) {
-  const estado = estadoDe(op);
-  const color = ESTADO_COLOR[estado];
+  const estado = estadoPublicoDe(op);
+  const color = ESTADO_PUBLICO_COLOR[estado];
   // El sello vive sobre la sección de tinta: el color de "cerrada" ES tinta
   // (sello tipo "CANJEADO" pensado para fondos claros) y desaparecía contra
   // el fondo. Sobre oscuro, el sello final va en papel.
-  const colorSello = estado === "cerrada" ? "#FBFAF6" : color;
+  const colorSello = estado === "entregada" ? "#FBFAF6" : color;
   // Aviso según la etapa del proceso: la página le dice a cada parte qué
   // puede hacer ahora, igual que lo haría el administrador en el grupo.
+  // Los avisos hablan solo de lo que el comprador ve: su pedido y su pago.
+  // Los pasos con el proveedor son internos y no se mencionan.
   const aviso =
-    estado === "entrada_recibida"
+    estado === "pago_recibido"
       ? {
-          icon: "✅",
-          text: "Entradas verificadas y en custodia del administrador. El comprador ya puede realizar el pago al vendedor.",
+          icon: "💸",
+          text: "Tu pago está confirmado. Estamos coordinando la entrega de las entradas.",
         }
-      : estado === "lista_para_cerrar"
+      : estado === "pedido_recibido"
         ? {
-            icon: "💸",
-            text: "El vendedor confirmó el pago. El administrador está transfiriendo las entradas al comprador.",
+            icon: "📝",
+            text: "Recibimos tu pedido. Un vendedor se contacta para coordinar el pago.",
           }
         : null;
   // Hora de Argentina explícita: esto se renderiza en el server (UTC en
@@ -152,7 +154,7 @@ export default function StatusStub({
                 className="mt-0.5 block font-display text-xl font-bold leading-tight tracking-wide sm:text-2xl"
                 style={{ textWrap: "balance" }}
               >
-                {ESTADO_LABEL_PUBLICO[estado]}
+                {ESTADO_PUBLICO_LABEL[estado]}
               </span>
             </div>
           </div>
@@ -166,9 +168,8 @@ export default function StatusStub({
           <div className="space-y-6 px-6 py-7">
             {/* Los tres pasos del proceso: entrada → pago → entrega */}
             <ProgressSteps
-              entrada={!!op.entrada_recibida_at}
               pago={!!op.pago_confirmado_at}
-              cerrada={!!op.cerrada_at}
+              entregada={!!op.cerrada_at}
               cancelada={estado === "cancelada"}
             />
 

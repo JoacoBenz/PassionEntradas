@@ -12,6 +12,9 @@ import {
   quienDe,
   whatsappMessage,
   TIPO_LABEL,
+  SEMAFORO_COLOR,
+  SEMAFORO_LABEL,
+  semaforoDe,
   totalItem,
   type OperacionItem,
   type Operacion,
@@ -90,8 +93,10 @@ export default function OperacionCard({
   const color = estadoDotColor(estado);
   const cancelada = estado === "cancelada";
   const cerrada = estado === "cerrada";
+  const semaforo = semaforoDe(op);
   const entrada = !!op.entrada_recibida_at;
   const pago = !!op.pago_confirmado_at;
+  const proveedor = !!op.pago_proveedor_at;
   const dias = diasHastaEvento(op.fecha_evento);
   const enCurso = !cerrada && !cancelada;
 
@@ -148,6 +153,14 @@ export default function OperacionCard({
             {TIPO_LABEL[op.tipo]}
           </span>
         )}
+        {/* Semáforo: verde entregada, rojo vencida o encima, amarillo con el
+            pago hecho, gris el resto. Se lee sin desplegar la tarjeta. */}
+        <span
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ background: SEMAFORO_COLOR[semaforo] }}
+          title={SEMAFORO_LABEL[semaforo]}
+          aria-label={SEMAFORO_LABEL[semaforo]}
+        />
         <span className="flex flex-col items-end leading-none">
           <span className="whitespace-nowrap font-display text-sm font-bold tabular-nums">
             {formatMonto(op.monto, op.moneda)}
@@ -319,18 +332,45 @@ export default function OperacionCard({
               </div>
             )}
 
-            {/* Hitos en orden estricto (fiel al proceso): primero se reciben y
-                verifican las entradas; recién ahí se autoriza el pago. */}
+            {/* Los cuatro hitos internos, SIN orden: en la práctica la
+                secuencia varía (a veces se le paga al proveedor antes de
+                tener la entrada). Ninguno bloquea a otro. */}
             {!readOnly && !cancelada && !cerrada && (
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <HitoButton
-                  label="Entrada recibida"
+                  label="Pago recibido"
+                  done={pago}
+                  por={quienDe(op.pago_confirmado_por)}
+                  color={HITO_COLOR.pago}
+                  busy={busy}
+                  onClick={() =>
+                    onAction?.(
+                      op,
+                      { action: "pago", done: !pago },
+                      !pago ? "Pago marcado como recibido" : "Pago desmarcado"
+                    )
+                  }
+                />
+                <HitoButton
+                  label="Pago a proveedor"
+                  done={proveedor}
+                  por={quienDe(op.pago_proveedor_por)}
+                  color={HITO_COLOR.pago}
+                  busy={busy}
+                  onClick={() =>
+                    onAction?.(
+                      op,
+                      { action: "proveedor", done: !proveedor },
+                      !proveedor ? "Pago al proveedor marcado" : "Pago al proveedor desmarcado"
+                    )
+                  }
+                />
+                <HitoButton
+                  label="Entrada del proveedor"
                   done={entrada}
                   por={quienDe(op.entrada_recibida_por)}
                   color={HITO_COLOR.entrada}
                   busy={busy}
-                  locked={pago}
-                  lockedHint="Hay un pago confirmado: desmarcá el pago primero"
                   onClick={() =>
                     onAction?.(
                       op,
@@ -340,25 +380,18 @@ export default function OperacionCard({
                   }
                 />
                 <HitoButton
-                  label="Pago confirmado"
-                  done={pago}
-                  por={quienDe(op.pago_confirmado_por)}
-                  color={HITO_COLOR.pago}
+                  label="Entrada entregada"
+                  done={false}
+                  color={HITO_COLOR.listo}
                   busy={busy}
-                  locked={!entrada}
-                  lockedHint="Primero marcá la entrada recibida: el pago se autoriza después de verificar"
                   onClick={() =>
-                    onAction?.(
-                      op,
-                      { action: "pago", done: !pago },
-                      !pago ? "Pago marcado como confirmado" : "Pago desmarcado"
-                    )
+                    onAction?.(op, { action: "cerrar", done: true }, "Entrega registrada — operación cerrada")
                   }
                 />
               </div>
             )}
 
-            {/* Tercer paso accionable: con entrada y pago listos, se cierra */}
+            {/* Atajo de cierre cuando ya están los tres internos. */}
             {!readOnly && estado === "lista_para_cerrar" && (
               <button
                 onClick={() =>

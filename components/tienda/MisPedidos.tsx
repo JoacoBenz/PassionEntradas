@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import AutoRefresh from "@/components/AutoRefresh";
 import { LANGS, LOCALE, TX, type Lang } from "@/lib/tienda-i18n";
-import type { Estado } from "@/lib/operaciones";
+import type { EstadoPublico } from "@/lib/operaciones";
 
 export type PedidoView = {
   id: string;
@@ -20,18 +20,16 @@ export type PedidoView = {
   cantidad: number;
   fecha_evento: string | null;
   created_at: string;
-  estado: Estado;
+  estado: EstadoPublico;
   // Factura emitida para este pedido (si el staff ya la generó).
   facturaId: string | null;
 };
 
 // Color del chip de estado, alineado con el agrupado del panel.
-const ESTADO_CLASS: Record<Estado, string> = {
-  esperando: "mp-e-abierta",
-  entrada_recibida: "mp-e-curso",
-  pago_confirmado: "mp-e-curso",
-  lista_para_cerrar: "mp-e-curso",
-  cerrada: "mp-e-cerrada",
+const ESTADO_CLASS: Record<EstadoPublico, string> = {
+  pedido_recibido: "mp-e-abierta",
+  pago_recibido: "mp-e-curso",
+  entregada: "mp-e-cerrada",
   cancelada: "mp-e-cancelada",
 };
 

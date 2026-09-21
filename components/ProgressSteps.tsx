@@ -1,20 +1,22 @@
 import { HITO_COLOR } from "@/lib/operaciones";
 
 type Props = {
-  entrada: boolean;
+  // Pasos que ve el COMPRADOR. Los hitos internos (entrada recibida del
+  // proveedor, pago al proveedor) no aparecen acá a propósito: son gestión
+  // nuestra y al comprador no le dicen nada de su pedido.
   pago: boolean;
-  cerrada: boolean;
+  entregada: boolean;
   cancelada?: boolean;
 };
 
-// Los hitos de la operación, mostrados A LA VEZ (entrada y pago son
-// independientes: cualquiera puede llegar primero). "Listo" se enciende
-// cuando el admin cierra la operación. En cancelada queda todo apagado.
-export default function ProgressSteps({ entrada, pago, cerrada, cancelada = false }: Props) {
+// Los tres pasos del comprador. "Pedido recibido" está hecho desde que la
+// operación existe: si está viendo esta página, su pedido llegó. En cancelada
+// queda todo apagado.
+export default function ProgressSteps({ pago, entregada, cancelada = false }: Props) {
   const items = [
-    { label: "Entrada", done: entrada && !cancelada, color: HITO_COLOR.entrada },
-    { label: "Pago", done: pago && !cancelada, color: HITO_COLOR.pago },
-    { label: "Entrega", done: cerrada && !cancelada, color: HITO_COLOR.listo },
+    { label: "Pedido recibido", done: !cancelada, color: HITO_COLOR.entrada },
+    { label: "Pago recibido", done: pago && !cancelada, color: HITO_COLOR.pago },
+    { label: "Entregada", done: entregada && !cancelada, color: HITO_COLOR.listo },
   ];
 
   return (
