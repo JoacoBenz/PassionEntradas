@@ -114,3 +114,6 @@ where not exists (select 1 from public.operacion_items i where i.operacion_id = 
 -- El constraint va en la migración que acompaña al código que deja de generar
 -- ceros (cuando las consultas pasen a su propia tabla). Schema y código tienen
 -- que viajar juntos para este cambio.
+
+-- ACTUALIZACIÓN: el constraint ya está aplicado, en 0032, junto con el
+-- código que dejó de generar consultas con monto 0.
