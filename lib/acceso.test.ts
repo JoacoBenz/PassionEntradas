@@ -58,9 +58,10 @@ describe("validarSolicitud — legajo", () => {
   });
 
   it("no lo confunde con la dirección vieja", () => {
-    // El campo `direccion` ya no participa: mandarlo no alcanza para pasar.
+    // El formulario viejo mandaba `direccion`. Ese payload ya no alcanza:
+    // sin legajo la solicitud se rechaza, venga o no la dirección.
     const { legajo: _fuera, ...sinLegajo } = base;
-    const r = validarSolicitud({ ...sinLegajo, direccion: "Av. Corrientes 1234" });
+    const r = validarSolicitud({ ...sinLegajo, direccion: "Av. Corrientes 1234" } as Record<string, unknown>);
     expect(r.ok).toBe(false);
   });
 });

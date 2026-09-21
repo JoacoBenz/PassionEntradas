@@ -20,7 +20,10 @@ export default function FacturaModal({
   onToast: (kind: "success" | "error", msg: string) => void;
 }) {
   const [nombre, setNombre] = useState(op.comprador_alias ?? "");
-  const [contacto, setContacto] = useState("");
+  // Si el pedido vino de la tienda ya sabemos a quién facturarle: se precarga
+  // su email. El email y el legajo definitivos los toma el servidor de la
+  // cuenta al emitir, así que lo tipeado acá no puede contradecirlos.
+  const [contacto, setContacto] = useState(op.cliente_email ?? "");
   // Cantidad del pedido (topeada por el stock en la tienda). Arranca de la
   // operación; si ya hay factura emitida, gana su snapshot (efecto de más abajo).
   const [cantidad, setCantidad] = useState(String(op.cantidad || 1));
@@ -184,6 +187,12 @@ export default function FacturaModal({
                 />
               </div>
               <div>
+                {op.cliente_email && (
+                  <p className="-mt-1 rounded-lg bg-canvas px-3 py-2 text-xs text-muted">
+                    Pedido de <span className="font-medium">{op.cliente_email}</span>. El
+                    email y el legajo de la factura se toman de su cuenta.
+                  </p>
+                )}
                 <label htmlFor="f-contacto" className={labelCls}>
                   Contacto (tel / email)
                 </label>

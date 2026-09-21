@@ -82,6 +82,12 @@ export default async function FacturaPage({ params }: { params: { id: string } }
           <div className="fac-party">
             <p className="fac-label">{t.billedTo}</p>
             <p className="fac-name">{d.comprador.nombre}</p>
+            {/* Email y legajo vienen de la cuenta que hizo el pedido; el
+                contacto es el campo libre que carga el admin. */}
+            {d.comprador.email && <p className="fac-dato">{d.comprador.email}</p>}
+            {d.comprador.legajo && (
+              <p className="fac-dato">{t.legajo}: {d.comprador.legajo}</p>
+            )}
             {d.comprador.contacto && <p className="fac-dato">{d.comprador.contacto}</p>}
           </div>
           <div className="fac-party">

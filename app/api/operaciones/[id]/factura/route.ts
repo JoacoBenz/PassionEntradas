@@ -116,6 +116,9 @@ export async function POST(
     pago_confirmado_at: string | null;
     fecha_evento: string | null;
     ticket_id: string | null;
+    // Quién la pidió desde la tienda (null en las cargadas a mano).
+    cliente_id?: string | null;
+    cliente_email?: string | null;
   };
   let op: OpFactura | null = null;
   let ticket: { competicion: string | null; ciudad: string | null; categoria: string | null } | null =
@@ -133,7 +136,7 @@ export async function POST(
     const admin = createAdminSupabase();
     const { data, error } = await admin
       .from("operaciones")
-      .select("id, code, evento, monto, fee, status, pago_confirmado_at, fecha_evento, ticket_id")
+      .select("id, code, evento, monto, fee, status, pago_confirmado_at, fecha_evento, ticket_id, cliente_id, cliente_email")
       .eq("id", params.id)
       .maybeSingle();
     if (error) {
@@ -167,9 +170,34 @@ export async function POST(
     );
   }
 
+  // Trazabilidad: si la operación nació de un pedido de la tienda, el email y
+  // el legajo se toman de la CUENTA del cliente, no de lo que tipeó el admin.
+  // Lo tipeado queda como respaldo para las operaciones cargadas a mano.
+  let compradorEmail: string | null = op.cliente_email ?? null;
+  let compradorLegajo: string | null = null;
+  let compradorNombre = nombre;
+  if (isMock()) {
+    // En demo no hay Supabase Auth: el perfil del cliente sale del mock, para
+    // que la cadena de trazabilidad se vea igual que en producción.
+    if (op.cliente_id) compradorLegajo = MOCK_USER.legajo;
+  } else if (op.cliente_id) {
+    const { data: u } = await createAdminSupabase().auth.admin.getUserById(op.cliente_id);
+    const meta = (u?.user?.user_metadata ?? {}) as Record<string, unknown>;
+    const de = (k: string) => (typeof meta[k] === "string" ? (meta[k] as string).trim() : "");
+    compradorEmail = u?.user?.email ?? compradorEmail;
+    compradorLegajo = de("legajo") || null;
+    // El nombre de la cuenta manda; si está vacío se respeta lo tipeado.
+    compradorNombre = de("nombre") || nombre;
+  }
+
   const datos: FacturaDatos = {
     idioma,
-    comprador: { nombre, contacto },
+    comprador: {
+      nombre: compradorNombre,
+      contacto,
+      email: compradorEmail,
+      legajo: compradorLegajo,
+    },
     agente: auth.quien,
     operacion: { id: op.id, code: op.code },
     evento: {

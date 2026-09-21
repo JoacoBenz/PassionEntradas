@@ -6,7 +6,16 @@ export type FacturaIdioma = "en" | "es";
 
 export type FacturaDatos = {
   idioma: FacturaIdioma;
-  comprador: { nombre: string; contacto: string | null };
+  // Datos del comprador. Cuando la operación salió de un pedido de la tienda,
+  // `email` y `legajo` se copian de la CUENTA que lo pidió, no de lo que tipeó
+  // el admin: así el mismo legajo que cargó al pedir acceso llega hasta la
+  // factura. En operaciones cargadas a mano quedan en null.
+  comprador: {
+    nombre: string;
+    contacto: string | null;
+    email?: string | null;
+    legajo?: string | null;
+  };
   // Quién manejó la venta (auditoría de la operación) — "Handled by Kiru".
   agente: string | null;
   operacion: { id: string; code: string };
@@ -54,6 +63,7 @@ export const FACTURA_TX = {
     docKind: "Invoice / Receipt",
     paid: "Paid",
     billedTo: "Billed to",
+    legajo: "Tax ID",
     issued: "Issued",
     handledBy: "Handled by",
     team: "TicketMirror team",
@@ -81,6 +91,7 @@ export const FACTURA_TX = {
     docKind: "Factura / Recibo",
     paid: "Pagado",
     billedTo: "Facturado a",
+    legajo: "Legajo/CUIT",
     issued: "Emitido",
     handledBy: "Atendió",
     team: "equipo TicketMirror",

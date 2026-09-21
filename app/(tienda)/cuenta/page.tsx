@@ -14,7 +14,7 @@ function metaStr(meta: Record<string, unknown>, key: string): string {
 }
 
 export default async function CuentaTiendaPage() {
-  let perfil: PerfilInicial = { nombre: "", telefono: "", direccion: "", lang: null };
+  let perfil: PerfilInicial = { nombre: "", telefono: "", legajo: "", lang: null };
 
   if (!isMock()) {
     const supabase = createServerSupabase();
@@ -26,16 +26,16 @@ export default async function CuentaTiendaPage() {
     const lang = metaStr(meta, "lang");
     let nombre = metaStr(meta, "nombre");
     let telefono = metaStr(meta, "telefono");
-    let direccion = metaStr(meta, "direccion");
+    let legajo = metaStr(meta, "legajo");
 
     // Clientes aprobados antes de que se guardara el perfil en la cuenta no
     // tienen estos datos en user_metadata: los recuperamos de su solicitud
     // (misma info que cargaron en la landing). Service role: la tabla es
     // deny-all. Solo si falta todo, para no pisar lo que el cliente ya editó.
-    if (!nombre && !telefono && !direccion && user.email) {
+    if (!nombre && !telefono && !legajo && user.email) {
       const { data: sol } = await createAdminSupabase()
         .from("solicitudes_acceso")
-        .select("nombre, telefono, direccion")
+        .select("nombre, telefono, legajo")
         .eq("email", user.email.toLowerCase())
         .order("created_at", { ascending: false })
         .limit(1)
@@ -43,18 +43,18 @@ export default async function CuentaTiendaPage() {
       if (sol) {
         nombre = sol.nombre ?? "";
         telefono = sol.telefono ?? "";
-        direccion = sol.direccion ?? "";
+        legajo = sol.legajo ?? "";
       }
     }
 
     perfil = {
       nombre,
       telefono,
-      direccion,
+      legajo,
       lang: lang === "en" || lang === "es" ? lang : null,
     };
   } else {
-    perfil = { nombre: "Demo Cliente", telefono: "+54 11 5555 1234", direccion: "Av. Demo 123", lang: null };
+    perfil = { nombre: "Demo Cliente", telefono: "+54 11 5555 1234", legajo: "20-31222333-9", lang: null };
   }
 
   return <CuentaCliente mock={isMock()} perfil={perfil} />;

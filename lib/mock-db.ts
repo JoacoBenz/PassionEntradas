@@ -15,6 +15,9 @@ export const isMock = () => process.env.MOCK_DATA === "1";
 export const MOCK_USER = {
   email: "demo@passion.local",
   rol: "administrador" as const,
+  // Perfil del cliente demo: el legajo viaja igual que en producción
+  // (solicitud -> cuenta -> pedido -> factura) para poder verlo sin Supabase.
+  legajo: "20-31222333-9",
 };
 
 export type MockMargen = {
