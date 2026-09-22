@@ -289,8 +289,13 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
     }
   }
 
-  const inputCls =
-    "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15";
+  // Sin ancho: el ancho lo pone cada campo. Agregarle "w-20" a una clase que
+  // ya dice "w-full" NO hace nada —gana la que Tailwind emite última, que es
+  // w-full— y así el select de moneda se comía la celda entera y el input de
+  // al lado quedaba en 26px, pisando al vecino.
+  const fieldCls =
+    "rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15";
+  const inputCls = `w-full ${fieldCls}`;
   const labelCls =
     "mb-1 block text-xs font-medium uppercase tracking-wide text-[#6A6E7E]";
 
@@ -383,39 +388,43 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col justify-between">
+          {/* Cada campo en su celda, ninguno compartiendo ancho con otro: el
+              select de moneda metido al lado del importe se encimaba con la
+              comisión y dejaba el costo en 26px. En celular van apilados. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label htmlFor="moneda" className={labelCls}>
+                Moneda
+              </label>
+              {/* La moneda es de la operación: no se convierte, se guarda. */}
+              <select
+                id="moneda"
+                className={inputCls}
+                value={form.moneda}
+                onChange={(e) => set("moneda", e.target.value)}
+              >
+                <option value="USD">USD</option>
+                <option value="ARS">ARS</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </div>
+            <div>
               <label htmlFor="monto" className={labelCls}>
                 Precio de costo
               </label>
-              <div className="flex gap-2">
-                {/* La moneda es de la operación: no se convierte, se muestra
-                    en la suya. Al lado del monto para que no haya duda de en
-                    qué se está cargando. */}
-                <select
-                  id="moneda"
-                  aria-label="Moneda"
-                  className={`${inputCls} w-24 shrink-0`}
-                  value={form.moneda}
-                  onChange={(e) => set("moneda", e.target.value)}
-                >
-                  <option value="USD">USD</option>
-                  <option value="ARS">ARS</option>
-                  <option value="EUR">EUR</option>
-                </select>
               <input
                 id="monto"
                 type="number"
                 min={0}
-                inputMode="numeric"
+                step="0.01"
+                inputMode="decimal"
                 className={`${inputCls} font-mono`}
                 value={form.costo}
                 onChange={(e) => set("costo", e.target.value)}
                 placeholder="0"
               />
-              </div>
             </div>
-            <div className="flex flex-col justify-between">
+            <div>
               <label htmlFor="fee" className={labelCls}>
                 Comisión
               </label>
@@ -423,7 +432,8 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
                 id="fee"
                 type="number"
                 min={0}
-                inputMode="numeric"
+                step="0.01"
+                inputMode="decimal"
                 className={`${inputCls} font-mono`}
                 value={form.fee}
                 onChange={(e) => set("fee", e.target.value)}
@@ -432,7 +442,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
             </div>
             {/* Lo que se le cobra al cliente. Se muestra armado para no tener
                 que sumarlo de cabeza: es el total que va a la factura. */}
-            <div className="col-span-2 flex items-center justify-between rounded-xl bg-canvas px-3 py-2">
+            <div className="flex items-center justify-between rounded-xl bg-canvas px-3 py-2 sm:col-span-3">
               <span className={`${labelCls} mb-0`}>Total al cliente</span>
               <span className="font-display text-sm font-bold tabular-nums">
                 {(() => {

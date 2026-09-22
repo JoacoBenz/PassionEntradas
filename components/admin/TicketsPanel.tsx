@@ -110,6 +110,46 @@ type SectorForm = {
   comision: string;
   stock: string;
 };
+// Un dato de la entrada con su etiqueta. Antes la tarjeta juntaba todo en una
+// línea sin etiquetas ("Platea Alta · US$ 150 · Stock 2") y con la tarjeta
+// angosta quedaba ilegible.
+function Dato({
+  k,
+  v,
+  fuerte = false,
+  ancho = false,
+}: {
+  k: string;
+  v: string;
+  fuerte?: boolean;
+  // Para los valores largos (la sede): ocupa dos columnas.
+  ancho?: boolean;
+}) {
+  return (
+    <div className={`min-w-0 ${ancho ? "col-span-2" : ""}`}>
+      <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted">{k}</dt>
+      {/* Envuelve en vez de cortar: el punto de la tarjeta es ver TODO lo que
+          se cargó, y un "Estadio Monumental, Buenos…" no sirve. */}
+      <dd className={`break-words ${fuerte ? "font-semibold text-body" : "text-[#4A4E5E]"}`}>
+        {v}
+      </dd>
+    </div>
+  );
+}
+
+function fmtFechaCorta(iso: string | null): string {
+  if (!iso) return "—";
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return `${d}/${m}/${y}`;
+}
+
+// La moneda guardada es texto libre en la base; se acota a las tres que maneja
+// la app para poder formatear.
+function monedaDe(v: string | null | undefined): Moneda {
+  const u = String(v ?? "USD").toUpperCase();
+  return u === "ARS" || u === "EUR" ? u : "USD";
+}
+
 const sectorVacio = (): SectorForm => ({
   categoria: "",
   moneda: "USD",
@@ -360,15 +400,23 @@ export default function TicketsPanel({
     }
   }
 
-  const inputCls =
-    "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15";
+  // Sin ancho: el ancho lo pone cada campo. Agregarle "w-20" a una clase que
+  // ya dice "w-full" NO hace nada —gana la que Tailwind emite última, que es
+  // w-full— y así el select de moneda se comía la celda entera y el input de
+  // al lado quedaba en 26px, pisando al vecino.
+  const fieldCls =
+    "rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15";
+  const inputCls = `w-full ${fieldCls}`;
   const labelCls =
     "mb-1 block text-xs font-medium uppercase tracking-wide text-[#6A6E7E]";
 
   const lastSync = syncRuns[0];
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6">
+    // max-w-5xl y no 3xl: es una página de DOS columnas (el formulario fijo en
+    // 380px y la lista al lado). Con 768px de ancho total a la lista le
+    // quedaban 330px y la ficha de cada entrada entraba a los tropezones.
+    <div className="mx-auto w-full max-w-5xl px-4 py-6">
       {/* Salud del catálogo / worker */}
       <section className="card-shadow mb-5 overflow-hidden rounded-2xl bg-white">
         <div className="grid grid-cols-3 divide-x divide-dashed divide-line">
@@ -543,32 +591,46 @@ export default function TicketsPanel({
                       </button>
                     )}
                   </div>
+                  {/* Cada campo en su celda. El select de moneda metido al
+                      lado del importe dejaba el input de costo en 63px en esta
+                      columna, que es angosta. */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
+                      <label className={labelCls}>Moneda</label>
+                      {/* La entrada se muestra en SU moneda: no se convierte. */}
+                      <select
+                        className={inputCls}
+                        value={s.moneda}
+                        onChange={(e) => setSector(i, "moneda", e.target.value)}
+                      >
+                        <option value="USD">USD</option>
+                        <option value="ARS">ARS</option>
+                        <option value="EUR">EUR</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Stock *</label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        className={`${inputCls} font-mono`}
+                        value={s.stock}
+                        onChange={(e) => setSector(i, "stock", e.target.value)}
+                      />
+                    </div>
+                    <div>
                       <label className={labelCls}>Precio de costo</label>
-                      <div className="flex gap-2">
-                        {/* La entrada se muestra en SU moneda: no se convierte. */}
-                        <select
-                          aria-label="Moneda"
-                          className={`${inputCls} w-20 shrink-0`}
-                          value={s.moneda}
-                          onChange={(e) => setSector(i, "moneda", e.target.value)}
-                        >
-                          <option value="USD">USD</option>
-                          <option value="ARS">ARS</option>
-                          <option value="EUR">EUR</option>
-                        </select>
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          inputMode="decimal"
-                          className={`${inputCls} font-mono`}
-                          value={s.costo}
-                          onChange={(e) => setSector(i, "costo", e.target.value)}
-                          placeholder="0"
-                        />
-                      </div>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        inputMode="decimal"
+                        className={`${inputCls} font-mono`}
+                        value={s.costo}
+                        onChange={(e) => setSector(i, "costo", e.target.value)}
+                        placeholder="0"
+                      />
                     </div>
                     <div>
                       <label className={labelCls}>Comisión</label>
@@ -593,17 +655,6 @@ export default function TicketsPanel({
                           return r.ok ? formatMonto(r.total, s.moneda as Moneda) : "—";
                         })()}
                       </span>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Stock *</label>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        className={`${inputCls} font-mono`}
-                        value={s.stock}
-                        onChange={(e) => setSector(i, "stock", e.target.value)}
-                      />
                     </div>
                   </div>
                 </div>
@@ -656,43 +707,77 @@ export default function TicketsPanel({
               portal y la sincronización no las toca.
             </div>
           ) : (
-            enPagina.map((t) => (
-              <div
-                key={t.id}
-                className="card-shadow flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-display font-semibold">{t.evento}</p>
-                  <p className="text-xs text-muted">
-                    {t.categoria ? `${t.categoria} · ` : ""}
-                    {t.precio_final != null ? `US$ ${t.precio_final}` : "A consultar"} · Stock{" "}
-                    {t.stock ?? 0}
-                  </p>
+            // La tarjeta mostraba el evento truncado a tres letras y el resto
+            // apretado en una columna de 70px: los botones eran shrink-0 y se
+            // quedaban con todo el ancho. Ahora el encabezado y los botones
+            // van arriba (los botones bajan de línea si no entran) y los datos
+            // de la entrada ocupan el ancho completo abajo.
+            enPagina.map((t) => {
+              const moneda = monedaDe(t.moneda_final);
+              const venta = t.precio_final != null ? Number(t.precio_final) : null;
+              const costo = t.precio_costo != null ? Number(t.precio_costo) : null;
+              const comision = venta != null && costo != null ? venta - costo : null;
+              return (
+                <div key={t.id} className="card-shadow rounded-2xl bg-white px-4 py-3">
+                  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+                    <div className="min-w-[12rem] flex-1">
+                      {/* Sin truncate: el nombre del evento es el dato para
+                          reconocerla, si no entra que envuelva. */}
+                      <p className="font-display font-semibold leading-snug">{t.evento}</p>
+                      {t.competicion && (
+                        <p className="text-xs text-muted">{t.competicion}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        href={`/moderador?evento=${encodeURIComponent(t.evento)}&ticket=${encodeURIComponent(t.id)}`}
+                        className="rounded-lg border border-brand px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/5"
+                      >
+                        Crear operación
+                      </Link>
+                      <button
+                        onClick={() => empezarEdicion(t)}
+                        disabled={busyId === t.id}
+                        className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-semibold text-[#4A4E5E] transition-colors hover:bg-canvas disabled:opacity-60"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => onDelete(t.id)}
+                        disabled={busyId === t.id}
+                        className="rounded-lg border border-estado-cancelada px-3 py-1.5 text-xs font-semibold text-estado-cancelada transition-colors hover:bg-estado-cancelada/5 disabled:opacity-60"
+                      >
+                        {busyId === t.id ? "Borrando…" : "Borrar"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Todo lo que se cargó de la entrada, cada dato con su
+                      etiqueta. El precio va en SU moneda: antes decía "US$"
+                      para todas, incluso para las cargadas en pesos. */}
+                  {/* Cuatro columnas recién en lg: `sm` mira el viewport, no
+                      el ancho de esta columna, y en una pantalla grande con la
+                      lista angosta partía todo en cuatro tiras de 75px. */}
+                  <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-dashed border-line pt-2.5 text-xs lg:grid-cols-4">
+                    <Dato k="Sector" v={t.categoria ?? "General"} />
+                    <Dato k="Fecha" v={fmtFechaCorta(t.fecha)} />
+                    <Dato k="Lugar" v={t.ciudad ?? "—"} ancho />
+                    <Dato k="Stock" v={String(t.stock ?? 0)} />
+                    <Dato
+                      k="Precio de venta"
+                      v={venta != null ? formatMonto(venta, moneda) : "A consultar"}
+                      fuerte
+                    />
+                    <Dato k="Costo" v={costo != null ? formatMonto(costo, moneda) : "—"} />
+                    <Dato
+                      k="Comisión"
+                      v={comision != null ? formatMonto(comision, moneda) : "—"}
+                    />
+                    <Dato k="Proveedor" v={t.proveedor || "—"} />
+                  </dl>
                 </div>
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                  <Link
-                    href={`/moderador?evento=${encodeURIComponent(t.evento)}&ticket=${encodeURIComponent(t.id)}`}
-                    className="rounded-lg border border-brand px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/5"
-                  >
-                    Crear operación
-                  </Link>
-                  <button
-                    onClick={() => empezarEdicion(t)}
-                    disabled={busyId === t.id}
-                    className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-semibold text-[#4A4E5E] transition-colors hover:bg-canvas disabled:opacity-60"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => onDelete(t.id)}
-                    disabled={busyId === t.id}
-                    className="rounded-lg border border-estado-cancelada px-3 py-1.5 text-xs font-semibold text-estado-cancelada transition-colors hover:bg-estado-cancelada/5 disabled:opacity-60"
-                  >
-                    {busyId === t.id ? "Borrando…" : "Borrar"}
-                  </button>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
 
           {totalPages > 1 && (

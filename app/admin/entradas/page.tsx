@@ -112,7 +112,7 @@ export default async function AdminEntradasPage() {
         portalActivo={portalActivo}
         competiciones={competiciones}
       />
-      <div className="mx-auto w-full max-w-3xl px-4 pb-6">
+      <div className="mx-auto w-full max-w-5xl px-4 pb-6">
         <MargenesPanel />
       </div>
       <BottomNav />
