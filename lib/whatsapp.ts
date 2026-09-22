@@ -63,7 +63,36 @@ export function limpiarParametro(valor: string, max = 300): string {
   return plano.slice(0, max - 1).trimEnd() + "…";
 }
 
-/** Los cinco parámetros de la plantilla `nuevo_pedido`, ya saneados. */
+// Nombres de las variables, EXACTAMENTE como figuran en la plantilla de
+// WhatsApp Manager. Meta pasó a parámetros con nombre: si la plantilla usa
+// {{cliente}}, el envío tiene que mandar `parameter_name: "cliente"` y no la
+// posición. Mandar lo que no corresponde hace fallar el mensaje entero con un
+// error que no aclara cuál era el problema.
+//
+// Si alguna plantilla se creara a la vieja usanza, con {{1}} {{2}}, se pone
+// WHATSAPP_TEMPLATE_NUMERICO=1 y se mandan por posición.
+export const PARAMS_PEDIDO = ["pedido", "cliente", "entrada", "detalle", "total"] as const;
+export const PARAMS_ACCESO = ["nombre", "email", "telefono", "legajo"] as const;
+
+export type ParametroPlantilla =
+  | { type: "text"; text: string }
+  | { type: "text"; parameter_name: string; text: string };
+
+function porNombre(): boolean {
+  return process.env.WHATSAPP_TEMPLATE_NUMERICO !== "1";
+}
+
+/** Arma los parámetros del cuerpo, con nombre o por posición. */
+export function armarParametros(
+  nombres: readonly string[],
+  valores: string[]
+): ParametroPlantilla[] {
+  return valores.map((text, i) =>
+    porNombre() ? { type: "text" as const, parameter_name: nombres[i], text } : { type: "text" as const, text }
+  );
+}
+
+/** Los cinco valores de la plantilla `nuevo_pedido`, ya saneados y en orden. */
 export function parametrosPlantilla(aviso: AvisoPedido): string[] {
   return [
     limpiarParametro(aviso.tipo, 40),
@@ -74,7 +103,7 @@ export function parametrosPlantilla(aviso: AvisoPedido): string[] {
   ];
 }
 
-/** Los cuatro parámetros de la plantilla `nuevo_acceso`, ya saneados. */
+/** Los cuatro valores de la plantilla `nuevo_acceso`, ya saneados y en orden. */
 export function parametrosAcceso(aviso: AvisoAcceso): string[] {
   return [
     limpiarParametro(aviso.nombre, 120),
@@ -113,7 +142,8 @@ export type WhatsappResult =
 // Si hay plantilla configurada se manda como plantilla; si no, texto libre.
 async function enviar(
   plantilla: string | undefined,
-  parametros: string[],
+  nombres: readonly string[],
+  valores: string[],
   texto: string
 ): Promise<WhatsappResult> {
   if (!whatsappConfigurado()) {
@@ -151,7 +181,7 @@ async function enviar(
         components: [
           {
             type: "body",
-            parameters: parametros.map((text) => ({ type: "text", text })),
+            parameters: armarParametros(nombres, valores),
           },
         ],
       },
@@ -187,10 +217,20 @@ async function enviar(
 
 /** Entró un pedido o una consulta desde la tienda. */
 export function notificarVendedores(aviso: AvisoPedido): Promise<WhatsappResult> {
-  return enviar(process.env.WHATSAPP_TEMPLATE, parametrosPlantilla(aviso), aviso.texto);
+  return enviar(
+    process.env.WHATSAPP_TEMPLATE,
+    PARAMS_PEDIDO,
+    parametrosPlantilla(aviso),
+    aviso.texto
+  );
 }
 
 /** Alguien pidió acceso desde la landing y hay que aprobarlo o rechazarlo. */
 export function notificarSolicitudAcceso(aviso: AvisoAcceso): Promise<WhatsappResult> {
-  return enviar(process.env.WHATSAPP_TEMPLATE_ACCESO, parametrosAcceso(aviso), aviso.texto);
+  return enviar(
+    process.env.WHATSAPP_TEMPLATE_ACCESO,
+    PARAMS_ACCESO,
+    parametrosAcceso(aviso),
+    aviso.texto
+  );
 }

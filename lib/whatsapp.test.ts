@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { limpiarParametro, parametrosAcceso, parametrosPlantilla } from "./whatsapp";
+import {
+  armarParametros,
+  limpiarParametro,
+  parametrosAcceso,
+  parametrosPlantilla,
+  PARAMS_ACCESO,
+  PARAMS_PEDIDO,
+} from "./whatsapp";
 
 // Meta rechaza el envío ENTERO si un parámetro trae un salto de línea, un tab
 // o espacios repetidos, y el error que devuelve no dice cuál de los cuatro era.
@@ -105,5 +112,47 @@ describe("parametrosAcceso", () => {
     // Meta rechaza el mensaje entero si un parámetro viene vacío.
     const sinLegajo = { ...aviso, legajo: "" };
     expect(parametrosAcceso(sinLegajo).every((p) => p.length > 0)).toBe(true);
+  });
+});
+
+// Meta pasó a parámetros con NOMBRE. Si la plantilla usa {{cliente}}, el envío
+// tiene que mandar parameter_name: "cliente"; mandar la posición hace fallar el
+// mensaje entero con un error que no aclara cuál era el problema.
+describe("armarParametros", () => {
+  const valores = ["un pedido", "Diego Sosa", "3", "River vs Boca", "US$ 1.706"];
+
+  it("por defecto manda el nombre de cada variable", () => {
+    delete process.env.WHATSAPP_TEMPLATE_NUMERICO;
+    expect(armarParametros(PARAMS_PEDIDO, valores)).toEqual([
+      { type: "text", parameter_name: "pedido", text: "un pedido" },
+      { type: "text", parameter_name: "cliente", text: "Diego Sosa" },
+      { type: "text", parameter_name: "entrada", text: "3" },
+      { type: "text", parameter_name: "detalle", text: "River vs Boca" },
+      { type: "text", parameter_name: "total", text: "US$ 1.706" },
+    ]);
+  });
+
+  it("los nombres son los de la plantilla, en su orden", () => {
+    expect(PARAMS_PEDIDO).toEqual(["pedido", "cliente", "entrada", "detalle", "total"]);
+    expect(PARAMS_ACCESO).toEqual(["nombre", "email", "telefono", "legajo"]);
+  });
+
+  it("con WHATSAPP_TEMPLATE_NUMERICO=1 vuelve a la posición", () => {
+    // Escape para una plantilla vieja con {{1}} {{2}}.
+    process.env.WHATSAPP_TEMPLATE_NUMERICO = "1";
+    const out = armarParametros(PARAMS_PEDIDO, valores);
+    delete process.env.WHATSAPP_TEMPLATE_NUMERICO;
+    expect(out[0]).toEqual({ type: "text", text: "un pedido" });
+    expect(out.every((p) => !("parameter_name" in p))).toBe(true);
+  });
+
+  it("hay un nombre por cada valor que se manda", () => {
+    // Un desajuste dejaría un parameter_name en undefined y Meta lo rechaza.
+    expect(PARAMS_PEDIDO).toHaveLength(parametrosPlantilla({
+      tipo: "un pedido", cliente: "x", entradas: 1, detalle: "y", total: "z", texto: "",
+    }).length);
+    expect(PARAMS_ACCESO).toHaveLength(parametrosAcceso({
+      nombre: "a", email: "b", telefono: "c", legajo: "d", texto: "",
+    }).length);
   });
 });
