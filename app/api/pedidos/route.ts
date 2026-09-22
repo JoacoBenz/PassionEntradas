@@ -390,8 +390,25 @@ export async function POST(request: Request) {
     `\n\nAccionalo desde el panel.`;
   const asunto = `🎟️ Nuevo pedido (${totalEntradas}) — ${ctx.comprador}`;
 
+  // Resumen en UNA línea para la plantilla de WhatsApp: sus parámetros no
+  // aceptan saltos de línea. El texto largo va igual por email y como fallback
+  // cuando todavía no hay plantilla configurada.
+  const lineas = [...lineasPedido, ...lineasConsulta];
+  const detalleCorto =
+    lineas.slice(0, 3).map(detalle).join(" · ") +
+    (lineas.length > 3 ? ` · +${lineas.length - 3} más` : "");
+  const totalCorto = operacion && resumen
+    ? formatUSD(resumen.monto) + (consultasCreadas.length > 0 ? " + a cotizar" : "")
+    : "a cotizar";
+
   const [wa, mail] = await Promise.all([
-    notificarVendedores(mensaje),
+    notificarVendedores({
+      cliente: quien,
+      entradas: totalEntradas,
+      detalle: detalleCorto,
+      total: totalCorto,
+      texto: mensaje,
+    }),
     notificarVendedoresEmail(asunto, mensaje),
   ]);
 

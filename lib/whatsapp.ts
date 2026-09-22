@@ -9,6 +9,54 @@
 // WHATSAPP_VENDEDORES: números de los vendedores en formato internacional
 // (sin +), separados por coma. Ej: "5491136148053,5492944806666".
 
+// --- plantilla (template) ---------------------------------------------------
+// La Cloud API sólo deja mandar texto libre DENTRO de la ventana de 24 h que se
+// abre cuando esa persona te escribe. Un aviso de "entró un pedido" casi nunca
+// cae adentro de esa ventana, así que fuera de ella Meta lo rechaza con el
+// error 131047. Para eso existen las plantillas aprobadas.
+//
+// Si WHATSAPP_TEMPLATE está seteada se manda la plantilla; si no, se sigue
+// mandando texto libre como hasta ahora (sirve para probar rápido con el
+// número de test, donde uno mismo le escribió recién).
+export function plantillaConfigurada(): boolean {
+  return Boolean(process.env.WHATSAPP_TEMPLATE);
+}
+
+// Datos del aviso. Se pasan sueltos y no como un texto armado porque los
+// parámetros de una plantilla NO pueden tener saltos de línea ni tabs: Meta
+// rechaza el envío entero (error 132000 / "invalid parameter"). El texto largo
+// se sigue usando para el email y para el fallback sin plantilla.
+export type AvisoPedido = {
+  cliente: string;
+  entradas: number;
+  detalle: string;
+  total: string;
+  /** Mensaje completo, multilínea: email y fallback de texto libre. */
+  texto: string;
+};
+
+// Meta rechaza parámetros con saltos de línea, tabs o espacios repetidos, y
+// corta a 1024 caracteres. Se limpia acá, con tests, porque el error que
+// devuelve no dice cuál de los cuatro parámetros estaba mal.
+export function limpiarParametro(valor: string, max = 300): string {
+  const plano = String(valor ?? "")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  if (plano.length <= max) return plano || "—";
+  return plano.slice(0, max - 1).trimEnd() + "…";
+}
+
+/** Los cuatro parámetros de la plantilla `nuevo_pedido`, ya saneados. */
+export function parametrosPlantilla(aviso: AvisoPedido): string[] {
+  return [
+    limpiarParametro(aviso.cliente, 120),
+    limpiarParametro(String(aviso.entradas), 10),
+    limpiarParametro(aviso.detalle, 400),
+    limpiarParametro(aviso.total, 60),
+  ];
+}
+
 export function whatsappConfigurado(): boolean {
   return Boolean(
     process.env.WHATSAPP_TOKEN &&
@@ -34,7 +82,7 @@ export type WhatsappResult =
 // Envía un mensaje de texto a cada vendedor. No lanza: cualquier fallo de un
 // destinatario se acumula y se reporta, pero nunca corta el flujo de negocio
 // (el pedido ya quedó registrado en la app antes de llamar acá).
-export async function notificarVendedores(text: string): Promise<WhatsappResult> {
+export async function notificarVendedores(aviso: AvisoPedido): Promise<WhatsappResult> {
   if (!whatsappConfigurado()) {
     return {
       ok: false,
@@ -51,6 +99,32 @@ export async function notificarVendedores(text: string): Promise<WhatsappResult>
   const errores: string[] = [];
   let enviados = 0;
 
+  const cuerpo = (to: string) => {
+    if (!plantillaConfigurada()) {
+      return {
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: { preview_url: false, body: aviso.texto },
+      };
+    }
+    return {
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: {
+        name: process.env.WHATSAPP_TEMPLATE,
+        language: { code: process.env.WHATSAPP_TEMPLATE_LANG || "es_AR" },
+        components: [
+          {
+            type: "body",
+            parameters: parametrosPlantilla(aviso).map((text) => ({ type: "text", text })),
+          },
+        ],
+      },
+    };
+  };
+
   for (const to of destinos) {
     try {
       const res = await fetch(url, {
@@ -59,12 +133,7 @@ export async function notificarVendedores(text: string): Promise<WhatsappResult>
           Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to,
-          type: "text",
-          text: { preview_url: false, body: text },
-        }),
+        body: JSON.stringify(cuerpo(to)),
       });
       if (res.ok) {
         enviados++;
