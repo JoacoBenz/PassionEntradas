@@ -12,9 +12,15 @@ type Props = {
 
 // Header mínimo: identidad y sesión. En desktop, si nav está activo, las
 // secciones aparecen como tabs junto a la marca.
+//
+// Pegado al tope (sticky): el panel es una lista larga de operaciones y, al
+// scrollear, el header se iba y había que volver arriba para cambiar de
+// sección o salir. z-30 lo deja por debajo de los modales (z-50) y de los
+// toasts, así que no tapa nada. El padding de safe-area se mantiene para que
+// en iOS no quede debajo de la barra de estado.
 export default function AppHeader({ subtitle, email, nav = false }: Props) {
   return (
-    <header className="surface-ink pt-[env(safe-area-inset-top)] text-white">
+    <header className="surface-ink sticky top-0 z-30 pt-[env(safe-area-inset-top)] text-white">
       {/* flex-wrap: si la marca + acciones no entran (Safari mide las fuentes
           más anchas que Chromium), la fila de acciones baja completa en vez
           de cortarse en el borde. */}

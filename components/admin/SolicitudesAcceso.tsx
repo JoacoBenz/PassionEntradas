@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { SolicitudAcceso } from "@/lib/acceso";
+import { fechaHora } from "@/lib/fechas";
 
 // Cola de solicitudes de acceso a la tienda. El admin aprueba (crea el usuario
 // cliente y muestra las credenciales UNA vez) o rechaza. Al aprobar se ofrecen
@@ -9,7 +10,14 @@ import type { SolicitudAcceso } from "@/lib/acceso";
 // enviar por email (si hay proveedor conectado).
 
 type Credenciales = { email: string; password: string };
-type Reveal = { creds: Credenciales; mensaje: string; emailConfigurado: boolean };
+type Reveal = {
+  creds: Credenciales;
+  mensaje: string;
+  emailConfigurado: boolean;
+  // El mail sale solo al aprobar; esto solo refleja si ese envio funciono,
+  // para que el boton quede como reenvio y no parezca un envio pendiente.
+  emailEnviado: boolean;
+};
 type EmailEstado =
   | { estado: "idle" }
   | { estado: "sending" }
@@ -18,12 +26,9 @@ type EmailEstado =
 
 function fmtFecha(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("es-AR", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    // Con zona explícita: sin ella el servidor escribía una hora y el
+    // navegador otra, y React descartaba el HTML del servidor.
+    return fechaHora(iso);
   } catch {
     return iso;
   }
@@ -94,9 +99,15 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
             creds: data.credenciales,
             mensaje: data.mensaje ?? "",
             emailConfigurado: Boolean(data.emailConfigurado),
+            emailEnviado: Boolean(data.emailEnviado),
           },
         }));
-        avisar("ok", "Acceso creado. Enviá las credenciales al cliente.");
+        avisar(
+          "ok",
+          data.emailEnviado
+            ? "Acceso creado y credenciales enviadas por email."
+            : "Acceso creado. Enviá las credenciales al cliente."
+        );
       } else {
         avisar("ok", "Solicitud rechazada.");
       }
@@ -128,6 +139,8 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
           creds: data.credenciales,
           mensaje: data.mensaje ?? "",
           emailConfigurado: Boolean(data.emailConfigurado),
+          // Regenerar la clave no manda nada: este mail queda pendiente.
+          emailEnviado: false,
         },
       }));
       avisar("ok", "Acceso regenerado. Copiá o enviá las credenciales nuevas.");
@@ -260,6 +273,13 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
                       {s.telefono && (
                         <p className="text-xs text-muted">{s.telefono}</p>
                       )}
+                      {/* Legajo/CUIL/CUIT en las solicitudes nuevas; las
+                          viejas solo tienen dirección. Se muestra lo que haya. */}
+                      {s.legajo && (
+                        <p className="text-xs text-muted">
+                          <span className="text-[#8A8FA3]">Legajo/CUIT:</span> {s.legajo}
+                        </p>
+                      )}
                       {s.direccion && (
                         <p className="text-xs text-muted">{s.direccion}</p>
                       )}
@@ -306,7 +326,9 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
                   Acceso generado — {r.creds.email}
                 </p>
                 <p className="mt-1 text-xs text-emerald-800/80">
-                  Guardá o enviá estas credenciales ahora: no se vuelven a mostrar.
+                  {r.emailEnviado
+                    ? `Las credenciales ya salieron por email a ${r.creds.email}. Guardalas igual: no se vuelven a mostrar.`
+                    : "Guardá o enviá estas credenciales ahora: no se vuelven a mostrar."}
                 </p>
                 <div className="mt-2 space-y-1.5">
                   <div className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2">
@@ -344,7 +366,9 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
                       ? "Enviando…"
                       : est.estado === "sent"
                         ? "✓ Enviado por email"
-                        : "Enviar por email"}
+                        : r.emailEnviado
+                          ? "Reenviar por email"
+                          : "Enviar por email"}
                   </button>
                   <button
                     onClick={() => setReveal((rv) => { const { [id]: _omit, ...rest } = rv; return rest; })}

@@ -14,6 +14,15 @@ export type Status =
 
 // Origen de la operación: carga interna del staff, o pedido/consulta hecho por
 // un cliente desde la tienda sobre una entrada del catálogo.
+export type Moneda = "ARS" | "USD" | "EUR";
+
+// Símbolo/prefijo por moneda para mostrar montos sin ambigüedad.
+export const MONEDA_LABEL: Record<Moneda, string> = {
+  ARS: "$",
+  USD: "US$",
+  EUR: "€",
+};
+
 export type TipoOperacion = "operacion" | "pedido" | "consulta";
 
 export type Operacion = {
@@ -25,6 +34,8 @@ export type Operacion = {
   // Total de la línea (precio unitario × cantidad). El unitario se deriva
   // como monto / cantidad.
   monto: number;
+  // Moneda de la operación. No se convierte: se muestra en la suya.
+  moneda: Moneda;
   // Cantidad de entradas del sector (>= 1). Topeada por el stock en la tienda.
   cantidad: number;
   fee: number;
@@ -34,12 +45,15 @@ export type Operacion = {
   status: Status;
   entrada_recibida_at: string | null;
   pago_confirmado_at: string | null;
+  // Hito interno: se le pagó al proveedor. Nunca se muestra en el ticket.
+  pago_proveedor_at: string | null;
   // Cierre explícito: con los dos hitos listos, el admin cierra la operación.
   cerrada_at: string | null;
   // Auditoría: email del admin que marcó cada paso (se limpia al desmarcar).
   // Dato interno del panel — nunca va al link público.
   entrada_recibida_por: string | null;
   pago_confirmado_por: string | null;
+  pago_proveedor_por: string | null;
   cerrada_por: string | null;
   // Fecha del evento (date, sin hora): prioriza lo urgente en el panel.
   fecha_evento: string | null;
@@ -74,6 +88,8 @@ export type OperacionPublica = Pick<
   | "comprador_alias"
   | "vendedor_alias"
   | "monto"
+  // El comprador tiene que ver en qué moneda está su operación.
+  | "moneda"
   | "status"
   | "entrada_recibida_at"
   | "pago_confirmado_at"
@@ -93,26 +109,150 @@ export type Estado =
 
 type Hitos = Pick<
   Operacion,
-  "status" | "entrada_recibida_at" | "pago_confirmado_at" | "cerrada_at"
+  | "status"
+  | "entrada_recibida_at"
+  | "pago_confirmado_at"
+  | "pago_proveedor_at"
+  | "cerrada_at"
 >;
 
+// Los hitos ya NO tienen orden: pueden marcarse en cualquier secuencia. El
+// estado es una lectura de cuántos están hechos, no una posición en una fila.
+//
+// CERRADA son los CUATRO hechos, no solo la entrega. `cerrada_at` es el hito
+// "entrada entregada"; tomarlo como el fin de la operación hacía que marcar la
+// entrega congelara los otros tres, y quedaban para siempre sin tildar cosas
+// que sí pasaron (típico: se entregó antes de pagarle al proveedor).
 export function estadoDe(op: Hitos): Estado {
   if (op.status === "cancelada") return "cancelada";
-  if (op.cerrada_at) return "cerrada";
   const entrada = !!op.entrada_recibida_at;
   const pago = !!op.pago_confirmado_at;
-  if (entrada && pago) return "lista_para_cerrar";
+  const proveedor = !!op.pago_proveedor_at;
+  const entregada = !!op.cerrada_at;
+  const hechos = [entrada, pago, proveedor, entregada].filter(Boolean).length;
+
+  if (hechos === 4) return "cerrada";
+  // Falta uno solo: la operación está a un paso de terminar.
+  if (hechos === 3) return "lista_para_cerrar";
+  // Con alguno hecho, gana el que más habla del avance hacia la entrega:
+  // tener la entrada en mano pesa más que haber cobrado.
   if (entrada) return "entrada_recibida";
-  if (pago) return "pago_confirmado";
+  if (pago || proveedor || entregada) return "pago_confirmado";
   return "esperando";
 }
+
+/** Los cuatro hitos están hechos: la operación terminó y se congela. */
+export function operacionCompleta(op: Hitos): boolean {
+  return (
+    !!op.entrada_recibida_at &&
+    !!op.pago_confirmado_at &&
+    !!op.pago_proveedor_at &&
+    !!op.cerrada_at
+  );
+}
+
+/** Lo que habilita la factura: el cliente pagó y ya tiene su entrada. */
+export function sePuedeFacturar(op: Hitos): boolean {
+  return op.status !== "cancelada" && !!op.pago_confirmado_at;
+}
+
+// --- vocabulario PÚBLICO --------------------------------------------------
+// Lo que ve el comprador en su ticket es otra cosa que lo que ve el panel: de
+// los cuatro hitos internos, dos (entrada recibida del proveedor y pago al
+// proveedor) son asunto nuestro y no se muestran. Por eso es un tipo aparte y
+// no una traducción de `Estado`: si fuera lo mismo con otras etiquetas, el día
+// que se agregue un hito interno se filtraría solo al ticket.
+// Lo que ve el cliente. `consulta_recibida` es el único que no sale de una
+// operación: es una consulta todavía sin precio, que aún no nació como
+// operación (ver `consultas`). Se expone igual para que el cliente vea que su
+// pedido no se perdió mientras el staff le busca precio.
+export type EstadoPublico =
+  | "consulta_recibida"
+  | "pedido_recibido"
+  | "pago_recibido"
+  | "entregada"
+  | "cancelada";
+
+type HitosPublicos = {
+  status: Status;
+  pago_confirmado_at: string | null;
+  cerrada_at: string | null;
+};
+
+export function estadoPublicoDe(op: HitosPublicos): EstadoPublico {
+  if (op.status === "cancelada") return "cancelada";
+  if (op.cerrada_at) return "entregada";
+  if (op.pago_confirmado_at) return "pago_recibido";
+  return "pedido_recibido";
+}
+
+export const ESTADO_PUBLICO_LABEL: Record<EstadoPublico, string> = {
+  consulta_recibida: "Consulta recibida",
+  pedido_recibido: "Pedido recibido",
+  pago_recibido: "Pago recibido",
+  entregada: "Entregada",
+  cancelada: "Cancelada",
+};
+
+export const ESTADO_PUBLICO_COLOR: Record<EstadoPublico, string> = {
+  consulta_recibida: "#5F6577",
+  pedido_recibido: "#5F6577",
+  pago_recibido: "#6C5BF2",
+  entregada: "#171B2B",
+  cancelada: "#D14D68",
+};
+
+// --- semáforo -----------------------------------------------------------
+// Verde: entregada. Rojo: sin entregar y el evento ya pasó o está encima.
+// Amarillo: sin entregar, sin urgencia de fecha, con el pago hecho.
+// Gris: el resto (y las canceladas, que quedan fuera del semáforo).
+export type Semaforo = "verde" | "amarillo" | "rojo" | "gris";
+
+// Días de antelación con los que una operación pasa a roja. Es lo único
+// configurable del semáforo; 7 por defecto.
+export const SEMAFORO_DIAS_AVISO = 7;
+
+export function semaforoDe(
+  op: Hitos & { fecha_evento: string | null },
+  diasAviso: number = SEMAFORO_DIAS_AVISO
+): Semaforo {
+  if (op.status === "cancelada") return "gris";
+  // Entregada gana siempre: una vez entregada no vuelve a ser urgente
+  // aunque el evento ya haya pasado.
+  if (op.cerrada_at) return "verde";
+  const dias = diasHastaEvento(op.fecha_evento);
+  // Sin fecha no hay contra qué medir la urgencia: nunca es roja.
+  if (dias != null && dias <= diasAviso) return "rojo";
+  if (op.pago_confirmado_at) return "amarillo";
+  return "gris";
+}
+
+export const SEMAFORO_LABEL: Record<Semaforo, string> = {
+  verde: "Entregada",
+  amarillo: "Pago hecho, falta entregar",
+  rojo: "Vencida o próxima a entregar",
+  gris: "Sin novedad",
+};
+
+// Leyenda del panel: SOLO los tres estados que el semáforo comunica. El gris
+// no está en la lista a propósito — no es un estado, es la ausencia de los
+// otros tres ("todavía no pasó nada"), y ponerlo en la leyenda obligaba a
+// explicar una cuarta cosa que no se acciona.
+export const SEMAFORO_LEYENDA: Semaforo[] = ["verde", "amarillo", "rojo"];
+
+export const SEMAFORO_COLOR: Record<Semaforo, string> = {
+  verde: "#0D9377",
+  amarillo: "#B07A14",
+  rojo: "#D14D68",
+  gris: "#98A0B3",
+};
 
 // Etiquetas del panel.
 export const ESTADO_LABEL: Record<Estado, string> = {
   esperando: "En espera",
   entrada_recibida: "Entrada recibida",
   pago_confirmado: "Pago confirmado",
-  lista_para_cerrar: "Lista para entregar",
+  lista_para_cerrar: "Falta un hito",
   cerrada: "Entregada",
   cancelada: "Cancelada",
 };
@@ -122,7 +262,7 @@ export const ESTADO_LABEL: Record<Estado, string> = {
 // al comprador; el cierre es la entrega hecha.
 export const ESTADO_LABEL_PUBLICO: Record<Estado, string> = {
   ...ESTADO_LABEL,
-  lista_para_cerrar: "En entrega",
+  lista_para_cerrar: "En entrega",  // el cliente no ve los hitos internos
   cerrada: "Entradas entregadas",
 };
 
@@ -178,6 +318,7 @@ export const HITO_COLOR = {
 export type StatusAction =
   | { action: "entrada"; done: boolean }
   | { action: "pago"; done: boolean }
+  | { action: "proveedor"; done: boolean }
   | { action: "cerrar"; done: boolean }
   | { action: "cancelar" }
   | { action: "reabrir" };
@@ -227,6 +368,20 @@ export function quienDe(valor: string | null | undefined): string | null {
 
 // Formato de moneda USD sin decimales ("US$ 1.234"): las operaciones se
 // manejan en dólares.
+// Formatea en la moneda de la operación. ARS sin decimales (los centavos no
+// existen en la práctica); USD y EUR con 2, que es lo contable.
+export function formatMonto(n: number, moneda: Moneda = "USD"): string {
+  const dec = moneda === "ARS" ? 0 : 2;
+  return (
+    MONEDA_LABEL[moneda] +
+    " " +
+    new Intl.NumberFormat("es-AR", {
+      minimumFractionDigits: dec,
+      maximumFractionDigits: dec,
+    }).format(n)
+  );
+}
+
 export function formatUSD(n: number): string {
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
@@ -239,3 +394,68 @@ export function formatUSD(n: number): string {
 export function whatsappMessage(evento: string, link: string): string {
   return `Hola 👋 Soy del equipo de AdminTickets (${evento}). Seguí el estado de tu operación acá: ${link}. Se actualiza solo, no hace falta que preguntes.`;
 }
+
+// --- líneas de la operación --------------------------------------------------
+// Un pedido del carrito es UNA operación con N líneas. La operación guarda un
+// resumen (evento, sector, cantidad, monto) para que el panel y el ticket
+// tengan encabezado sin leer las líneas; el detalle real vive acá.
+export type OperacionItem = {
+  id: string;
+  operacion_id: string;
+  ticket_id: string | null;
+  evento: string;
+  sector: string | null;
+  fecha_evento: string | null;
+  cantidad: number;
+  precio_unitario: number;
+  created_at: string;
+};
+
+// Total de una línea. La operación es la suma de todas.
+export function totalItem(i: Pick<OperacionItem, "cantidad" | "precio_unitario">): number {
+  return i.cantidad * i.precio_unitario;
+}
+
+// --- consultas ---------------------------------------------------------------
+// Una consulta NO es una operación: es una entrada pedida sin precio cerrado.
+// Cuando se arregla el precio, se convierte en operación y queda apuntando a
+// ella por `operacion_id`.
+export type EstadoConsulta = "pendiente" | "convertida" | "descartada";
+
+export type Consulta = {
+  id: string;
+  code: string;
+  // Comparte valor con la operación creada en el mismo envío del carrito.
+  envio_id: string | null;
+  cliente_id: string | null;
+  cliente_email: string | null;
+  comprador_alias: string | null;
+  ticket_id: string | null;
+  evento: string;
+  sector: string | null;
+  fecha_evento: string | null;
+  cantidad: number;
+  notas: string | null;
+  estado: EstadoConsulta;
+  operacion_id: string | null;
+  resuelta_por: string | null;
+  resuelta_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const ESTADO_CONSULTA_LABEL: Record<EstadoConsulta, string> = {
+  pendiente: "Pendiente",
+  convertida: "Convertida en operación",
+  descartada: "Descartada",
+};
+
+// Línea tal como la ve el comprador en el link público: sin ticket_id ni ids
+// internos, que no le dicen nada y son del catálogo.
+export type ItemPublico = {
+  evento: string;
+  sector: string | null;
+  fecha_evento: string | null;
+  cantidad: number;
+  precio_unitario: number;
+};

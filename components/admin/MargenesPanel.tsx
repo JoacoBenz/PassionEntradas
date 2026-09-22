@@ -162,7 +162,7 @@ export default function MargenesPanel() {
   );
 
   const inputPctCls =
-    "w-20 rounded-lg border border-line bg-white px-2.5 py-1.5 text-right font-mono text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15";
+    "h-10 w-20 rounded-lg border border-line bg-white px-2.5 text-right font-mono text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15";
   const btnCls =
     "rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-deep disabled:opacity-50";
 
@@ -312,7 +312,7 @@ export default function MargenesPanel() {
                   aria-label="Evento para la nueva regla"
                   value={nuevaCat}
                   onChange={(e) => setNuevaCat(e.target.value)}
-                  className="min-w-0 flex-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm outline-none focus:border-brand"
+                  className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-white px-2.5 text-sm outline-none focus:border-brand"
                 >
                   <option value="">Elegir evento…</option>
                   {sinRegla.map((c) => (

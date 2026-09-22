@@ -9,7 +9,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import AutoRefresh from "@/components/AutoRefresh";
 import { LANGS, LOCALE, TX, type Lang } from "@/lib/tienda-i18n";
-import type { Estado } from "@/lib/operaciones";
+import type { EstadoPublico } from "@/lib/operaciones";
+import { fechaDia, fechaHora } from "@/lib/fechas";
 
 export type PedidoView = {
   id: string;
@@ -20,18 +21,20 @@ export type PedidoView = {
   cantidad: number;
   fecha_evento: string | null;
   created_at: string;
-  estado: Estado;
+  estado: EstadoPublico;
   // Factura emitida para este pedido (si el staff ya la generó).
   facturaId: string | null;
+  // Una consulta sin precio todavía no es una operación: no hay link público
+  // de seguimiento que mostrar hasta que el staff la cargue.
+  seguible: boolean;
 };
 
 // Color del chip de estado, alineado con el agrupado del panel.
-const ESTADO_CLASS: Record<Estado, string> = {
-  esperando: "mp-e-abierta",
-  entrada_recibida: "mp-e-curso",
-  pago_confirmado: "mp-e-curso",
-  lista_para_cerrar: "mp-e-curso",
-  cerrada: "mp-e-cerrada",
+const ESTADO_CLASS: Record<EstadoPublico, string> = {
+  consulta_recibida: "mp-e-abierta",
+  pedido_recibido: "mp-e-abierta",
+  pago_recibido: "mp-e-curso",
+  entregada: "mp-e-cerrada",
   cancelada: "mp-e-cancelada",
 };
 
@@ -50,16 +53,20 @@ function useLang(): [Lang, (l: Lang) => void] {
 
 function fmtDate(value: string | null, lang: Lang, withTime = false): string {
   if (!value) return "—";
-  // fecha_evento viene como YYYY-MM-DD (sin hora); created_at es timestamp.
-  const iso = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString(LOCALE[lang], {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
-  });
+  // fecha_evento viene como YYYY-MM-DD (sin hora) y se muestra como ese día,
+  // sin corrimientos. created_at es un timestamp y va en hora de Argentina:
+  // sin zona explícita el servidor escribía una hora y el navegador otra, y
+  // React tiraba todo el HTML del servidor para rehacerlo en el cliente.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, d] = value.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(LOCALE[lang], {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+  return withTime ? fechaHora(value, LOCALE[lang]) : fechaDia(value, LOCALE[lang]);
 }
 
 export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
@@ -153,15 +160,19 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
                 <div className="mp-foot">
                   <span className="mp-code">N.º {p.code}</span>
                   <span className="mp-links">
-                    {/* Link público de seguimiento (mismo que comparte el staff). */}
-                    <a
-                      className="mp-link"
-                      href={`/op/${p.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {mp.verSeguimiento}
-                    </a>
+                    {/* Link público de seguimiento (mismo que comparte el
+                        staff). La consulta sin precio todavía no tiene
+                        operación detrás, así que no hay nada que seguir. */}
+                    {p.seguible && (
+                      <a
+                        className="mp-link"
+                        href={`/op/${p.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {mp.verSeguimiento}
+                      </a>
+                    )}
                     {/* Factura: solo si el staff ya la emitió. */}
                     {p.facturaId && (
                       <a

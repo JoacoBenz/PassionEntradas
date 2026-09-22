@@ -2,24 +2,31 @@
 
 import { useState } from "react";
 import {
-  ESTADO_LABEL,
   HITO_COLOR,
   diasHastaEvento,
   estadoDe,
-  estadoDotColor,
-  formatUSD,
+  formatMonto,
   formatFecha,
   quienDe,
   whatsappMessage,
   TIPO_LABEL,
+  SEMAFORO_COLOR,
+  SEMAFORO_LABEL,
+  semaforoDe,
+  sePuedeFacturar,
+  totalItem,
+  type OperacionItem,
   type Operacion,
   type StatusAction,
 } from "@/lib/operaciones";
-import StatusChip from "@/components/StatusChip";
 import FacturaModal from "./FacturaModal";
+import { fechaDia } from "@/lib/fechas";
 
 type Props = {
   op: Operacion;
+  // Líneas de la operación. Un pedido del carrito puede traer varias entradas
+  // de sectores o eventos distintos; la cabecera solo muestra el resumen.
+  items?: OperacionItem[];
   baseUrl: string;
   busy?: boolean;
   // readOnly: modo moderador — sin botones de cambio de estado.
@@ -69,6 +76,7 @@ function fechaCorta(fecha: string): string {
 // trae los hitos, las notas y las acciones.
 export default function OperacionCard({
   op,
+  items = [],
   baseUrl,
   busy = false,
   readOnly = false,
@@ -79,13 +87,18 @@ export default function OperacionCard({
 }: Props) {
   const link = `${baseUrl}/op/${op.id}`;
   const estado = estadoDe(op);
-  // Punto de la fila: color por GRUPO (abierta / en curso / cerrada /
-  // cancelada), para leer el estado de un vistazo.
-  const color = estadoDotColor(estado);
   const cancelada = estado === "cancelada";
   const cerrada = estado === "cerrada";
+  const semaforo = semaforoDe(op);
+  // Quién pidió la entrada. El alias es lo que se muestra; el email queda
+  // para el detalle, cuando aporta algo distinto.
+  const cliente = op.comprador_alias ?? op.cliente_email ?? null;
   const entrada = !!op.entrada_recibida_at;
   const pago = !!op.pago_confirmado_at;
+  const proveedor = !!op.pago_proveedor_at;
+  // La entrega es un hito más, no el fin de la operación: la tarjeta sigue
+  // editable hasta que los cuatro estén tildados.
+  const entregada = !!op.cerrada_at;
   const dias = diasHastaEvento(op.fecha_evento);
   const enCurso = !cerrada && !cancelada;
 
@@ -115,24 +128,37 @@ export default function OperacionCard({
         aria-expanded={open}
         className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-canvas/40"
       >
+        {/* UN solo indicador de estado por fila: el semáforo. Antes había
+            además un punto por grupo de estado y las dos cosas juntas
+            confundían más de lo que explicaban. */}
         <span
-          className="h-2 w-2 shrink-0 rounded-full"
-          style={{ backgroundColor: color }}
-          aria-hidden
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ background: SEMAFORO_COLOR[semaforo] }}
+          title={SEMAFORO_LABEL[semaforo]}
+          aria-label={SEMAFORO_LABEL[semaforo]}
         />
         <span className="min-w-0 flex-1">
           <span className="block truncate font-display text-[15px] font-semibold leading-tight tracking-tight">
             {op.evento}
           </span>
+          {/* El cliente va en la fila cerrada: saber con quién se está
+              trabajando no tiene que costar un click. */}
+          {cliente && (
+            <span className="mt-0.5 block truncate text-[11px] font-medium text-[#4A4E5E]">
+              {cliente}
+            </span>
+          )}
           <span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-wider text-muted">
-            {op.code} · {ESTADO_LABEL[estado]}
+            {op.code} · {SEMAFORO_LABEL[semaforo]}
             {op.fecha_evento ? ` · ${fechaCorta(op.fecha_evento)}` : ""}
           </span>
         </span>
         {op.tipo !== "operacion" && (
-          // Origen: pedido/consulta del cliente desde la tienda.
+          // Origen: pedido/consulta del cliente desde la tienda. Se esconde en
+          // celular: entre el chip y el monto le comían 90px al nombre del
+          // evento, que es lo que sirve para reconocer la fila ("Match 12, …").
           <span
-            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+            className="hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide sm:inline-block"
             style={
               op.tipo === "pedido"
                 ? { color: "#1F33E0", backgroundColor: "#1F33E014" }
@@ -144,11 +170,11 @@ export default function OperacionCard({
         )}
         <span className="flex flex-col items-end leading-none">
           <span className="whitespace-nowrap font-display text-sm font-bold tabular-nums">
-            {formatUSD(op.monto)}
+            {formatMonto(op.monto, op.moneda)}
           </span>
           {op.cantidad > 1 && (
             <span className="mt-0.5 font-mono text-[10px] text-muted">
-              ×{op.cantidad} · {formatUSD(Math.round(op.monto / op.cantidad))} c/u
+              ×{op.cantidad} · {formatMonto(op.monto / op.cantidad, op.moneda)} c/u
             </span>
           )}
         </span>
@@ -170,16 +196,53 @@ export default function OperacionCard({
       {open && (
         <div className="border-t border-dashed border-[#C5C9D6]">
           <div className="p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusChip estado={estado} />
-              {enCurso && dias != null && dias <= 14 && <UrgenciaChip dias={dias} />}
-            </div>
+            {/* Sin chip de estado: el semáforo de la fila ya lo dice y los
+                cuatro hitos de abajo muestran el detalle. Lo que sí aporta
+                acá es la urgencia por fecha. */}
+            {enCurso && dias != null && dias <= 14 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <UrgenciaChip dias={dias} />
+              </div>
+            )}
+
+            {/* Entradas del pedido. Con una sola línea la cabecera ya lo dice
+                todo, así que el detalle aparece recién desde dos. */}
+            {items.length > 1 && (
+              <div className="mt-3 overflow-hidden rounded-xl border border-line">
+                <p className="border-b border-line bg-canvas px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  {items.length} entradas en este pedido
+                </p>
+                <ul className="divide-y divide-line">
+                  {items.map((i) => (
+                    <li key={i.id} className="flex items-start justify-between gap-3 px-3 py-2">
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-medium">{i.evento}</span>
+                        <span className="block text-[11px] text-muted">
+                          {i.sector ?? "General"}
+                          {i.fecha_evento ? ` · ${formatFecha(i.fecha_evento)}` : ""}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block whitespace-nowrap text-xs font-semibold tabular-nums">
+                          {formatMonto(totalItem(i), op.moneda)}
+                        </span>
+                        {i.cantidad > 1 && (
+                          <span className="block font-mono text-[10px] text-muted">
+                            ×{i.cantidad} · {formatMonto(i.precio_unitario, op.moneda)} c/u
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#6A6E7E]">
               {op.fecha_evento && <span>📅 {formatFecha(op.fecha_evento)}</span>}
               <span>
                 Comisión{" "}
-                <span className="font-semibold text-body">{formatUSD(op.fee)}</span>
+                <span className="font-semibold text-body">{formatMonto(op.fee, op.moneda)}</span>
               </span>
               {op.comprador_alias && (
                 <span>
@@ -280,18 +343,48 @@ export default function OperacionCard({
               </div>
             )}
 
-            {/* Hitos en orden estricto (fiel al proceso): primero se reciben y
-                verifican las entradas; recién ahí se autoriza el pago. */}
+            {/* Los cuatro hitos internos, SIN orden: en la práctica la
+                secuencia varía (a veces se le paga al proveedor antes de
+                tener la entrada). Ninguno bloquea a otro.
+                La grilla los ordena por con QUIÉN es cada uno: columna
+                izquierda el proveedor (le pagamos / nos manda la entrada),
+                columna derecha el cliente (nos paga / le entregamos). */}
             {!readOnly && !cancelada && !cerrada && (
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <HitoButton
-                  label="Entrada recibida"
+                  label="Pago a proveedor"
+                  done={proveedor}
+                  por={quienDe(op.pago_proveedor_por)}
+                  color={HITO_COLOR.pago}
+                  busy={busy}
+                  onClick={() =>
+                    onAction?.(
+                      op,
+                      { action: "proveedor", done: !proveedor },
+                      !proveedor ? "Pago al proveedor marcado" : "Pago al proveedor desmarcado"
+                    )
+                  }
+                />
+                <HitoButton
+                  label="Pago recibido"
+                  done={pago}
+                  por={quienDe(op.pago_confirmado_por)}
+                  color={HITO_COLOR.pago}
+                  busy={busy}
+                  onClick={() =>
+                    onAction?.(
+                      op,
+                      { action: "pago", done: !pago },
+                      !pago ? "Pago marcado como recibido" : "Pago desmarcado"
+                    )
+                  }
+                />
+                <HitoButton
+                  label="Entrada del proveedor"
                   done={entrada}
                   por={quienDe(op.entrada_recibida_por)}
                   color={HITO_COLOR.entrada}
                   busy={busy}
-                  locked={pago}
-                  lockedHint="Hay un pago confirmado: desmarcá el pago primero"
                   onClick={() =>
                     onAction?.(
                       op,
@@ -301,50 +394,31 @@ export default function OperacionCard({
                   }
                 />
                 <HitoButton
-                  label="Pago confirmado"
-                  done={pago}
-                  por={quienDe(op.pago_confirmado_por)}
-                  color={HITO_COLOR.pago}
+                  label="Entrada entregada"
+                  done={entregada}
+                  por={quienDe(op.cerrada_por)}
+                  color={HITO_COLOR.listo}
                   busy={busy}
-                  locked={!entrada}
-                  lockedHint="Primero marcá la entrada recibida: el pago se autoriza después de verificar"
                   onClick={() =>
                     onAction?.(
                       op,
-                      { action: "pago", done: !pago },
-                      !pago ? "Pago marcado como confirmado" : "Pago desmarcado"
+                      { action: "cerrar", done: !entregada },
+                      !entregada ? "Entrega registrada" : "Entrega desmarcada"
                     )
                   }
                 />
               </div>
             )}
 
-            {/* Tercer paso accionable: con entrada y pago listos, se cierra */}
-            {!readOnly && estado === "lista_para_cerrar" && (
-              <button
-                onClick={() =>
-                  onAction?.(op, { action: "cerrar", done: true }, "Entrega registrada — operación cerrada")
-                }
-                disabled={busy}
-                className="mt-2 w-full rounded-xl bg-cobalt px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-cobalt-deep disabled:opacity-60"
-              >
-                ✓ Entradas entregadas — cerrar
-              </button>
-            )}
-
-            {/* Cerrada: resumen con opción de reabrir el cierre. Con los
-                botones de hitos ocultos, el "quién hizo qué" vive acá. */}
+            {/* Completa (los cuatro hitos): resumen con opción de reabrir.
+                Con los botones ocultos, el "quién hizo qué" vive acá. */}
             {!readOnly && cerrada && (
               <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-ink px-4 py-3 text-white">
                 <span className="min-w-0 text-sm font-semibold">
-                  ✓ Operación cerrada
+                  ✓ Operación completa
                   {op.cerrada_at && (
                     <span className="ml-2 font-normal text-white/60">
-                      {new Date(op.cerrada_at).toLocaleDateString("es-AR", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        timeZone: "America/Argentina/Buenos_Aires",
-                      })}
+                      {fechaDia(op.cerrada_at)}
                     </span>
                   )}
                   {quienDe(op.cerrada_por) && (
@@ -364,7 +438,7 @@ export default function OperacionCard({
                 </span>
                 <button
                   onClick={() =>
-                    onAction?.(op, { action: "cerrar", done: false }, "Cierre reabierto")
+                    onAction?.(op, { action: "cerrar", done: false }, "Operación reabierta")
                   }
                   disabled={busy}
                   className="rounded-lg border border-white/25 px-3 py-1.5 text-xs font-medium text-white/85 transition-colors hover:bg-white/10 disabled:opacity-60"
@@ -397,8 +471,10 @@ export default function OperacionCard({
             >
               Copiar WhatsApp
             </button>
-            {/* Recibo/factura: recién cuando el pago está confirmado. */}
-            {!readOnly && pago && !cancelada && (
+            {/* Recibo/factura: la habilita el pago del CLIENTE. No espera a que
+                la operación esté completa — los hitos con el proveedor son
+                asunto nuestro y no pueden trabar el comprobante. */}
+            {!readOnly && sePuedeFacturar(op) && (
               <button onClick={() => setFacturaAbierta(true)} className={secondaryBtn}>
                 Factura
               </button>

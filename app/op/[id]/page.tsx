@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
 import StatusStub from "@/components/StatusStub";
 import AutoRefresh from "@/components/AutoRefresh";
-import type { OperacionPublica, Status } from "@/lib/operaciones";
-import { isMock, mockOpPublica } from "@/lib/mock-db";
+import type { ItemPublico, OperacionPublica, Status } from "@/lib/operaciones";
+import { isMock, mockListItems, mockOpPublica } from "@/lib/mock-db";
 
 // Página pública read-only. Se accede por el uuid (impredecible).
 // Lee vía el RPC `operacion_publica`, que exige el uuid exacto y devuelve
@@ -24,11 +24,19 @@ export default async function OperacionPublicaPage({
   }
 
   let op: OperacionPublica;
+  let items: ItemPublico[] = [];
 
   if (isMock()) {
     const mock = mockOpPublica(params.id);
     if (!mock) notFound();
     op = mock;
+    items = mockListItems(params.id).map((i) => ({
+      evento: i.evento,
+      sector: i.sector,
+      fecha_evento: i.fecha_evento,
+      cantidad: i.cantidad,
+      precio_unitario: i.precio_unitario,
+    }));
   } else {
     const supabase = createServerSupabase();
 
@@ -44,6 +52,12 @@ export default async function OperacionPublicaPage({
       ...(data as Omit<OperacionPublica, "status"> & { status: string }),
       status: (data as { status: string }).status as Status,
     };
+
+    // Líneas del pedido por RPC (la tabla es deny-all y este link es anónimo).
+    const { data: filas } = await supabase.rpc("operacion_items_publicos", {
+      op_id: params.id,
+    });
+    items = (filas ?? []) as ItemPublico[];
   }
 
   return (
@@ -51,7 +65,7 @@ export default async function OperacionPublicaPage({
       {/* Repolea una versión mínima y solo re-baja la página si la operación
           cambió: este link vive abierto en los grupos, es el tráfico grande. */}
       <AutoRefresh versionUrl={`/api/op/${params.id}/version`} />
-      <StatusStub op={op} />
+      <StatusStub op={op} items={items} />
       <footer className="mt-6 text-center text-xs text-muted">
         AdminTickets · Custodia de operaciones
       </footer>

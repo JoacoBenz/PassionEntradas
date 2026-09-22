@@ -204,3 +204,27 @@
   .fac-sheet { box-shadow: none; border-width: 1px; max-width: none; }
   .fac-print-row { display: none; }
 }
+
+/* Factura de varias entradas: tabla en vez del ticket con talón. El talón
+   con código de barras no tiene sentido repetido línea por línea. */
+.fac-lineas { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.fac-lineas th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #8a8f9e;
+  padding: 0 0 7px;
+  border-bottom: 1px solid #e3e5ec;
+}
+.fac-lineas th.num, .fac-lineas td.num { text-align: right; white-space: nowrap; }
+.fac-lineas td {
+  padding: 10px 0;
+  border-bottom: 1px solid #eff0f4;
+  font-size: 13px;
+  vertical-align: top;
+}
+.fac-lineas td.num { font-variant-numeric: tabular-nums; }
+.fac-l-ev { display: block; font-weight: 600; }
+.fac-l-meta { display: block; margin-top: 2px; font-size: 11px; color: #8a8f9e; }

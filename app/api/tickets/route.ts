@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import { isMock, mockCreateManual } from "@/lib/mock-db";
+import { parsePrecio } from "@/lib/precios";
 
 // POST /api/tickets — publica una entrada manual en el catálogo.
 // Un evento puede traer VARIOS sectores (cada uno con su precio y stock):
@@ -13,13 +14,28 @@ import { isMock, mockCreateManual } from "@/lib/mock-db";
 
 const MAX_SECTORES = 20;
 
-type SectorInput = { categoria: string; precio: number; stock: number };
+type SectorInput = {
+  categoria: string;
+  precio: number;
+  stock: number;
+  moneda: string;
+  costo: number | null;
+};
 
 function parseSectores(t: any): SectorInput[] | { error: string } {
   // Formato nuevo (lista) o viejo (campos planos = un sector).
   const crudos: any[] = Array.isArray(t.sectores)
     ? t.sectores
-    : [{ categoria: t.categoria, precio: t.precio, stock: t.stock }];
+    : [
+        {
+          categoria: t.categoria,
+          precio: t.precio,
+          costo: t.costo,
+          comision: t.comision,
+          moneda: t.moneda,
+          stock: t.stock,
+        },
+      ];
 
   if (crudos.length === 0) {
     return { error: "Cargá al menos un sector" };
@@ -33,13 +49,30 @@ function parseSectores(t: any): SectorInput[] | { error: string } {
   for (let i = 0; i < crudos.length; i++) {
     const n = crudos.length > 1 ? ` (sector ${i + 1})` : "";
     const categoria = String(crudos[i]?.categoria ?? "").trim();
-    const precio = Number(crudos[i]?.precio);
     const stock = Math.trunc(Number(crudos[i]?.stock));
+    // Moneda de la entrada. Cualquier cosa que no sea una de las tres cae a
+    // USD, que es como se cargaban antes.
+    const monedaRaw = String(crudos[i]?.moneda ?? "USD").toUpperCase();
+    const moneda = ["ARS", "USD", "EUR"].includes(monedaRaw) ? monedaRaw : "USD";
     if (!categoria) {
       return { error: `El sector es obligatorio${n}` };
     }
-    if (!Number.isFinite(precio) || precio <= 0) {
-      return { error: `El precio debe ser mayor a 0${n}` };
+    // El precio se carga como COSTO + COMISIÓN y se vende por la suma. Se
+    // acepta `precio` suelto por compatibilidad con el formato viejo (una
+    // pestaña abierta con el panel anterior, o el PATCH de edición).
+    let costo: number | null;
+    let precio: number;
+    if (crudos[i]?.costo != null || crudos[i]?.comision != null) {
+      const p = parsePrecio(crudos[i].costo, crudos[i].comision, n);
+      if (!p.ok) return { error: p.error };
+      costo = p.costo;
+      precio = p.total;
+    } else {
+      precio = Number(crudos[i]?.precio);
+      if (!Number.isFinite(precio) || precio <= 0) {
+        return { error: `El precio debe ser mayor a 0${n}` };
+      }
+      costo = null;
     }
     if (!Number.isFinite(stock) || stock < 1) {
       return { error: `El stock debe ser al menos 1${n}` };
@@ -49,7 +82,7 @@ function parseSectores(t: any): SectorInput[] | { error: string } {
       return { error: `El sector "${categoria}" está repetido` };
     }
     vistos.add(clave);
-    sectores.push({ categoria, precio, stock });
+    sectores.push({ categoria, precio, stock, moneda, costo });
   }
   return sectores;
 }
@@ -104,6 +137,10 @@ export async function POST(request: Request) {
     );
   }
 
+  // Proveedor: va por evento, no por sector (las entradas de un mismo
+  // partido salen del mismo lado).
+  const proveedor = String(t?.proveedor ?? "").trim().slice(0, 160) || null;
+
   const sectores = parseSectores(t);
   if ("error" in sectores) {
     return NextResponse.json({ error: sectores.error }, { status: 400 });
@@ -117,12 +154,15 @@ export async function POST(request: Request) {
     fecha,
     ciudad,
     categoria: s.categoria,
-    // Las entradas propias se cargan directamente en USD (a diferencia del
-    // portal Passion, que cotiza en EUR y el worker convierte).
+    // La entrada propia se carga en la moneda que elige el admin y se muestra
+    // en esa: no se convierte. (El portal es el único que convierte, EUR->USD,
+    // y eso lo hace el worker.)
     precio_origen: s.precio,
-    moneda_origen: "USD",
+    moneda_origen: s.moneda ?? "USD",
     precio_final: s.precio,
-    moneda_final: "USD",
+    moneda_final: s.moneda ?? "USD",
+    precio_costo: s.costo ?? null,
+    proveedor,
     stock: s.stock,
     disponible: true,
     estado: "book",

@@ -5,6 +5,7 @@ import type { FacturaDatos, FacturaIdioma } from "@/lib/factura";
 import {
   isMock,
   MOCK_USER,
+  mockListItems,
   mockFacturaDeOperacion,
   mockGuardarFactura,
   mockListOps,
@@ -116,6 +117,9 @@ export async function POST(
     pago_confirmado_at: string | null;
     fecha_evento: string | null;
     ticket_id: string | null;
+    // Quién la pidió desde la tienda (null en las cargadas a mano).
+    cliente_id?: string | null;
+    cliente_email?: string | null;
   };
   let op: OpFactura | null = null;
   let ticket: { competicion: string | null; ciudad: string | null; categoria: string | null } | null =
@@ -133,7 +137,7 @@ export async function POST(
     const admin = createAdminSupabase();
     const { data, error } = await admin
       .from("operaciones")
-      .select("id, code, evento, monto, fee, status, pago_confirmado_at, fecha_evento, ticket_id")
+      .select("id, code, evento, monto, fee, status, pago_confirmado_at, fecha_evento, ticket_id, cliente_id, cliente_email")
       .eq("id", params.id)
       .maybeSingle();
     if (error) {
@@ -167,9 +171,75 @@ export async function POST(
     );
   }
 
+  // Trazabilidad: si la operación nació de un pedido de la tienda, el email y
+  // el legajo se toman de la CUENTA del cliente, no de lo que tipeó el admin.
+  // Lo tipeado queda como respaldo para las operaciones cargadas a mano.
+  let compradorEmail: string | null = op.cliente_email ?? null;
+  let compradorLegajo: string | null = null;
+  let compradorNombre = nombre;
+  if (isMock()) {
+    // En demo no hay Supabase Auth: el perfil del cliente sale del mock, para
+    // que la cadena de trazabilidad se vea igual que en producción.
+    if (op.cliente_id) compradorLegajo = MOCK_USER.legajo;
+  } else if (op.cliente_id) {
+    const { data: u } = await createAdminSupabase().auth.admin.getUserById(op.cliente_id);
+    const meta = (u?.user?.user_metadata ?? {}) as Record<string, unknown>;
+    const de = (k: string) => (typeof meta[k] === "string" ? (meta[k] as string).trim() : "");
+    compradorEmail = u?.user?.email ?? compradorEmail;
+    compradorLegajo = de("legajo") || null;
+    // El nombre de la cuenta manda; si está vacío se respeta lo tipeado.
+    compradorNombre = de("nombre") || nombre;
+  }
+
+  // Líneas de la operación. Si no tiene (operación vieja, anterior al modelo
+  // multi-línea), se arma una sola con el resumen para que la factura salga
+  // igual que antes.
+  let lineas: NonNullable<FacturaDatos["items"]> = [];
+  if (isMock()) {
+    lineas = mockListItems(op.id).map((i) => ({
+      evento: i.evento,
+      sector: i.sector,
+      fecha: i.fecha_evento,
+      cantidad: i.cantidad,
+      precio_unitario: i.precio_unitario,
+      subtotal: Math.round(i.cantidad * i.precio_unitario * 100) / 100,
+    }));
+  } else {
+    const { data: filas } = await createAdminSupabase()
+      .from("operacion_items")
+      .select("evento, sector, fecha_evento, cantidad, precio_unitario")
+      .eq("operacion_id", op.id)
+      .order("created_at", { ascending: true });
+    lineas = (filas ?? []).map((i: any) => ({
+      evento: i.evento,
+      sector: i.sector ?? null,
+      fecha: i.fecha_evento ?? null,
+      cantidad: Number(i.cantidad),
+      precio_unitario: Number(i.precio_unitario),
+      subtotal: Math.round(Number(i.cantidad) * Number(i.precio_unitario) * 100) / 100,
+    }));
+  }
+  if (lineas.length === 0) {
+    lineas = [
+      {
+        evento: op.evento,
+        sector: ticket?.categoria ?? null,
+        fecha: op.fecha_evento,
+        cantidad,
+        precio_unitario: Math.round((op.monto / cantidad) * 100) / 100,
+        subtotal: op.monto,
+      },
+    ];
+  }
+
   const datos: FacturaDatos = {
     idioma,
-    comprador: { nombre, contacto },
+    comprador: {
+      nombre: compradorNombre,
+      contacto,
+      email: compradorEmail,
+      legajo: compradorLegajo,
+    },
     agente: auth.quien,
     operacion: { id: op.id, code: op.code },
     evento: {
@@ -179,11 +249,17 @@ export async function POST(
       sede: ticket?.ciudad ?? null,
       sector: ticket?.categoria ?? null,
     },
+    items: lineas,
     cantidad,
     precio_unitario: Math.round((op.monto / cantidad) * 100) / 100,
     subtotal: op.monto,
+    // `fee` se guarda como registro interno de la comisión (métricas,
+    // contabilidad), pero NO se le suma al total ni se le muestra al cliente:
+    // el precio de la entrada ya viene con el markup adentro. Antes se
+    // desglosaba como "servicio y custodia" y se cobraba encima, que es
+    // cobrarle la comisión dos veces bajo el modelo costo + comisión.
     fee: op.fee,
-    total: op.monto + op.fee,
+    total: op.monto,
     metodo_pago: metodo,
     pago_confirmado_at: op.pago_confirmado_at,
   };

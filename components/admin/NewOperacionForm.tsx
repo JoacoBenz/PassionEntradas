@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
-import type { Operacion } from "@/lib/operaciones";
+import { useEffect, useRef, useState } from "react";
+import { formatMonto, type Moneda, type Operacion } from "@/lib/operaciones";
 import { parseTitle } from "@/lib/tickets";
+import { parsePrecio } from "@/lib/precios";
 
 type Props = {
   onCreated: (op: Operacion) => void;
@@ -19,8 +20,12 @@ type TicketMatch = {
   fecha: string | null;
   categoria: string | null;
   precio_final: number | null;
+  precio_costo: number | null;
   stock: number | null;
   source: "portal" | "manual";
+  // Ya convertidos a USD por la API (la tienda cobra en USD).
+  costo_usd: number | null;
+  precio_usd: number | null;
 };
 
 // Autocompletado del evento contra el catálogo: elegir un resultado vincula
@@ -135,11 +140,22 @@ function EventoCombo({
   );
 }
 
+// Quién vende, por defecto. Hoy carga siempre el mismo; se puede cambiar en el
+// campo, y el día que sean varios esto sale de la sesión.
+const VENDEDOR_POR_DEFECTO = "Nacho";
+
+// Valor centinela del desplegable de comprador para cargar a alguien que no
+// está en la lista.
+const OTRO = "__otro__";
+
+type ClienteOpcion = { id: string; nombre: string; email: string; operaciones: number };
+
 const empty = {
   evento: "",
   comprador_alias: "",
-  vendedor_alias: "",
-  monto: "",
+  vendedor_alias: VENDEDOR_POR_DEFECTO,
+  costo: "",
+  moneda: "USD",
   fee: "",
   fecha_evento: "",
   notas: "",
@@ -153,6 +169,9 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
   // prefill de "Crear operación" no lo trae y muestra un texto genérico).
   const [vinculo, setVinculo] = useState<{ categoria: string | null; source: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  // Clientes para el desplegable de comprador, ya rankeados por la API.
+  const [clientes, setClientes] = useState<ClienteOpcion[]>([]);
+  const [escribiendoComprador, setEscribiendoComprador] = useState(false);
   // El disabled de React llega tarde si dos taps caen en el mismo tick:
   // el ref corta el segundo submit antes de que dispare otro POST.
   const enviando = useRef(false);
@@ -161,20 +180,70 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  // Elegir una entrada del buscador: vincula el ticket y autocompleta fecha
-  // (siempre) y monto (solo si está vacío y la entrada es propia: las de
-  // Passion están en EUR en la base, no sirven como monto USD directo).
+  // Llegando desde "Crear operación" de una entrada del catálogo, se traen
+  // sus datos igual que si se hubiera elegido del buscador. Antes solo venía
+  // el nombre del evento y había que cargar fecha, costo y comisión a mano,
+  // teniendo el sistema los tres.
+  useEffect(() => {
+    const id = prefill?.ticketId;
+    const nombre = prefill?.evento;
+    if (!id || !nombre) return;
+    let vivo = true;
+    fetch(`/api/tickets/buscar?q=${encodeURIComponent(nombre.slice(0, 60))}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: TicketMatch[]) => {
+        if (!vivo) return;
+        const t = rows.find((x) => x.id === id);
+        if (t) elegirTicket(t);
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+    // Solo al montar: después manda lo que el usuario elija en el buscador.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Si la lista no carga (red, permisos), el form no se traba: se cae al
+  // campo de texto y la operación se puede cargar igual.
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/clientes")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!vivo) return;
+        const lista = (d?.clientes ?? []) as ClienteOpcion[];
+        if (lista.length === 0) setEscribiendoComprador(true);
+        setClientes(lista);
+      })
+      .catch(() => {
+        if (vivo) setEscribiendoComprador(true);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  // Elegir una entrada del buscador trae TODO lo que ya sabemos de ella:
+  // fecha, costo y comisión. Para las de Passion también — la API las devuelve
+  // ya pasadas a USD, así que la operación queda con los mismos números que vio
+  // el cliente en la tienda, y la comisión es el markup que se le aplicó.
+  // Se pisa lo que haya: elegir una entrada es decir "cargá ESTA".
   function elegirTicket(t: TicketMatch) {
     setTicketId(t.id);
     setVinculo({ categoria: t.categoria, source: t.source });
+    const costo = t.costo_usd;
+    const precio = t.precio_usd;
+    const comision = costo != null && precio != null ? Math.round((precio - costo) * 100) / 100 : null;
     setForm((f) => ({
       ...f,
       evento: t.evento,
       fecha_evento: t.fecha ? t.fecha.slice(0, 10) : f.fecha_evento,
-      monto:
-        !f.monto.trim() && t.source === "manual" && t.precio_final != null
-          ? String(Math.round(t.precio_final))
-          : f.monto,
+      moneda: "USD",
+      costo: costo != null ? String(costo) : f.costo,
+      // Solo si da positiva: una entrada sin costo cargado no tiene comisión
+      // conocida, y poner 0 sería afirmar que no ganamos nada.
+      fee: comision != null && comision > 0 ? String(comision) : f.fee,
     }));
   }
 
@@ -211,9 +280,11 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
       onError("El vendedor es obligatorio");
       return;
     }
-    const montoNum = Number(form.monto);
-    if (!form.monto.trim() || !Number.isFinite(montoNum) || montoNum <= 0) {
-      onError("El monto debe ser mayor a 0");
+    // Costo + comisión: al cliente se le cobra la suma, y eso es lo único
+    // que va a ver en la factura.
+    const precio = parsePrecio(form.costo, form.fee);
+    if (!precio.ok) {
+      onError(precio.error);
       return;
     }
     enviando.current = true;
@@ -226,8 +297,9 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
           evento: form.evento,
           comprador_alias: form.comprador_alias || null,
           vendedor_alias: form.vendedor_alias || null,
-          monto: Number(form.monto || 0),
-          fee: Number(form.fee || 0),
+          monto: precio.total,
+          fee: precio.comision,
+          moneda: form.moneda,
           ticket_id: ticketId,
           fecha_evento: form.fecha_evento || null,
           notas: form.notas || null,
@@ -248,15 +320,18 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
         comprador_alias: form.comprador_alias.trim() || null,
         vendedor_alias: form.vendedor_alias.trim() || null,
         cuenta_debitar: null,
-        monto: Math.trunc(Number(form.monto || 0)),
+        monto: precio.total,
+        moneda: form.moneda as Moneda,
         cantidad: 1,
-        fee: Math.trunc(Number(form.fee || 0)),
+        fee: precio.comision,
         status: "esperando_entrada",
         entrada_recibida_at: null,
         pago_confirmado_at: null,
+        pago_proveedor_at: null,
         cerrada_at: null,
         entrada_recibida_por: null,
         pago_confirmado_por: null,
+        pago_proveedor_por: null,
         cerrada_por: null,
         fecha_evento: form.fecha_evento || null,
         notas: form.notas.trim() || null,
@@ -278,8 +353,13 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
     }
   }
 
-  const inputCls =
-    "w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15";
+  // Sin ancho: el ancho lo pone cada campo. Agregarle "w-20" a una clase que
+  // ya dice "w-full" NO hace nada —gana la que Tailwind emite última, que es
+  // w-full— y así el select de moneda se comía la celda entera y el input de
+  // al lado quedaba en 26px, pisando al vecino.
+  const fieldCls =
+    "rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15";
+  const inputCls = `w-full ${fieldCls}`;
   const labelCls =
     "mb-1 block text-xs font-medium uppercase tracking-wide text-[#6A6E7E]";
 
@@ -337,13 +417,58 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
               <label htmlFor="comprador" className={labelCls}>
                 Comprador *
               </label>
-              <input
-                id="comprador"
-                className={inputCls}
-                value={form.comprador_alias}
-                onChange={(e) => set("comprador_alias", e.target.value)}
-                placeholder="Nombre o alias"
-              />
+              {/* Lista cerrada de clientes, los que más compraron arriba. Antes
+                  se escribía a mano y el mismo cliente terminaba cargado como
+                  "Juan Perez", "juan perez" y "Juan P.". Queda la opción de
+                  escribirlo para los que todavía no tienen cuenta. */}
+              {escribiendoComprador ? (
+                <div className="flex gap-2">
+                  <input
+                    id="comprador"
+                    autoFocus
+                    className={`${inputCls} min-w-0`}
+                    value={form.comprador_alias}
+                    onChange={(e) => set("comprador_alias", e.target.value)}
+                    placeholder="Nombre o alias"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEscribiendoComprador(false);
+                      set("comprador_alias", "");
+                    }}
+                    className="shrink-0 rounded-lg border border-line px-2.5 text-xs font-semibold text-[#4A4E5E] transition-colors hover:bg-canvas"
+                    title="Volver a la lista de clientes"
+                  >
+                    Lista
+                  </button>
+                </div>
+              ) : (
+                <select
+                  id="comprador"
+                  className={inputCls}
+                  value={form.comprador_alias}
+                  onChange={(e) => {
+                    if (e.target.value === OTRO) {
+                      setEscribiendoComprador(true);
+                      set("comprador_alias", "");
+                      return;
+                    }
+                    set("comprador_alias", e.target.value);
+                  }}
+                >
+                  <option value="">
+                    {clientes.length ? "Elegí un cliente…" : "Cargando clientes…"}
+                  </option>
+                  {clientes.map((c) => (
+                    <option key={c.id} value={c.nombre}>
+                      {c.nombre}
+                      {c.operaciones > 0 ? ` · ${c.operaciones} ${c.operaciones === 1 ? "op." : "ops."}` : ""}
+                    </option>
+                  ))}
+                  <option value={OTRO}>Otro (escribir)…</option>
+                </select>
+              )}
             </div>
             <div className="flex flex-col justify-between">
               <label htmlFor="vendedor" className={labelCls}>
@@ -372,36 +497,68 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col justify-between">
+          {/* Cada campo en su celda, ninguno compartiendo ancho con otro: el
+              select de moneda metido al lado del importe se encimaba con la
+              comisión y dejaba el costo en 26px. En celular van apilados. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label htmlFor="moneda" className={labelCls}>
+                Moneda
+              </label>
+              {/* La moneda es de la operación: no se convierte, se guarda. */}
+              <select
+                id="moneda"
+                className={inputCls}
+                value={form.moneda}
+                onChange={(e) => set("moneda", e.target.value)}
+              >
+                <option value="USD">USD</option>
+                <option value="ARS">ARS</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </div>
+            <div>
               <label htmlFor="monto" className={labelCls}>
-                Monto (USD) *
+                Precio de costo
               </label>
               <input
                 id="monto"
                 type="number"
                 min={0}
-                inputMode="numeric"
+                step="0.01"
+                inputMode="decimal"
                 className={`${inputCls} font-mono`}
-                value={form.monto}
-                onChange={(e) => set("monto", e.target.value)}
-                placeholder="850"
+                value={form.costo}
+                onChange={(e) => set("costo", e.target.value)}
+                placeholder="0"
               />
             </div>
-            <div className="flex flex-col justify-between">
+            <div>
               <label htmlFor="fee" className={labelCls}>
-                Comisión (USD)
+                Comisión
               </label>
               <input
                 id="fee"
                 type="number"
                 min={0}
-                inputMode="numeric"
+                step="0.01"
+                inputMode="decimal"
                 className={`${inputCls} font-mono`}
                 value={form.fee}
                 onChange={(e) => set("fee", e.target.value)}
-                placeholder="60"
+                placeholder="0"
               />
+            </div>
+            {/* Lo que se le cobra al cliente. Se muestra armado para no tener
+                que sumarlo de cabeza: es el total que va a la factura. */}
+            <div className="flex items-center justify-between rounded-xl bg-canvas px-3 py-2 sm:col-span-3">
+              <span className={`${labelCls} mb-0`}>Total al cliente</span>
+              <span className="font-display text-sm font-bold tabular-nums">
+                {(() => {
+                  const r = parsePrecio(form.costo, form.fee);
+                  return r.ok ? formatMonto(r.total, form.moneda as Moneda) : "—";
+                })()}
+              </span>
             </div>
           </div>
 

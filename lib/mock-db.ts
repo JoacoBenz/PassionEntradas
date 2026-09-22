@@ -2,7 +2,16 @@
 // Vive en globalThis para sobrevivir al hot-reload del dev server; se
 // resetea al reiniciar el proceso. NO usar en producción.
 
-import { generateCode, type Operacion, type OperacionPublica, type StatusAction } from "@/lib/operaciones";
+import {
+  generateCode,
+  type Consulta,
+  type Moneda,
+  type Operacion,
+  type OperacionItem,
+  type OperacionPublica,
+  type StatusAction,
+  operacionCompleta,
+} from "@/lib/operaciones";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import type { Factura, FacturaDatos } from "@/lib/factura";
 import { generarPassword, type SolicitudAcceso, type SolicitudInput } from "@/lib/acceso";
@@ -15,6 +24,9 @@ export const isMock = () => process.env.MOCK_DATA === "1";
 export const MOCK_USER = {
   email: "demo@passion.local",
   rol: "administrador" as const,
+  // Perfil del cliente demo: el legajo viaja igual que en producción
+  // (solicitud -> cuenta -> pedido -> factura) para poder verlo sin Supabase.
+  legajo: "20-31222333-9",
 };
 
 export type MockMargen = {
@@ -34,6 +46,8 @@ type MockDB = {
   facturas: MockFactura[];
   facturaNumero: number;
   solicitudes: SolicitudAcceso[];
+  items: OperacionItem[];
+  consultas: Consulta[];
 };
 
 function iso(minsAgo: number) {
@@ -49,14 +63,17 @@ function seed(): MockDB {
       comprador_alias: "compra_marce",
       vendedor_alias: "vende_lucho",
       monto: 850000,
+      moneda: "USD",
       cantidad: 1,
       fee: 60000,
       status: "entrada_recibida",
       entrada_recibida_at: iso(90),
       pago_confirmado_at: null,
+      pago_proveedor_at: null,
       cerrada_at: null,
       entrada_recibida_por: MOCK_USER.email,
       pago_confirmado_por: null,
+      pago_proveedor_por: null,
       cerrada_por: null,
       fecha_evento: "2026-07-18",
       notas: "Vendedor manda el QR el jueves.",
@@ -76,14 +93,17 @@ function seed(): MockDB {
       comprador_alias: "juanma_ok",
       vendedor_alias: null,
       monto: 300000,
+      moneda: "USD",
       cantidad: 2,
       fee: 25000,
       status: "esperando_entrada",
       entrada_recibida_at: null,
       pago_confirmado_at: null,
+      pago_proveedor_at: null,
       cerrada_at: null,
       entrada_recibida_por: null,
       pago_confirmado_por: null,
+      pago_proveedor_por: null,
       cerrada_por: null,
       fecha_evento: "2026-07-09",
       notas: null,
@@ -104,14 +124,17 @@ function seed(): MockDB {
       comprador_alias: "f1fan",
       vendedor_alias: "scuderia_ar",
       monto: 500000,
+      moneda: "USD",
       cantidad: 1,
       fee: 40000,
       status: "confirmada",
       entrada_recibida_at: iso(60 * 24 * 3),
       pago_confirmado_at: iso(60 * 24 * 2),
+      pago_proveedor_at: null,
       cerrada_at: null,
       entrada_recibida_por: MOCK_USER.email,
       pago_confirmado_por: MOCK_USER.email,
+      pago_proveedor_por: null,
       cerrada_por: null,
       fecha_evento: null,
       notas: null,
@@ -156,6 +179,7 @@ function seed(): MockDB {
       nombre: "Lucía Fernández",
       email: "lucia.fernandez@example.com",
       telefono: "+54 9 11 5555 1234",
+      legajo: "27-35123456-4",
       direccion: "Av. Corrientes 1234, CABA",
       mensaje: "Busco entradas para la final del Mundial 2026.",
       estado: "pendiente",
@@ -173,6 +197,7 @@ function seed(): MockDB {
       nombre: "Diego Sosa",
       email: "diego.sosa@example.com",
       telefono: "+54 9 351 444 7788",
+      legajo: "20-28999111-7",
       direccion: "Bv. San Juan 500, Córdoba",
       mensaje: null,
       estado: "aprobada",
@@ -197,6 +222,8 @@ function seed(): MockDB {
     facturas: [],
     facturaNumero: 0,
     solicitudes,
+    items: [],
+    consultas: [],
   };
 }
 
@@ -215,8 +242,8 @@ export function mockListOps(limit?: number): Operacion[] {
 export function mockOpPublica(id: string): OperacionPublica | null {
   const op = db().ops.find((o) => o.id === id);
   if (!op) return null;
-  const { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at } = op;
-  return { code, evento, comprador_alias, vendedor_alias, monto, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at };
+  const { code, evento, comprador_alias, vendedor_alias, monto, moneda, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at } = op;
+  return { code, evento, comprador_alias, vendedor_alias, monto, moneda, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at };
 }
 
 export function mockCreateOp(input: {
@@ -234,13 +261,19 @@ export function mockCreateOp(input: {
   cliente_email?: string | null;
   sector?: string | null;
   cantidad?: number;
+  moneda?: Moneda;
+  envio_id?: string | null;
+  // Líneas del pedido: se guardan aparte, igual que en la base.
+  items?: Omit<OperacionItem, "id" | "operacion_id" | "created_at">[];
 }): Operacion {
   const now = new Date().toISOString();
+  const { items: lineas, ...campos } = input;
   const op: Operacion = {
     id: crypto.randomUUID(),
     code: generateCode(),
-    ...input,
+    ...campos,
     cantidad: input.cantidad ?? 1,
+    moneda: input.moneda ?? "USD",
     tipo: input.tipo ?? "operacion",
     cliente_id: input.cliente_id ?? null,
     cliente_email: input.cliente_email ?? null,
@@ -248,14 +281,20 @@ export function mockCreateOp(input: {
     status: "esperando_entrada",
     entrada_recibida_at: null,
     pago_confirmado_at: null,
+    pago_proveedor_at: null,
     cerrada_at: null,
     entrada_recibida_por: null,
     pago_confirmado_por: null,
+    pago_proveedor_por: null,
     cerrada_por: null,
     created_at: now,
     updated_at: now,
   };
-  db().ops.unshift(op);
+  const d = db();
+  d.ops.unshift(op);
+  for (const l of lineas ?? []) {
+    d.items.push({ id: crypto.randomUUID(), operacion_id: op.id, created_at: now, ...l });
+  }
   return op;
 }
 
@@ -282,30 +321,32 @@ export function mockApplyAction(
 
   switch (action.action) {
     case "entrada":
-    case "pago": {
+    case "pago":
+    case "proveedor": {
       if (cancelada) {
         return { ok: false, status: 409, error: "La operación está cancelada; reabrila para editar hitos" };
       }
-      if (op.cerrada_at) {
-        return { ok: false, status: 409, error: "La operación está cerrada; reabrí el cierre para editar hitos" };
+      // Espejo de la API: congela recién con los cuatro hechos.
+      if (operacionCompleta(op)) {
+        return {
+          ok: false,
+          status: 409,
+          error: "La operación está completa; desmarcá un hito para volver a editarla",
+        };
       }
-      if (action.action === "pago" && action.done && !op.entrada_recibida_at) {
-        return { ok: false, status: 409, error: "Primero marcá la entrada recibida: el pago se autoriza después de verificar las entradas" };
-      }
-      if (action.action === "entrada" && !action.done && op.pago_confirmado_at) {
-        return { ok: false, status: 409, error: "Hay un pago confirmado sobre esta entrada; desmarcá el pago primero" };
-      }
-      const col = action.action === "entrada" ? "entrada_recibida_at" : "pago_confirmado_at";
-      const colPor = action.action === "entrada" ? "entrada_recibida_por" : "pago_confirmado_por";
+      // Sin orden: espejo de la API y del trigger, que ya no lo imponen.
+      const COLS = {
+        entrada: ["entrada_recibida_at", "entrada_recibida_por"],
+        pago: ["pago_confirmado_at", "pago_confirmado_por"],
+        proveedor: ["pago_proveedor_at", "pago_proveedor_por"],
+      } as const;
+      const [col, colPor] = COLS[action.action];
       op[col] = action.done ? new Date().toISOString() : null;
       op[colPor] = action.done ? MOCK_USER.email : null;
       break;
     }
     case "cerrar":
       if (cancelada) return { ok: false, status: 409, error: "La operación está cancelada; no se puede cerrar" };
-      if (action.done && !(op.entrada_recibida_at && op.pago_confirmado_at)) {
-        return { ok: false, status: 409, error: "Para cerrar hacen falta la entrada recibida y el pago confirmado" };
-      }
       op.cerrada_at = action.done ? new Date().toISOString() : null;
       op.cerrada_por = action.done ? MOCK_USER.email : null;
       // Entrada propia vinculada: cerrar descuenta 1 del stock de la tienda;
@@ -316,8 +357,8 @@ export function mockApplyAction(
       break;
     case "cancelar":
       if (cancelada) return { ok: false, status: 409, error: "La operación ya está cancelada" };
-      if (op.cerrada_at) {
-        return { ok: false, status: 409, error: "La operación está cerrada; reabrí el cierre antes de cancelar" };
+      if (operacionCompleta(op)) {
+        return { ok: false, status: 409, error: "La operación está completa; no se puede cancelar" };
       }
       op.status = "cancelada";
       break;
@@ -477,7 +518,8 @@ export function mockCrearSolicitud(input: SolicitudInput): { ok: true } | { ok: 
     nombre: input.nombre,
     email: input.email,
     telefono: input.telefono,
-    direccion: input.direccion,
+    legajo: input.legajo,
+    direccion: null,
     mensaje: input.mensaje,
     estado: "pendiente",
     user_id: null,
@@ -569,4 +611,108 @@ export function mockRevocarSolicitud(
   }
   s.updated_at = new Date().toISOString();
   return { ok: true, solicitud: s };
+}
+
+
+// --- líneas de la operación y consultas (espejo de las tablas nuevas) -------
+export function mockListItems(operacionId: string): OperacionItem[] {
+  return db().items.filter((i) => i.operacion_id === operacionId);
+}
+
+export function mockListConsultas(): Consulta[] {
+  return db().consultas;
+}
+
+// Consultas PENDIENTES del cliente (las convertidas ya se ven como operación,
+// mostrarlas otra vez sería duplicar el mismo pedido en la lista).
+export function mockListConsultasCliente(
+  clienteId: string | null,
+  email: string | null
+): Consulta[] {
+  return db()
+    .consultas.filter(
+      (c) =>
+        c.estado === "pendiente" &&
+        ((clienteId && c.cliente_id === clienteId) ||
+          (email && c.cliente_email?.toLowerCase() === email.toLowerCase()))
+    )
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export function mockCrearConsulta(input: {
+  envio_id: string | null;
+  cliente_id: string | null;
+  cliente_email: string | null;
+  comprador_alias: string | null;
+  ticket_id: string | null;
+  evento: string;
+  sector: string | null;
+  fecha_evento: string | null;
+  cantidad: number;
+  notas: string | null;
+}): Consulta {
+  const now = new Date().toISOString();
+  const c: Consulta = {
+    id: crypto.randomUUID(),
+    code: generateCode(),
+    ...input,
+    estado: "pendiente",
+    operacion_id: null,
+    resuelta_por: null,
+    resuelta_at: null,
+    created_at: now,
+    updated_at: now,
+  };
+  db().consultas.unshift(c);
+  return c;
+}
+
+// Convierte una consulta en operación (espejo de /api/consultas/[id]/convertir).
+export function mockConvertirConsulta(
+  id: string,
+  opts: { monto: number; fee: number; moneda?: Moneda; quien: string }
+): { ok: true; op: Operacion } | { ok: false; status: number; error: string } {
+  const d = db();
+  const c = d.consultas.find((x) => x.id === id);
+  // Distinguir "no existe" de "ya resuelta": el mock tiene que dar el mismo
+  // código que la API real o el demo miente sobre el comportamiento.
+  if (!c) return { ok: false, status: 404, error: "Consulta no encontrada" };
+  if (c.estado !== "pendiente") {
+    return { ok: false, status: 409, error: "Esta consulta ya fue resuelta" };
+  }
+  const cantidad = Math.max(1, c.cantidad || 1);
+  const op = mockCreateOp({
+    evento: c.evento,
+    comprador_alias: c.comprador_alias,
+    vendedor_alias: null,
+    monto: opts.monto,
+    fee: opts.fee,
+    moneda: opts.moneda ?? "USD",
+    cantidad,
+    ticket_id: c.ticket_id,
+    fecha_evento: c.fecha_evento,
+    notas: `${c.notas ?? ""}\nCargada desde consulta por ${opts.quien}.`.trim(),
+    cuenta_debitar: null,
+    tipo: "pedido",
+    cliente_id: c.cliente_id,
+    cliente_email: c.cliente_email,
+    sector: c.sector,
+    envio_id: c.envio_id,
+    items: [
+      {
+        ticket_id: c.ticket_id,
+        evento: c.evento,
+        sector: c.sector,
+        fecha_evento: c.fecha_evento,
+        cantidad,
+        precio_unitario: opts.monto / cantidad,
+      },
+    ],
+  });
+  c.estado = "convertida";
+  c.operacion_id = op.id;
+  c.resuelta_por = opts.quien;
+  c.resuelta_at = new Date().toISOString();
+  c.updated_at = c.resuelta_at;
+  return { ok: true, op };
 }

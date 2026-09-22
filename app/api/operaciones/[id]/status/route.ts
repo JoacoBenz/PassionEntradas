@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
-import { estadoDe, type Operacion, type StatusAction } from "@/lib/operaciones";
+import {
+  estadoDe,
+  operacionCompleta,
+  type Operacion,
+  type StatusAction,
+} from "@/lib/operaciones";
 import { getRol, nombreDe } from "@/lib/auth";
 import { isMock, mockApplyAction } from "@/lib/mock-db";
 
@@ -16,7 +21,10 @@ function parseAction(body: any): StatusAction | null {
     return { action: body.action };
   }
   if (
-    (body?.action === "entrada" || body?.action === "pago" || body?.action === "cerrar") &&
+    (body?.action === "entrada" ||
+      body?.action === "pago" ||
+      body?.action === "proveedor" ||
+      body?.action === "cerrar") &&
     typeof body.done === "boolean"
   ) {
     return { action: body.action, done: body.done };
@@ -79,7 +87,7 @@ export async function PATCH(
 
   const { data: current, error: readErr } = await admin
     .from("operaciones")
-    .select("status, entrada_recibida_at, pago_confirmado_at, cerrada_at, ticket_id")
+    .select("status, entrada_recibida_at, pago_confirmado_at, pago_proveedor_at, cerrada_at, ticket_id")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -98,38 +106,33 @@ export async function PATCH(
 
   switch (action.action) {
     case "entrada":
-    case "pago": {
+    case "pago":
+    case "proveedor": {
       if (cancelada) {
         return NextResponse.json(
           { error: "La operación está cancelada; reabrila para editar hitos" },
           { status: 409 }
         );
       }
-      if (current.cerrada_at) {
+      // Congela recién con los CUATRO hechos: haber entregado no es haber
+      // terminado, y mientras falte alguno hay que poder seguir marcando
+      // (se entrega antes de pagarle al proveedor todo el tiempo).
+      if (operacionCompleta(current as any)) {
         return NextResponse.json(
-          { error: "La operación está cerrada; reabrí el cierre para editar hitos" },
+          { error: "La operación está completa; desmarcá un hito para volver a editarla" },
           { status: 409 }
         );
       }
-      // Secuencia del proceso: el pago se autoriza recién después de
-      // verificar las entradas; y la entrada no se desmarca con un pago
-      // confirmado encima (romperia el orden).
-      if (action.action === "pago" && action.done && !current.entrada_recibida_at) {
-        return NextResponse.json(
-          { error: "Primero marcá la entrada recibida: el pago se autoriza después de verificar las entradas" },
-          { status: 409 }
-        );
-      }
-      if (action.action === "entrada" && !action.done && current.pago_confirmado_at) {
-        return NextResponse.json(
-          { error: "Hay un pago confirmado sobre esta entrada; desmarcá el pago primero" },
-          { status: 409 }
-        );
-      }
-      const col =
-        action.action === "entrada" ? "entrada_recibida_at" : "pago_confirmado_at";
-      const colPor =
-        action.action === "entrada" ? "entrada_recibida_por" : "pago_confirmado_por";
+      // Los hitos NO tienen orden: en la práctica la secuencia varía (a veces
+      // se le paga al proveedor antes de tener la entrada en mano). Antes acá
+      // había dos 409 que forzaban entrada -> pago; se fueron junto con la
+      // regla equivalente del trigger de la base.
+      const COLS = {
+        entrada: ["entrada_recibida_at", "entrada_recibida_por"],
+        pago: ["pago_confirmado_at", "pago_confirmado_por"],
+        proveedor: ["pago_proveedor_at", "pago_proveedor_por"],
+      } as const;
+      const [col, colPor] = COLS[action.action as keyof typeof COLS];
       patch = {
         [col]: action.done ? new Date().toISOString() : null,
         // Quién lo marcó; al desmarcar se limpia junto con el hito.
@@ -144,12 +147,9 @@ export async function PATCH(
           { status: 409 }
         );
       }
-      if (action.done && !(current.entrada_recibida_at && current.pago_confirmado_at)) {
-        return NextResponse.json(
-          { error: "Para cerrar hacen falta la entrada recibida y el pago confirmado" },
-          { status: 409 }
-        );
-      }
+      // Cerrar ya no exige hitos previos: la entrega puede estar hecha con
+      // el resto pendiente de registrar, y forzarlo llevaba a marcar hitos
+      // falsos solo para poder cerrar.
       patch = {
         cerrada_at: action.done ? new Date().toISOString() : null,
         cerrada_por: action.done ? quien : null,
@@ -191,7 +191,7 @@ export async function PATCH(
     .update(patch)
     .eq("id", params.id)
     .select(
-      "id, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, entrada_recibida_por, pago_confirmado_por, cerrada_por, updated_at"
+      "id, status, entrada_recibida_at, pago_confirmado_at, pago_proveedor_at, cerrada_at, entrada_recibida_por, pago_confirmado_por, cerrada_por, updated_at"
     )
     .single();
 
@@ -241,17 +241,23 @@ function pickResult(
     | "status"
     | "entrada_recibida_at"
     | "pago_confirmado_at"
+    | "pago_proveedor_at"
     | "cerrada_at"
     | "entrada_recibida_por"
     | "pago_confirmado_por"
     | "cerrada_por"
-  > & { updated_at?: string }
+  > & { updated_at?: string; pago_proveedor_por?: string | null }
 ) {
   return {
     id: op.id,
     status: op.status,
     entrada_recibida_at: op.entrada_recibida_at,
     pago_confirmado_at: op.pago_confirmado_at,
+    // El hito del proveedor faltaba acá: el panel marcaba el check, el
+    // servidor lo guardaba, y la respuesta volvía sin él — así que la tarjeta
+    // mostraba el hito sin tildar hasta refrescar la página.
+    pago_proveedor_at: op.pago_proveedor_at,
+    pago_proveedor_por: (op as { pago_proveedor_por?: string | null }).pago_proveedor_por ?? null,
     cerrada_at: op.cerrada_at,
     entrada_recibida_por: op.entrada_recibida_por,
     pago_confirmado_por: op.pago_confirmado_por,

@@ -60,6 +60,21 @@ export default async function FacturaPage({ params }: { params: { id: string } }
   const t = FACTURA_TX[d.idioma] ?? FACTURA_TX.en;
   const num = numeroFactura(factura.numero, factura.created_at);
   const usd = (n: number) => fmtMontoFactura(n, d.idioma);
+  // Facturas emitidas antes del modelo multi-línea no traen `items`: se arma
+  // una línea con el resumen para que se sigan viendo igual.
+  const lineas =
+    d.items && d.items.length > 0
+      ? d.items
+      : [
+          {
+            evento: d.evento.titulo,
+            sector: d.evento.sector,
+            fecha: d.evento.fecha,
+            cantidad: d.cantidad,
+            precio_unitario: d.precio_unitario,
+            subtotal: d.subtotal,
+          },
+        ];
   const opUrl = `/op/${d.operacion.id}`;
 
   return (
@@ -82,6 +97,12 @@ export default async function FacturaPage({ params }: { params: { id: string } }
           <div className="fac-party">
             <p className="fac-label">{t.billedTo}</p>
             <p className="fac-name">{d.comprador.nombre}</p>
+            {/* Email y legajo vienen de la cuenta que hizo el pedido; el
+                contacto es el campo libre que carga el admin. */}
+            {d.comprador.email && <p className="fac-dato">{d.comprador.email}</p>}
+            {d.comprador.legajo && (
+              <p className="fac-dato">{t.legajo}: {d.comprador.legajo}</p>
+            )}
             {d.comprador.contacto && <p className="fac-dato">{d.comprador.contacto}</p>}
           </div>
           <div className="fac-party">
@@ -99,39 +120,74 @@ export default async function FacturaPage({ params }: { params: { id: string } }
         </section>
 
         <section className="fac-item-wrap">
-          <p className="fac-label">{t.ticketPurchased}</p>
-          <div className="fac-ticket">
-            <div className="fac-t-body">
-              {d.evento.competicion && (
-                <p className="fac-t-eyebrow">{d.evento.competicion}</p>
-              )}
-              <h1 className="fac-t-title">{d.evento.titulo}</h1>
-              <div className="fac-t-meta">
-                <div>
-                  <span className="k">{t.date}</span>
-                  <span className="v">{fechaLarga(d.evento.fecha, d.idioma, t.dateTBC)}</span>
-                </div>
-                <div>
-                  <span className="k">{t.venue}</span>
-                  <span className="v">{d.evento.sede ?? t.venueTBC}</span>
-                </div>
-                {d.evento.sector && (
-                  <div>
-                    <span className="k">{t.section}</span>
-                    <span className="v">{d.evento.sector}</span>
-                  </div>
+          <p className="fac-label">
+            {lineas.length === 1 ? t.ticketPurchased : t.ticketsPurchased}
+          </p>
+          {lineas.length === 1 ? (
+            <div className="fac-ticket">
+              <div className="fac-t-body">
+                {d.evento.competicion && (
+                  <p className="fac-t-eyebrow">{d.evento.competicion}</p>
                 )}
+                <h1 className="fac-t-title">{lineas[0].evento}</h1>
+                <div className="fac-t-meta">
+                  <div>
+                    <span className="k">{t.date}</span>
+                    <span className="v">
+                      {fechaLarga(lineas[0].fecha ?? d.evento.fecha, d.idioma, t.dateTBC)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="k">{t.venue}</span>
+                    <span className="v">{d.evento.sede ?? t.venueTBC}</span>
+                  </div>
+                  {lineas[0].sector && (
+                    <div>
+                      <span className="k">{t.section}</span>
+                      <span className="v">{lineas[0].sector}</span>
+                    </div>
+                  )}
+                </div>
               </div>
+              <aside className="fac-t-stub">
+                <span className="fac-stub-k">{t.qty}</span>
+                <span className="fac-stub-qty">×{lineas[0].cantidad}</span>
+                <span className="fac-stub-k">{t.unitPrice}</span>
+                <span className="fac-stub-price">{usd(lineas[0].precio_unitario)}</span>
+                <div className="fac-barcode" aria-hidden />
+                <span className="fac-stub-code">{d.operacion.code}</span>
+              </aside>
             </div>
-            <aside className="fac-t-stub">
-              <span className="fac-stub-k">{t.qty}</span>
-              <span className="fac-stub-qty">×{d.cantidad}</span>
-              <span className="fac-stub-k">{t.unitPrice}</span>
-              <span className="fac-stub-price">{usd(d.precio_unitario)}</span>
-              <div className="fac-barcode" aria-hidden />
-              <span className="fac-stub-code">{d.operacion.code}</span>
-            </aside>
-          </div>
+          ) : (
+            /* Varias entradas: tabla clásica. El talón con código de barras
+               no tiene sentido repetido una vez por línea. */
+            <table className="fac-lineas">
+              <thead>
+                <tr>
+                  <th>{t.lineCol}</th>
+                  <th className="num">{t.qty}</th>
+                  <th className="num">{t.unitPrice}</th>
+                  <th className="num">{t.total}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lineas.map((l, i) => (
+                  <tr key={i}>
+                    <td>
+                      <span className="fac-l-ev">{l.evento}</span>
+                      <span className="fac-l-meta">
+                        {l.sector ?? "—"}
+                        {l.fecha ? ` · ${fechaLarga(l.fecha, d.idioma, t.dateTBC)}` : ""}
+                      </span>
+                    </td>
+                    <td className="num">×{l.cantidad}</td>
+                    <td className="num">{usd(l.precio_unitario)}</td>
+                    <td className="num">{usd(l.subtotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </section>
 
         <section>
@@ -139,13 +195,25 @@ export default async function FacturaPage({ params }: { params: { id: string } }
             <table>
               <tbody>
                 <tr>
-                  <td className="t-label">{t.subtotal(d.cantidad, usd(d.precio_unitario))}</td>
+                  <td className="t-label">
+                    {/* Con varias líneas no hay UN precio unitario que
+                        mostrar: el subtotal va sin él. */}
+                    {lineas.length === 1
+                      ? t.subtotal(d.cantidad, usd(d.precio_unitario))
+                      : t.subtotal(d.cantidad, "")}
+                  </td>
                   <td>{usd(d.subtotal)}</td>
                 </tr>
-                <tr>
-                  <td className="t-label">{t.fee}</td>
-                  <td>{usd(d.fee)}</td>
-                </tr>
+                {/* Solo las facturas VIEJAS desglosan el fee: se emitieron con
+                    el total = subtotal + fee y hay que seguir mostrándolas tal
+                    como se entregaron. Las nuevas cobran el precio de la
+                    entrada, que ya incluye la comisión. */}
+                {d.total > d.subtotal && (
+                  <tr>
+                    <td className="t-label">{t.fee}</td>
+                    <td>{usd(d.fee)}</td>
+                  </tr>
+                )}
                 <tr className="total-row">
                   <td>{t.total}</td>
                   <td>{usd(d.total)}</td>

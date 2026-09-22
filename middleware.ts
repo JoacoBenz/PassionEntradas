@@ -1,6 +1,8 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getRol } from "@/lib/auth";
+import { decidirRuteo } from "@/lib/ruteo";
+import { sesionCaida } from "@/lib/sesion";
 
 // Refresca la sesión de Supabase Auth y RUTEA los módulos:
 // - /admin: solo administrador (los moderadores van a /moderador), salvo
@@ -9,34 +11,39 @@ import { getRol } from "@/lib/auth";
 // - /entradas y /buscar (la tienda): staff o CLIENTE aprobado. Anónimo -> al
 //   login de cliente (/ingresar). La tienda dejó de ser pública.
 // - Sesión SIN rol: no es de nadie, se corta y afuera.
-// La landing (/), /op/[id] y la factura pública quedan fuera del matcher.
+// - La landing (/) es pública, pero al staff lo manda a su panel.
+//
+// La REGLA en sí (qué rol va a dónde) vive en lib/ruteo.ts, pura y con tests:
+// es lo que sostiene los permisos del sitio, y acá no se puede verificar — el
+// modo demo saltea la autenticación entera. Este archivo solo la aplica.
+// /op/[id] y la factura pública quedan fuera del matcher.
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
-  const esPanel = path.startsWith("/admin") || path.startsWith("/moderador");
-  const esTienda =
-    path === "/buscar" ||
-    path === "/mapa" ||
-    path.startsWith("/entradas") ||
-    path.startsWith("/cuenta") ||
-    path.startsWith("/mis-pedidos");
-  const esLoginAdmin = path === "/admin/login";
-  const esLoginCliente = path === "/ingresar";
-  const esLogin = esLoginAdmin || esLoginCliente;
+
+  // `response` es donde Supabase escribe las cookies: la sesión refrescada, o
+  // el borrado de la cookie cuando la sesión ya no existe. Se declara ANTES de
+  // cualquier redirect porque redirectTo las tiene que arrastrar.
+  let response = NextResponse.next({ request });
 
   function redirectTo(pathname: string) {
     const url = request.nextUrl.clone();
     url.pathname = pathname;
-    return NextResponse.redirect(url);
+    const redirect = NextResponse.redirect(url);
+    // Un NextResponse.redirect nuevo NO hereda nada de `response`. Si se
+    // devuelve pelado, el Set-Cookie que borra la sesión muerta nunca llega al
+    // navegador: la cookie vieja vuelve en el request siguiente, Supabase
+    // intenta refrescarla de nuevo y el 400 refresh_token_not_found se repite
+    // para siempre. Por eso las cookies viajan con la redirección.
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
   }
 
   // Modo demo sin Supabase: todo abierto; los logins mandan a su módulo.
   if (process.env.MOCK_DATA === "1") {
-    if (esLoginAdmin) return redirectTo("/admin");
-    if (esLoginCliente) return redirectTo("/entradas");
+    if (path === "/admin/login") return redirectTo("/admin");
+    if (path === "/ingresar") return redirectTo("/entradas");
     return NextResponse.next();
   }
-
-  let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -67,56 +74,38 @@ export async function middleware(request: NextRequest) {
   // reafirma con getUser()+rol (defensa en profundidad).
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
 
-  // Sin sesión: la tienda y el panel van al login único. /admin/login es solo
-  // un alias, así que también se resuelve acá (evita depender del redirect de
-  // la página, que al ser estática no emitía Location).
-  if (!user) {
-    if (esTienda) return redirectTo("/ingresar");
-    if (esPanel) return redirectTo("/ingresar");
-    return response;
-  }
-
-  const rol = getRol(user);
-
-  // Sesión sin rol (cuenta creada por fuera): se corta y afuera. Se cierra la
-  // sesión para que el login no la recicle en loop.
-  if (rol == null) {
-    if (esLogin) return response; // dejar re-loguear
-    await supabase.auth.signOut();
+  // La cookie apunta a una sesión que Auth ya no tiene (usuario borrado,
+  // sesión revocada, clave rotada). Hay que sacarle la cookie al navegador acá
+  // mismo: si sigue mandándola, cada request vuelve a intentar el refresh y
+  // vuelve a fallar. signOut local borra la cookie sin pedirle nada al servidor
+  // de Auth, que para esta sesión ya no tiene nada que decir.
+  if (sesionCaida(error)) {
+    await supabase.auth.signOut({ scope: "local" });
     return redirectTo("/ingresar");
   }
 
-  // Ya logueado y entrando a CUALQUIER login -> a su lugar.
-  if (esLogin) {
-    return redirectTo(
-      rol === "administrador"
-        ? "/admin"
-        : rol === "moderador"
-          ? "/moderador"
-          : "/entradas"
-    );
-  }
+  const decision = decidirRuteo(path, user ? getRol(user) : null, !!user);
 
-  // Cliente: solo la tienda. El panel lo manda a las entradas.
-  if (rol === "cliente") {
-    if (esPanel) return redirectTo("/entradas");
-    return response;
+  if (decision.accion === "cerrar-sesion") {
+    // Sesión que no es de nadie: se cierra para que el login no la recicle en
+    // un loop de redirecciones.
+    await supabase.auth.signOut();
+    return redirectTo(decision.a);
   }
-
-  // Moderador en el panel de administración -> a su módulo, con la excepción
-  // de /admin/cuenta (cambiar su propia contraseña).
-  if (rol === "moderador" && path.startsWith("/admin") && path !== "/admin/cuenta") {
-    return redirectTo("/moderador");
+  if (decision.accion === "redirigir") {
+    return redirectTo(decision.a);
   }
-
-  // Staff en la tienda: permitido (además de su panel).
   return response;
 }
 
 export const config = {
   matcher: [
+    // La raíz entra al matcher solo para mandar al staff a su panel; el
+    // anónimo y el cliente siguen viendo la landing estática.
+    "/",
     "/admin/:path*",
     "/moderador/:path*",
     "/entradas/:path*",

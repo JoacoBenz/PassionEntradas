@@ -77,7 +77,7 @@ export function Landing() {
   // Teléfono en dos partes: país (código) + número. Se combinan al enviar.
   const [pais, setPais] = useState(PAIS_DEFAULT);
   const [telefono, setTelefono] = useState("");
-  const [direccion, setDireccion] = useState("");
+  const [legajo, setLegajo] = useState("");
   const [mensaje, setMensaje] = useState("");
   // Consentimiento de términos: obligatorio para poder enviar la solicitud.
   const [acepto, setAcepto] = useState(false);
@@ -103,7 +103,7 @@ export function Landing() {
       const res = await fetch("/api/acceso/solicitar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, email, telefono: telefonoCompleto, direccion, mensaje, empresa, acepto }),
+        body: JSON.stringify({ nombre, email, telefono: telefonoCompleto, legajo, mensaje, empresa, acepto }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -123,7 +123,7 @@ export function Landing() {
     setEmail("");
     setPais(PAIS_DEFAULT);
     setTelefono("");
-    setDireccion("");
+    setLegajo("");
     setMensaje("");
     setAcepto(false);
     setEstado("idle");
@@ -258,14 +258,16 @@ export function Landing() {
                   </div>
                 </label>
                 <label className="lp-field">
-                  <span>{lp.fDireccion}</span>
+                  <span>{lp.fLegajo}</span>
                   <input
                     type="text"
-                    name="direccion"
-                    autoComplete="street-address"
+                    name="legajo"
+                    inputMode="text"
+                    autoComplete="off"
+                    placeholder={lp.fLegajoPh}
                     required
-                    value={direccion}
-                    onChange={(e) => setDireccion(e.target.value)}
+                    value={legajo}
+                    onChange={(e) => setLegajo(e.target.value)}
                   />
                 </label>
                 <label className="lp-field">

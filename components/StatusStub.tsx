@@ -1,9 +1,10 @@
 import {
-  ESTADO_COLOR,
-  ESTADO_LABEL_PUBLICO,
-  estadoDe,
-  formatUSD,
+  ESTADO_PUBLICO_COLOR,
+  ESTADO_PUBLICO_LABEL,
+  estadoPublicoDe,
+  formatMonto,
   formatFecha,
+  type ItemPublico,
   type OperacionPublica,
 } from "@/lib/operaciones";
 import ProgressSteps from "./ProgressSteps";
@@ -44,25 +45,33 @@ function Microtext({ dark = false }: { dark?: boolean }) {
 // Talón / stub de entrada. El contenedor no pinta fondo: cada sección pinta
 // el suyo y enmascara medio círculo en sus juntas (.punch-*), así el
 // troquelado son agujeros de verdad a través de los que se ve la página.
-export default function StatusStub({ op }: { op: OperacionPublica }) {
-  const estado = estadoDe(op);
-  const color = ESTADO_COLOR[estado];
+export default function StatusStub({
+  op,
+  items = [],
+}: {
+  op: OperacionPublica;
+  items?: ItemPublico[];
+}) {
+  const estado = estadoPublicoDe(op);
+  const color = ESTADO_PUBLICO_COLOR[estado];
   // El sello vive sobre la sección de tinta: el color de "cerrada" ES tinta
   // (sello tipo "CANJEADO" pensado para fondos claros) y desaparecía contra
   // el fondo. Sobre oscuro, el sello final va en papel.
-  const colorSello = estado === "cerrada" ? "#FBFAF6" : color;
+  const colorSello = estado === "entregada" ? "#FBFAF6" : color;
   // Aviso según la etapa del proceso: la página le dice a cada parte qué
   // puede hacer ahora, igual que lo haría el administrador en el grupo.
+  // Los avisos hablan solo de lo que el comprador ve: su pedido y su pago.
+  // Los pasos con el proveedor son internos y no se mencionan.
   const aviso =
-    estado === "entrada_recibida"
+    estado === "pago_recibido"
       ? {
-          icon: "✅",
-          text: "Entradas verificadas y en custodia del administrador. El comprador ya puede realizar el pago al vendedor.",
+          icon: "💸",
+          text: "Tu pago está confirmado. Estamos coordinando la entrega de las entradas.",
         }
-      : estado === "lista_para_cerrar"
+      : estado === "pedido_recibido"
         ? {
-            icon: "💸",
-            text: "El vendedor confirmó el pago. El administrador está transfiriendo las entradas al comprador.",
+            icon: "📝",
+            text: "Recibimos tu pedido. Un vendedor se contacta para coordinar el pago.",
           }
         : null;
   // Hora de Argentina explícita: esto se renderiza en el server (UTC en
@@ -106,6 +115,27 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
                 {formatFecha(op.fecha_evento)}
               </p>
             )}
+            {/* Entradas del pedido. Desde dos: con una sola el título ya la
+                nombra y repetirla sería ruido. */}
+            {items.length > 1 && (
+              <ul className="mt-3 space-y-1 border-t border-white/10 pt-3">
+                {items.map((i, n) => (
+                  <li key={n} className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="min-w-0">
+                      <span className="block truncate text-white/85">{i.evento}</span>
+                      <span className="block text-xs text-white/45">
+                        {i.sector ?? "General"}
+                        {i.cantidad > 1 ? ` · ×${i.cantidad}` : ""}
+                        {i.fecha_evento ? ` · ${formatFecha(i.fecha_evento)}` : ""}
+                      </span>
+                    </span>
+                    <span className="shrink-0 whitespace-nowrap font-mono text-xs text-white/70">
+                      {formatMonto(i.cantidad * i.precio_unitario, op.moneda)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 
@@ -124,7 +154,7 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
                 className="mt-0.5 block font-display text-xl font-bold leading-tight tracking-wide sm:text-2xl"
                 style={{ textWrap: "balance" }}
               >
-                {ESTADO_LABEL_PUBLICO[estado]}
+                {ESTADO_PUBLICO_LABEL[estado]}
               </span>
             </div>
           </div>
@@ -138,9 +168,8 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
           <div className="space-y-6 px-6 py-7">
             {/* Los tres pasos del proceso: entrada → pago → entrega */}
             <ProgressSteps
-              entrada={!!op.entrada_recibida_at}
               pago={!!op.pago_confirmado_at}
-              cerrada={!!op.cerrada_at}
+              entregada={!!op.cerrada_at}
               cancelada={estado === "cancelada"}
             />
 
@@ -150,7 +179,7 @@ export default function StatusStub({ op }: { op: OperacionPublica }) {
                   Monto
                 </dt>
                 <dd className="mt-0.5 font-display text-3xl font-bold tabular-nums tracking-tight">
-                  {formatUSD(op.monto)}
+                  {formatMonto(op.monto, op.moneda)}
                 </dd>
               </div>
               {op.comprador_alias && (

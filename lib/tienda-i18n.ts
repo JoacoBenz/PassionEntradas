@@ -115,6 +115,8 @@ const en = {
   waDisponible: "Available now",
   waOcupado: "With a customer",
   waChat: "Chat",
+  // Un solo contacto y sin nombre propio: quién atiende es asunto del equipo.
+  waAgenteNombre: "Agent",
   waAgenteMsg: (agente: string) => `Hi ${agente}! I'd like to ask about tickets.`,
 
   // catálogo
@@ -162,6 +164,21 @@ const en = {
   },
 
   // mapa mundial de eventos (/mapa)
+  zonaMapa: "Map zone",
+  mapaPag: {
+    verTodas: (n: number) => `Show all ${n} cities`,
+    verMenos: "Show fewer",
+    pagina: (a: number, b: number) => `Page ${a} of ${b}`,
+    anteriores: "← Previous",
+    siguientes: "Next →",
+  },
+  plano: {
+    abrir: "Open the seating map",
+    cerrar: "Close",
+    acercar: "Zoom in",
+    alejar: "Zoom out",
+    ayuda: "Tap the map to zoom, drag to move",
+  },
   mapa: {
     nav: "Events map",
     eyebrow: "Worldwide",
@@ -205,6 +222,8 @@ const en = {
     fNombre: "Full name",
     fEmail: "Email",
     fTelefono: "Phone",
+    fLegajo: "Employee ID / Tax ID",
+    fLegajoPh: "e.g. 20-12345678-9",
     fDireccion: "Address",
     fMensaje: "Anything you're looking for? (optional)",
     fMensajePh: "e.g. World Cup final, F1 Monza, a specific match…",
@@ -256,12 +275,13 @@ const en = {
     creado: "Requested",
     verSeguimiento: "Track status ↗",
     verFactura: "View invoice ↗",
+    // Mismos tres pasos que el ticket público: el comprador ve su pedido,
+    // no nuestra gestión con el proveedor.
     estados: {
-      esperando: "Received — a seller will reach out",
-      entrada_recibida: "In progress",
-      pago_confirmado: "In progress",
-      lista_para_cerrar: "Almost done",
-      cerrada: "Completed",
+      consulta_recibida: "Enquiry received — we are pricing it",
+      pedido_recibido: "Order received — a seller will reach out",
+      pago_recibido: "Payment received",
+      entregada: "Delivered",
       cancelada: "Cancelled",
     } as Record<string, string>,
   },
@@ -467,6 +487,7 @@ const es: typeof en = {
   waDisponible: "Disponible ahora",
   waOcupado: "Con un cliente",
   waChat: "Chatear",
+  waAgenteNombre: "Agente",
   waAgenteMsg: (agente) => `Hola ${agente}! Quiero consultar por entradas.`,
 
   fCategoria: "Categoría",
@@ -511,6 +532,21 @@ const es: typeof en = {
     errRed: "Error de red. Probá de nuevo.",
   },
 
+  zonaMapa: "Zona del mapa",
+  mapaPag: {
+    verTodas: (n: number) => `Ver las ${n} ciudades`,
+    verMenos: "Ver menos",
+    pagina: (a: number, b: number) => `Página ${a} de ${b}`,
+    anteriores: "← Anteriores",
+    siguientes: "Siguientes →",
+  },
+  plano: {
+    abrir: "Ver el mapa de sectores",
+    cerrar: "Cerrar",
+    acercar: "Acercar",
+    alejar: "Alejar",
+    ayuda: "Tocá el mapa para acercar, arrastrá para moverte",
+  },
   mapa: {
     nav: "Mapa de eventos",
     eyebrow: "Por el mundo",
@@ -553,6 +589,8 @@ const es: typeof en = {
     fNombre: "Nombre y apellido",
     fEmail: "Email",
     fTelefono: "Teléfono",
+    fLegajo: "Legajo / CUIL / CUIT",
+    fLegajoPh: "Ej. 20-12345678-9",
     fDireccion: "Dirección",
     fMensaje: "¿Buscás algo en particular? (opcional)",
     fMensajePh: "ej: final del Mundial, F1 Monza, un partido puntual…",
@@ -603,11 +641,10 @@ const es: typeof en = {
     verSeguimiento: "Ver seguimiento ↗",
     verFactura: "Ver factura ↗",
     estados: {
-      esperando: "Recibido — un vendedor te contacta",
-      entrada_recibida: "En curso",
-      pago_confirmado: "En curso",
-      lista_para_cerrar: "Casi listo",
-      cerrada: "Completado",
+      consulta_recibida: "Consulta recibida — te pasamos el precio",
+      pedido_recibido: "Pedido recibido — un vendedor te contacta",
+      pago_recibido: "Pago recibido",
+      entregada: "Entregada",
       cancelada: "Cancelado",
     } as Record<string, string>,
   },

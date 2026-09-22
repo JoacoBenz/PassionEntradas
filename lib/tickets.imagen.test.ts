@@ -96,3 +96,62 @@ describe("buildEvents aplica el filtro", () => {
     expect(ev.imagen).toBeNull();
   });
 });
+
+// En la tarjeta de un evento, el que entra quiere ver qué puede comprar. Si
+// los sectores sin cupo van primero, lo primero que lee es "consultar".
+describe("orden de los sectores", () => {
+  const u = (o: Partial<Ticket>): Ticket => ({
+    id: Math.random().toString(),
+    evento: "River vs Boca",
+    competicion: "Liga",
+    fecha: "2026-07-18T12:00:00Z",
+    ciudad: "Buenos Aires",
+    categoria: "S",
+    precio_final: 100,
+    stock: 3,
+    estado: "book",
+    source: "portal",
+    ...o,
+  });
+
+  const orden = (us: Ticket[]) =>
+    buildEvents(us)[0].ubicaciones.map((x) => `${x.categoria}:${x.precio_final ?? "-"}`);
+
+  it("los comprables van antes que los de consultar", () => {
+    expect(
+      orden([
+        u({ categoria: "SinCupo", stock: 0, precio_final: 50 }),
+        u({ categoria: "Disponible", stock: 2, precio_final: 300 }),
+      ])
+    ).toEqual(["Disponible:300", "SinCupo:50"]);
+  });
+
+  it("dentro de cada grupo, del más barato al más caro", () => {
+    expect(
+      orden([
+        u({ categoria: "CaroOk", precio_final: 900 }),
+        u({ categoria: "BaratoOk", precio_final: 100 }),
+        u({ categoria: "CaroReq", precio_final: 800, stock: 0 }),
+        u({ categoria: "BaratoReq", precio_final: 200, stock: 0 }),
+      ])
+    ).toEqual(["BaratoOk:100", "CaroOk:900", "BaratoReq:200", "CaroReq:800"]);
+  });
+
+  it("un sector sin precio cuenta como a consultar", () => {
+    expect(
+      orden([
+        u({ categoria: "SinPrecio", precio_final: null }),
+        u({ categoria: "ConPrecio", precio_final: 500 }),
+      ])
+    ).toEqual(["ConPrecio:500", "SinPrecio:-"]);
+  });
+
+  it("un sector on_request no es comprable aunque tenga stock", () => {
+    expect(
+      orden([
+        u({ categoria: "OnRequest", estado: "on_request", stock: 5, precio_final: 50 }),
+        u({ categoria: "Book", precio_final: 400 }),
+      ])
+    ).toEqual(["Book:400", "OnRequest:50"]);
+  });
+});

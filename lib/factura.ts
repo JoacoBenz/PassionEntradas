@@ -6,7 +6,16 @@ export type FacturaIdioma = "en" | "es";
 
 export type FacturaDatos = {
   idioma: FacturaIdioma;
-  comprador: { nombre: string; contacto: string | null };
+  // Datos del comprador. Cuando la operación salió de un pedido de la tienda,
+  // `email` y `legajo` se copian de la CUENTA que lo pidió, no de lo que tipeó
+  // el admin: así el mismo legajo que cargó al pedir acceso llega hasta la
+  // factura. En operaciones cargadas a mano quedan en null.
+  comprador: {
+    nombre: string;
+    contacto: string | null;
+    email?: string | null;
+    legajo?: string | null;
+  };
   // Quién manejó la venta (auditoría de la operación) — "Handled by Kiru".
   agente: string | null;
   operacion: { id: string; code: string };
@@ -17,6 +26,19 @@ export type FacturaDatos = {
     sede: string | null;
     sector: string | null;
   };
+  // Entradas de la operación. Un pedido del carrito puede traer varias de
+  // sectores o eventos distintos, y la factura tiene que mostrarlas todas.
+  // Opcional: las facturas emitidas antes del modelo multi-línea no la
+  // tienen y se siguen renderizando con los campos sueltos de abajo.
+  items?: {
+    evento: string;
+    sector: string | null;
+    fecha: string | null;
+    cantidad: number;
+    precio_unitario: number;
+    subtotal: number;
+  }[];
+  // Resumen (y compatibilidad con las facturas viejas de una sola línea).
   cantidad: number;
   precio_unitario: number;
   subtotal: number;
@@ -54,17 +76,23 @@ export const FACTURA_TX = {
     docKind: "Invoice / Receipt",
     paid: "Paid",
     billedTo: "Billed to",
+    legajo: "Tax ID",
     issued: "Issued",
     handledBy: "Handled by",
     team: "TicketMirror team",
     operacion: "Operation",
     ticketPurchased: "Ticket purchased",
+    // Varias líneas: el encabezado de la sección va en plural y la columna
+    // tiene su propio título (repetir "Ticket purchased" en las dos leía mal).
+    ticketsPurchased: "Tickets purchased",
+    lineCol: "Detail",
     date: "Date",
     venue: "Venue",
     section: "Section",
     qty: "Qty",
     unitPrice: "Unit price",
-    subtotal: (q: number, unit: string) => `Subtotal (${q} × ${unit})`,
+    subtotal: (q: number, unit: string) =>
+      unit ? `Subtotal (${q} × ${unit})` : `Subtotal (${q})`,
     fee: "Service & escrow fee",
     total: "Total",
     usdNote: "All amounts in US dollars (USD).",
@@ -81,17 +109,21 @@ export const FACTURA_TX = {
     docKind: "Factura / Recibo",
     paid: "Pagado",
     billedTo: "Facturado a",
+    legajo: "Legajo/CUIT",
     issued: "Emitido",
     handledBy: "Atendió",
     team: "equipo TicketMirror",
     operacion: "Operación",
     ticketPurchased: "Entrada comprada",
+    ticketsPurchased: "Entradas compradas",
+    lineCol: "Detalle",
     date: "Fecha",
     venue: "Sede",
     section: "Sector",
     qty: "Cant.",
     unitPrice: "Precio unitario",
-    subtotal: (q: number, unit: string) => `Subtotal (${q} × ${unit})`,
+    subtotal: (q: number, unit: string) =>
+      unit ? `Subtotal (${q} × ${unit})` : `Subtotal (${q})`,
     fee: "Servicio y custodia",
     total: "Total",
     usdNote: "Todos los montos en dólares estadounidenses (USD).",

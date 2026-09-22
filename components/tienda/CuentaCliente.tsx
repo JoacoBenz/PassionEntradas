@@ -15,7 +15,9 @@ import { waLink } from "@/lib/tickets";
 export type PerfilInicial = {
   nombre: string;
   telefono: string;
-  direccion: string;
+  // Mismo dato que cargó al pedir acceso: viaja sin cambiar de nombre por
+  // solicitud -> cuenta -> perfil -> factura.
+  legajo: string;
   lang: Lang | null;
 };
 
@@ -66,7 +68,7 @@ export function CuentaCliente({ mock, perfil }: { mock: boolean; perfil: PerfilI
   // Perfil.
   const [nombre, setNombre] = useState(perfil.nombre);
   const [telefono, setTelefono] = useState(perfil.telefono);
-  const [direccion, setDireccion] = useState(perfil.direccion);
+  const [legajo, setLegajo] = useState(perfil.legajo);
   const [perfilEstado, setPerfilEstado] = useState<Estado>("idle");
   const [perfilError, setPerfilError] = useState<string | null>(null);
 
@@ -82,7 +84,7 @@ export function CuentaCliente({ mock, perfil }: { mock: boolean; perfil: PerfilI
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.updateUser({
-        data: { nombre, telefono, direccion },
+        data: { nombre, telefono, legajo },
       });
       if (error) {
         setPerfilError(lp.cuentaErrGeneric);
@@ -191,12 +193,13 @@ export function CuentaCliente({ mock, perfil }: { mock: boolean; perfil: PerfilI
               />
             </label>
             <label className="lp-field">
-              <span>{lp.fDireccion}</span>
+              <span>{lp.fLegajo}</span>
               <input
                 type="text"
-                autoComplete="street-address"
-                value={direccion}
-                onChange={(e) => setDireccion(e.target.value)}
+                autoComplete="off"
+                placeholder={lp.fLegajoPh}
+                value={legajo}
+                onChange={(e) => setLegajo(e.target.value)}
               />
             </label>
 

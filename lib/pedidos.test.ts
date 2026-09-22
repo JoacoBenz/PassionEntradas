@@ -3,10 +3,15 @@ import {
   evaluarLimite,
   precioUsd,
   reconciliarItem,
+  resumenOperacion,
+  separarPorTipo,
   RL_MAX_VENTANA,
   RL_MIN_INTERVALO_MS,
   type ItemPedido,
   type TicketRef,
+  tipoDelEnvio,
+  detalleDeLineas,
+  TIPO_ENVIO_LABEL,
 } from "./pedidos";
 
 // El cliente manda el body del pedido, así que TODO lo que llega es hostil
@@ -211,5 +216,302 @@ describe("evaluarLimite", () => {
   // Fail-open: perder un pedido legítimo es peor que dejar pasar uno de más.
   it("una fecha ilegible no bloquea", () => {
     expect(evaluarLimite(["no-es-fecha"], AHORA)).toBeNull();
+  });
+});
+
+// Un envío del carrito arma UNA operación. Estos tests fijan cómo se resume
+// un pedido de varias entradas en una sola cabecera.
+describe("resumenOperacion", () => {
+  const linea = (over: Partial<ItemPedido> = {}): ItemPedido => ({
+    tipo: "pedido",
+    evento: "Arsenal vs Lille",
+    sector: "B",
+    ticket_id: "t1",
+    monto: 518,
+    cantidad: 1,
+    fecha_evento: "2026-11-05",
+    ...over,
+  });
+
+  it("con una sola línea el encabezado es esa línea", () => {
+    const r = resumenOperacion([linea()]);
+    expect(r.evento).toBe("Arsenal vs Lille");
+    expect(r.sector).toBe("B");
+    expect(r.ticket_id).toBe("t1");
+    expect(r.cantidad).toBe(1);
+    expect(r.monto).toBe(518);
+  });
+
+  it("con varias líneas avisa cuántas más hay", () => {
+    const r = resumenOperacion([linea(), linea({ evento: "Real Madrid vs City" })]);
+    expect(r.evento).toBe("Arsenal vs Lille +1 más");
+  });
+
+  // Sector y ticket pertenecen a la línea: ponerlos en la cabecera con varias
+  // líneas haría que la operación parezca de un solo sector.
+  it("no atribuye sector ni ticket a una operación de varias líneas", () => {
+    const r = resumenOperacion([linea(), linea({ sector: "C", ticket_id: "t2" })]);
+    expect(r.sector).toBeNull();
+    expect(r.ticket_id).toBeNull();
+  });
+
+  it("suma las entradas, no cuenta las líneas", () => {
+    const r = resumenOperacion([linea({ cantidad: 2 }), linea({ cantidad: 3 })]);
+    expect(r.cantidad).toBe(5);
+  });
+
+  it("suma los montos de las líneas", () => {
+    const r = resumenOperacion([linea({ monto: 518 }), linea({ monto: 1556 })]);
+    expect(r.monto).toBe(2074);
+  });
+
+  // La fecha de la operación marca su urgencia: manda la más próxima.
+  it("toma la fecha más próxima de todas las líneas", () => {
+    const r = resumenOperacion([
+      linea({ fecha_evento: "2027-01-10" }),
+      linea({ fecha_evento: "2026-11-05" }),
+    ]);
+    expect(r.fecha_evento).toBe("2026-11-05");
+  });
+
+  it("ignora las líneas sin fecha al elegir la más próxima", () => {
+    const r = resumenOperacion([
+      linea({ fecha_evento: null }),
+      linea({ fecha_evento: "2026-12-01" }),
+    ]);
+    expect(r.fecha_evento).toBe("2026-12-01");
+  });
+
+  it("queda sin fecha si ninguna línea la tiene", () => {
+    expect(resumenOperacion([linea({ fecha_evento: null })]).fecha_evento).toBeNull();
+  });
+});
+
+describe("separarPorTipo", () => {
+  const p = (tipo: "pedido" | "consulta"): ItemPedido => ({
+    tipo,
+    evento: "X",
+    sector: null,
+    ticket_id: null,
+    monto: tipo === "pedido" ? 100 : 0,
+    cantidad: 1,
+    fecha_evento: null,
+  });
+
+  // Carrito mixto: lo que tiene precio arma la operación, lo demás va a
+  // consultas. Es el caso que define el modelo.
+  it("parte un carrito mixto en pedidos y consultas", () => {
+    const { pedidos, consultas } = separarPorTipo([p("pedido"), p("consulta"), p("pedido")]);
+    expect(pedidos).toHaveLength(2);
+    expect(consultas).toHaveLength(1);
+  });
+
+  it("un carrito solo de consultas no deja nada para la operación", () => {
+    const { pedidos, consultas } = separarPorTipo([p("consulta"), p("consulta")]);
+    expect(pedidos).toHaveLength(0);
+    expect(consultas).toHaveLength(2);
+  });
+});
+
+// La comisión es la razón por la que el negocio existe y NO se estaba
+// guardando: `fee` iba en 0 para todo lo que entraba por la tienda, así que el
+// tablero decía "comisión ganada: US$ 0" aunque cada entrada tuviera su markup
+// adentro del precio.
+describe("comisión de la línea (precio − costo)", () => {
+  const base = {
+    tipo: "pedido" as const,
+    evento: "X",
+    sector: null,
+    ticket_id: "t1",
+    monto: 0,
+    cantidad: 1,
+    fecha_evento: null,
+  };
+
+  it("portal: precio y costo se convierten con la misma tasa", () => {
+    // Passion cobra 100 EUR, se vende a 120 EUR, tasa 1,10 -> 132 y 110 USD.
+    const r = reconciliarItem(
+      { ...base },
+      {
+        evento: "X",
+        categoria: null,
+        precio_final: 120,
+        precio_origen: 100,
+        stock: 5,
+        fecha: null,
+        source: "portal",
+      },
+      1.1
+    );
+    expect(r.monto).toBe(132);
+    expect(r.comision).toBe(22);
+  });
+
+  it("propia: costo y precio ya están en la misma moneda", () => {
+    const r = reconciliarItem(
+      { ...base },
+      {
+        evento: "X",
+        categoria: null,
+        precio_final: 155,
+        precio_costo: 120,
+        stock: 5,
+        fecha: null,
+        source: "manual",
+      },
+      1.1
+    );
+    expect(r.monto).toBe(155);
+    expect(r.comision).toBe(35);
+  });
+
+  it("monto = costo + comisión, también con cantidad", () => {
+    const r = reconciliarItem(
+      { ...base, cantidad: 3 },
+      {
+        evento: "X",
+        categoria: null,
+        precio_final: 155,
+        precio_costo: 120,
+        stock: 10,
+        fecha: null,
+        source: "manual",
+      },
+      1.1
+    );
+    expect(r.monto).toBe(465);
+    expect(r.comision).toBe(105);
+    expect(r.monto - r.comision!).toBe(360); // el costo, 120 × 3
+  });
+
+  it("sin costo cargado no se inventa comisión", () => {
+    // Las filas viejas del portal no tienen precio_origen: preferimos un 0
+    // honesto antes que una ganancia imaginaria en el tablero.
+    const r = reconciliarItem(
+      { ...base },
+      { evento: "X", categoria: null, precio_final: 120, stock: 5, fecha: null, source: "portal" },
+      1.1
+    );
+    expect(r.monto).toBe(132);
+    expect(r.comision).toBe(0);
+  });
+
+  it("si el costo fuera mayor al precio, la comisión no es negativa", () => {
+    const r = reconciliarItem(
+      { ...base },
+      {
+        evento: "X",
+        categoria: null,
+        precio_final: 100,
+        precio_costo: 130,
+        stock: 5,
+        fecha: null,
+        source: "manual",
+      },
+      1
+    );
+    expect(r.comision).toBe(0);
+  });
+
+  it("una consulta no tiene precio ni comisión", () => {
+    const r = reconciliarItem(
+      { ...base, tipo: "consulta" },
+      {
+        evento: "X",
+        categoria: null,
+        precio_final: 155,
+        precio_costo: 120,
+        stock: 5,
+        fecha: null,
+        source: "manual",
+      },
+      1
+    );
+    expect(r.monto).toBe(0);
+    expect(r.comision).toBe(0);
+  });
+});
+
+// El vendedor recibe el aviso por WhatsApp y tiene que saber, sin abrir nada,
+// qué le entró: si es un pedido con precio cerrado o una consulta a cotizar, y
+// cuántas entradas son.
+describe("aviso a los vendedores", () => {
+  const linea = (o: Partial<ItemPedido>): ItemPedido => ({
+    tipo: "pedido",
+    evento: "River vs Boca",
+    sector: "Platea Alta",
+    ticket_id: null,
+    monto: 100,
+    cantidad: 1,
+    fecha_evento: null,
+    ...o,
+  });
+
+  describe("tipoDelEnvio", () => {
+    it("solo entradas con precio: pedido", () => {
+      expect(tipoDelEnvio([linea({})], [])).toBe("pedido");
+    });
+    it("solo entradas a cotizar: consulta", () => {
+      expect(tipoDelEnvio([], [linea({ tipo: "consulta" })])).toBe("consulta");
+    });
+    it("las dos cosas en el mismo carrito: mixto", () => {
+      expect(tipoDelEnvio([linea({})], [linea({ tipo: "consulta" })])).toBe("mixto");
+    });
+    it("un carrito vacío no rompe", () => {
+      expect(tipoDelEnvio([], [])).toBe("pedido");
+    });
+
+    it("la etiqueta trae el artículo y concuerda en género", () => {
+      // La plantilla dice "Entró {{1}} en la tienda": sin el artículo salía
+      // "Nuevo consulta".
+      expect(TIPO_ENVIO_LABEL.pedido).toBe("un pedido");
+      expect(TIPO_ENVIO_LABEL.consulta).toBe("una consulta");
+      expect(TIPO_ENVIO_LABEL.mixto).toBe("un pedido con consultas");
+    });
+  });
+
+  describe("detalleDeLineas", () => {
+    it("una sola entrada: evento y sector", () => {
+      expect(detalleDeLineas([linea({})], [])).toBe("River vs Boca (Platea Alta)");
+    });
+
+    it("la cantidad se ve cuando es más de una", () => {
+      expect(detalleDeLineas([linea({ cantidad: 3 })], [])).toContain("x3");
+      expect(detalleDeLineas([linea({ cantidad: 1 })], [])).not.toContain("x1");
+    });
+
+    it("varias entradas se listan todas", () => {
+      const d = detalleDeLineas([linea({}), linea({ evento: "Final", sector: "Cat 1" })], []);
+      expect(d).toBe("River vs Boca (Platea Alta) + Final (Cat 1)");
+    });
+
+    it("con más de `max` resume el resto en vez de estirarse", () => {
+      const muchas = Array.from({ length: 8 }, (_, i) => linea({ evento: `E${i}` }));
+      const d = detalleDeLineas(muchas, [], 3);
+      expect(d).toContain("y 5 mas");
+      expect(d.split("+").length).toBe(3);
+    });
+
+    it("carrito mixto: cada grupo va rotulado", () => {
+      // Sin el rótulo el vendedor no sabe cuál tiene que cotizar.
+      const d = detalleDeLineas(
+        [linea({ evento: "River vs Boca" })],
+        [linea({ tipo: "consulta", evento: "Final", sector: "Cat 1" })]
+      );
+      expect(d).toBe("A reservar: River vs Boca (Platea Alta) | A cotizar: Final (Cat 1)");
+    });
+
+    it("sin mezcla no se rotula: no aporta nada", () => {
+      expect(detalleDeLineas([linea({})], [])).not.toContain("A reservar");
+    });
+
+    it("nunca tiene saltos de línea (es un parámetro de plantilla)", () => {
+      const d = detalleDeLineas([linea({ evento: "A\nB" })], [linea({ tipo: "consulta" })]);
+      expect(d).not.toMatch(/\n/);
+    });
+
+    it("sin líneas devuelve vacío y no un separador suelto", () => {
+      expect(detalleDeLineas([], [])).toBe("");
+    });
   });
 });

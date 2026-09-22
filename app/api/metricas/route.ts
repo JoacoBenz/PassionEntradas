@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { esStaff, getRol } from "@/lib/auth";
 import type { Metrics } from "@/lib/metrics";
-import { computeMetrics } from "@/lib/metrics";
+import { computeMetrics, metricasDominantes } from "@/lib/metrics";
 import { isMock, mockListOps } from "@/lib/mock-db";
 
 // GET /api/metricas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD — métricas del tablero
@@ -34,23 +34,11 @@ export async function GET(request: Request) {
   }
 
   const { data, error } = await createAdminSupabase()
-    .rpc("metricas_operaciones", { p_desde: desde, p_hasta: hasta })
-    .single();
+    .rpc("metricas_operaciones", { p_desde: desde, p_hasta: hasta });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const m = (data ?? {}) as Record<string, number | null>;
-  const plataMovida = Number(m.plata_movida ?? 0);
-  const entradasVendidas = Number(m.entradas_vendidas ?? 0);
-  const metrics: Metrics = {
-    plataMovida,
-    comisionGanada: Number(m.comision_ganada ?? 0),
-    entradasVendidas,
-    enJuegoMonto: Number(m.en_juego_monto ?? 0),
-    enJuegoOps: Number(m.en_juego_ops ?? 0),
-    ticketPromedio:
-      entradasVendidas > 0 ? Math.round(plataMovida / entradasVendidas) : 0,
-  };
+  const metrics: Metrics = metricasDominantes((data ?? []) as any[]);
   return NextResponse.json(metrics);
 }

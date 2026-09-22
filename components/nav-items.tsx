@@ -1,4 +1,8 @@
 // Secciones del admin, compartidas por BottomNav (móvil) y TopNav (desktop).
+//
+// Son CUATRO a propósito. Con una quinta ("Consultas") la barra se partía en
+// dos líneas; las consultas viven ahora dentro del Panel, mezcladas con las
+// operaciones y marcadas con un signo de pregunta.
 
 export type NavItem = { href: string; label: string; icon: React.ReactNode };
 

@@ -47,7 +47,7 @@ export async function fetchTickets(): Promise<Ticket[]> {
       const { data, error } = await supabase
         .from("tickets")
         .select(
-          "id,evento,competicion,fecha,ciudad,categoria,precio_final,stock,estado,source,disponible,imagen_url"
+          "id,evento,competicion,fecha,ciudad,categoria,precio_final,stock,estado,source,disponible,imagen_url,zona_color"
         )
         // Eventos vigentes (sin fecha o de hoy en adelante, día argentino).
         .or(`fecha.is.null,fecha.gte.${hoy}`)

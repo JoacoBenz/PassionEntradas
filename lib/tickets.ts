@@ -18,12 +18,25 @@ export type Ticket = {
   stock: number | null;
   estado: TicketEstado;
   source: TicketSource;
+  // Lo que nos cuesta la entrada antes del markup. En el portal es lo que
+  // cobra Passion; en las propias lo carga el admin (ahí se llama
+  // precio_costo). La diferencia con precio_final es nuestra comisión.
+  precio_origen?: number | null;
+  // Entradas propias: lo que nos costó. Mismo rol que precio_origen en las del
+  // portal; se separa porque una la carga el admin y la otra el worker.
+  precio_costo?: number | null;
   // Mapa de sectores del evento (URL pública del bucket `mapas`), si hay.
   imagen_url?: string | null;
+  // Zona coloreada del mapa a la que pertenece este sector. El mapa ya viene
+  // con las zonas pintadas: esto le dice al agente cuál mirar. Lo escribe el
+  // worker; puede venir como color (#E4572E, "red") o como nombre de zona.
+  zona_color?: string | null;
 };
 
 export type TicketFull = Ticket & {
-  precio_origen: number | null;
+  // A quién se la compramos. Junto con precio_costo y precio_final da el
+  // margen real por entrada.
+  proveedor?: string | null;
   moneda_origen: string;
   moneda_final: string | null;
   disponible: boolean;
@@ -43,6 +56,17 @@ export type SyncRun = {
   duration_ms: number | null;
   created_at: string;
 };
+
+// Un sector se puede comprar cuando tiene cupo, está reservable y tiene
+// precio. El mismo criterio que usa la fila de la tienda para decidir si
+// muestra "Agregar" o "Consultar".
+export function comprable(u: {
+  stock: number | null;
+  estado: TicketEstado;
+  precio_final: number | null;
+}): boolean {
+  return (u.stock ?? 0) > 0 && u.estado === "book" && Number(u.precio_final ?? 0) > 0;
+}
 
 // Evento agrupado (varias ubicaciones/sectores del mismo partido).
 export type EventoAgrupado = {
@@ -253,11 +277,69 @@ export function buildEvents(rows: Ticket[]): EventoAgrupado[] {
       : todos.length
         ? Math.min(...todos)
         : null;
+    // Primero lo que se puede comprar, después lo que hay que consultar: el
+    // que entra a la tarjeta quiere ver qué hay disponible, no arrancar por
+    // los sectores sin cupo. Dentro de cada grupo, del más barato al más caro.
     ev.ubicaciones.sort((a, b) => {
+      const ca = comprable(a) ? 0 : 1;
+      const cb = comprable(b) ? 0 : 1;
+      if (ca !== cb) return ca - cb;
       const pa = a.precio_final == null ? Infinity : Number(a.precio_final);
       const pb = b.precio_final == null ? Infinity : Number(b.precio_final);
       return pa - pb;
     });
   }
   return evs;
+}
+
+
+// La zona del mapa puede llegar como color (#E4572E, "red") o como nombre
+// ("Zona Roja"). Si es un color se puede pintar una muestra; si no, se
+// muestra el texto tal cual. Se resuelve acá y no en el componente para no
+// tener que adivinar el formato en cada lugar que la use.
+// Los que concuerdan en género van en las dos formas: la zona es femenina
+// ("Zona Roja") y el sector masculino ("Sector Rojo"), y con una sola de las
+// dos la mitad de los casos quedaba sin pintar.
+const COLORES_CSS = [
+  "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown",
+  "black", "white", "grey", "gray", "cyan", "magenta", "violet", "gold",
+  "rojo", "roja", "azul", "verde", "amarillo", "amarilla", "naranja",
+  "violeta", "blanco", "blanca", "negro", "negra", "gris", "dorado", "dorada",
+  "rosa", "marron", "celeste",
+];
+
+// El worker puede mandar el color en castellano; CSS solo entiende inglés.
+const ES_A_CSS: Record<string, string> = {
+  rojo: "red", roja: "red", azul: "blue", verde: "green",
+  amarillo: "yellow", amarilla: "yellow", naranja: "orange", violeta: "violet",
+  blanco: "white", blanca: "white", negro: "black", negra: "black",
+  gris: "gray", dorado: "gold", dorada: "gold", rosa: "pink",
+  marron: "brown", celeste: "skyblue",
+};
+const colorCss = (c: string) => ES_A_CSS[c] ?? c;
+
+export type ZonaMapa = {
+  // Etiqueta legible de la zona ("Zona Azul"). null cuando el portal mandó
+  // SOLO un color en hexadecimal: "#E4572E" no le dice nada a nadie, con ver
+  // el círculo del color y buscarlo en el mapa alcanza.
+  texto: string | null;
+  color: string | null;
+  // El valor tal como vino, para el title/aria-label: aunque no se muestre,
+  // no se pierde.
+  crudo: string;
+};
+
+export function zonaDelMapa(valor: string | null | undefined): ZonaMapa | null {
+  const v = String(valor ?? "").trim();
+  if (!v) return null;
+  // Hexa puro: solo color, sin texto.
+  if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v)) {
+    return { texto: null, color: v, crudo: v.toUpperCase() };
+  }
+  const lower = v.toLowerCase();
+  // Un color con nombre ("verde", "red") SÍ se muestra: es legible.
+  if (COLORES_CSS.includes(lower)) return { texto: v, color: colorCss(lower), crudo: v };
+  // Nombre con el color adentro ("Zona Roja", "Sector Azul"): se pinta igual.
+  const encontrado = COLORES_CSS.find((c) => lower.includes(c));
+  return { texto: v, color: encontrado ? colorCss(encontrado) : null, crudo: v };
 }

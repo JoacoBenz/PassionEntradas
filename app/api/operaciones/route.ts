@@ -40,6 +40,12 @@ export async function POST(request: Request) {
     ? String(body.vendedor_alias).trim()
     : null;
   const monto = Math.trunc(Number(body.monto));
+  // Moneda de la operación: se guarda, no se convierte. Cualquier valor que
+  // no sea una de las tres cae a USD, que es el default histórico.
+  const monedaRaw = String(body.moneda ?? "USD").toUpperCase();
+  const moneda = (["ARS", "USD", "EUR"] as const).includes(monedaRaw as any)
+    ? (monedaRaw as "ARS" | "USD" | "EUR")
+    : "USD";
   const fee = Math.trunc(Number(body.fee));
   const ticket_id = body.ticket_id ? String(body.ticket_id) : null;
   const fecha_evento = body.fecha_evento ? String(body.fecha_evento) : null;
@@ -83,7 +89,7 @@ export async function POST(request: Request) {
   }
 
   if (isMock()) {
-    const op = mockCreateOp({ evento, comprador_alias, vendedor_alias, monto, fee, ticket_id, fecha_evento, notas, cuenta_debitar });
+    const op = mockCreateOp({ evento, comprador_alias, vendedor_alias, monto, moneda, fee, ticket_id, fecha_evento, notas, cuenta_debitar });
     return NextResponse.json({ id: op.id, code: op.code }, { status: 201 });
   }
 
@@ -100,6 +106,7 @@ export async function POST(request: Request) {
         comprador_alias,
         vendedor_alias,
         monto,
+        moneda,
         fee,
         ticket_id,
         fecha_evento,
