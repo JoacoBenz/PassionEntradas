@@ -184,3 +184,57 @@ export function separarPorTipo(items: ItemPedido[]): {
     consultas: items.filter((i) => i.tipo === "consulta"),
   };
 }
+
+// --- aviso a los vendedores --------------------------------------------------
+// Qué clase de envío entró. Un mismo carrito puede traer entradas con precio
+// cerrado Y entradas a cotizar, y al vendedor le cambia lo que tiene que hacer:
+// un pedido se acciona, una consulta hay que chequearla y ponerle precio.
+export type TipoEnvio = "pedido" | "consulta" | "mixto";
+
+export function tipoDelEnvio(pedidos: ItemPedido[], consultas: ItemPedido[]): TipoEnvio {
+  if (pedidos.length > 0 && consultas.length > 0) return "mixto";
+  return consultas.length > 0 ? "consulta" : "pedido";
+}
+
+// Con el artículo adentro: la plantilla dice "Entró {{1}} en la tienda" y
+// "consulta" es femenino. Con la etiqueta pelada salía "Nuevo consulta".
+export const TIPO_ENVIO_LABEL: Record<TipoEnvio, string> = {
+  pedido: "un pedido",
+  consulta: "una consulta",
+  mixto: "un pedido con consultas",
+};
+
+// Una línea por entrada, todo en UN renglón: es lo que se manda como parámetro
+// de la plantilla de WhatsApp, y ahí no entran saltos de línea. Se muestran
+// hasta `max` y el resto se resume, para no pasarse del largo que acepta Meta.
+//
+// Cuando el envío trae de los dos tipos, cada grupo va rotulado: si no, el
+// vendedor no sabe cuál de las entradas tiene que cotizar.
+export function detalleDeLineas(
+  pedidos: ItemPedido[],
+  consultas: ItemPedido[],
+  max = 5
+): string {
+  // El nombre de un evento del portal puede traer saltos de línea: se aplanan
+  // acá y no sólo al mandar, porque esta función promete UNA línea.
+  const plano = (v: string) => v.replace(/\s+/g, " ").trim();
+  const uno = (l: ItemPedido) =>
+    `${plano(l.evento)}${l.sector ? ` (${plano(l.sector)})` : ""}${
+      l.cantidad > 1 ? ` x${l.cantidad}` : ""
+    }`;
+
+  const grupo = (lineas: ItemPedido[], rotulo: string | null): string => {
+    if (lineas.length === 0) return "";
+    const visibles = lineas.slice(0, max).map(uno).join(" + ");
+    const resto = lineas.length > max ? ` y ${lineas.length - max} mas` : "";
+    return `${rotulo ? `${rotulo}: ` : ""}${visibles}${resto}`;
+  };
+
+  const mixto = pedidos.length > 0 && consultas.length > 0;
+  return [
+    grupo(pedidos, mixto ? "A reservar" : null),
+    grupo(consultas, mixto ? "A cotizar" : null),
+  ]
+    .filter(Boolean)
+    .join(" | ");
+}

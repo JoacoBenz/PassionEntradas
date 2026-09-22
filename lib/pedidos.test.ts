@@ -9,6 +9,9 @@ import {
   RL_MIN_INTERVALO_MS,
   type ItemPedido,
   type TicketRef,
+  tipoDelEnvio,
+  detalleDeLineas,
+  TIPO_ENVIO_LABEL,
 } from "./pedidos";
 
 // El cliente manda el body del pedido, así que TODO lo que llega es hostil
@@ -426,5 +429,89 @@ describe("comisión de la línea (precio − costo)", () => {
     );
     expect(r.monto).toBe(0);
     expect(r.comision).toBe(0);
+  });
+});
+
+// El vendedor recibe el aviso por WhatsApp y tiene que saber, sin abrir nada,
+// qué le entró: si es un pedido con precio cerrado o una consulta a cotizar, y
+// cuántas entradas son.
+describe("aviso a los vendedores", () => {
+  const linea = (o: Partial<ItemPedido>): ItemPedido => ({
+    tipo: "pedido",
+    evento: "River vs Boca",
+    sector: "Platea Alta",
+    ticket_id: null,
+    monto: 100,
+    cantidad: 1,
+    fecha_evento: null,
+    ...o,
+  });
+
+  describe("tipoDelEnvio", () => {
+    it("solo entradas con precio: pedido", () => {
+      expect(tipoDelEnvio([linea({})], [])).toBe("pedido");
+    });
+    it("solo entradas a cotizar: consulta", () => {
+      expect(tipoDelEnvio([], [linea({ tipo: "consulta" })])).toBe("consulta");
+    });
+    it("las dos cosas en el mismo carrito: mixto", () => {
+      expect(tipoDelEnvio([linea({})], [linea({ tipo: "consulta" })])).toBe("mixto");
+    });
+    it("un carrito vacío no rompe", () => {
+      expect(tipoDelEnvio([], [])).toBe("pedido");
+    });
+
+    it("la etiqueta trae el artículo y concuerda en género", () => {
+      // La plantilla dice "Entró {{1}} en la tienda": sin el artículo salía
+      // "Nuevo consulta".
+      expect(TIPO_ENVIO_LABEL.pedido).toBe("un pedido");
+      expect(TIPO_ENVIO_LABEL.consulta).toBe("una consulta");
+      expect(TIPO_ENVIO_LABEL.mixto).toBe("un pedido con consultas");
+    });
+  });
+
+  describe("detalleDeLineas", () => {
+    it("una sola entrada: evento y sector", () => {
+      expect(detalleDeLineas([linea({})], [])).toBe("River vs Boca (Platea Alta)");
+    });
+
+    it("la cantidad se ve cuando es más de una", () => {
+      expect(detalleDeLineas([linea({ cantidad: 3 })], [])).toContain("x3");
+      expect(detalleDeLineas([linea({ cantidad: 1 })], [])).not.toContain("x1");
+    });
+
+    it("varias entradas se listan todas", () => {
+      const d = detalleDeLineas([linea({}), linea({ evento: "Final", sector: "Cat 1" })], []);
+      expect(d).toBe("River vs Boca (Platea Alta) + Final (Cat 1)");
+    });
+
+    it("con más de `max` resume el resto en vez de estirarse", () => {
+      const muchas = Array.from({ length: 8 }, (_, i) => linea({ evento: `E${i}` }));
+      const d = detalleDeLineas(muchas, [], 3);
+      expect(d).toContain("y 5 mas");
+      expect(d.split("+").length).toBe(3);
+    });
+
+    it("carrito mixto: cada grupo va rotulado", () => {
+      // Sin el rótulo el vendedor no sabe cuál tiene que cotizar.
+      const d = detalleDeLineas(
+        [linea({ evento: "River vs Boca" })],
+        [linea({ tipo: "consulta", evento: "Final", sector: "Cat 1" })]
+      );
+      expect(d).toBe("A reservar: River vs Boca (Platea Alta) | A cotizar: Final (Cat 1)");
+    });
+
+    it("sin mezcla no se rotula: no aporta nada", () => {
+      expect(detalleDeLineas([linea({})], [])).not.toContain("A reservar");
+    });
+
+    it("nunca tiene saltos de línea (es un parámetro de plantilla)", () => {
+      const d = detalleDeLineas([linea({ evento: "A\nB" })], [linea({ tipo: "consulta" })]);
+      expect(d).not.toMatch(/\n/);
+    });
+
+    it("sin líneas devuelve vacío y no un separador suelto", () => {
+      expect(detalleDeLineas([], [])).toBe("");
+    });
   });
 });

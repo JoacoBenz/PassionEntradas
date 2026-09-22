@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { validarSolicitud } from "@/lib/acceso";
 import { isMock, mockCrearSolicitud } from "@/lib/mock-db";
+import { notificarSolicitudAcceso } from "@/lib/whatsapp";
+import { notificarVendedoresEmail } from "@/lib/email";
 
 // POST /api/acceso/solicitar — PÚBLICO. Un visitante de la landing pide
 // acceso a la tienda. Se inserta con service role (la tabla es RLS deny-all).
@@ -28,9 +30,28 @@ export async function POST(request: Request) {
   }
   const { nombre, email, telefono, legajo, mensaje, acepto } = parsed.value;
 
+  // Aviso al staff. Best-effort y DESPUÉS de guardar: una solicitud no se
+  // pierde porque WhatsApp o el mail estén caídos. Sin esto la solicitud
+  // quedaba esperando a que alguien se acordara de mirar el panel.
+  const avisar = async () => {
+    const texto =
+      `Nueva solicitud de acceso\n` +
+      `Nombre: ${nombre}\n` +
+      `Email: ${email}\n` +
+      `Teléfono: ${telefono}\n` +
+      `Legajo/CUIT: ${legajo}` +
+      (mensaje ? `\nMensaje: ${mensaje}` : "") +
+      `\n\nAprobala desde el panel.`;
+    await Promise.all([
+      notificarSolicitudAcceso({ nombre, email, telefono, legajo, texto }),
+      notificarVendedoresEmail(`Nueva solicitud de acceso — ${nombre}`, texto),
+    ]).catch(() => undefined);
+  };
+
   if (isMock()) {
     const r = mockCrearSolicitud(parsed.value);
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+    await avisar();
     return NextResponse.json({ ok: true }, { status: 201 });
   }
 
@@ -43,6 +64,8 @@ export async function POST(request: Request) {
     // 23505 = unique_violation: ya hay una solicitud PENDIENTE con ese email.
     // No es un error para el usuario: ya está en la cola.
     if ((error as any).code === "23505") {
+      // Ya había una solicitud pendiente de ese email: no se vuelve a avisar,
+      // el staff ya la tiene en el panel.
       return NextResponse.json({ ok: true });
     }
     return NextResponse.json(
@@ -51,5 +74,6 @@ export async function POST(request: Request) {
     );
   }
 
+  await avisar();
   return NextResponse.json({ ok: true }, { status: 201 });
 }

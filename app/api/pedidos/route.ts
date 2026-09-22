@@ -18,6 +18,9 @@ import {
   reconciliarItem,
   resumenOperacion,
   separarPorTipo,
+  detalleDeLineas,
+  tipoDelEnvio,
+  TIPO_ENVIO_LABEL,
   RL_MAX_VENTANA,
   RL_VENTANA_MS,
   type ItemPedido,
@@ -393,19 +396,18 @@ export async function POST(request: Request) {
   // Resumen en UNA línea para la plantilla de WhatsApp: sus parámetros no
   // aceptan saltos de línea. El texto largo va igual por email y como fallback
   // cuando todavía no hay plantilla configurada.
-  const lineas = [...lineasPedido, ...lineasConsulta];
-  const detalleCorto =
-    lineas.slice(0, 3).map(detalle).join(" · ") +
-    (lineas.length > 3 ? ` · +${lineas.length - 3} más` : "");
-  const totalCorto = operacion && resumen
-    ? formatUSD(resumen.monto) + (consultasCreadas.length > 0 ? " + a cotizar" : "")
-    : "a cotizar";
+  const tipoEnvio = tipoDelEnvio(lineasPedido, lineasConsulta);
+  const totalCorto =
+    operacion && resumen
+      ? formatUSD(resumen.monto) + (consultasCreadas.length > 0 ? " + a cotizar" : "")
+      : "a cotizar";
 
   const [wa, mail] = await Promise.all([
     notificarVendedores({
+      tipo: TIPO_ENVIO_LABEL[tipoEnvio],
       cliente: quien,
       entradas: totalEntradas,
-      detalle: detalleCorto,
+      detalle: detalleDeLineas(lineasPedido, lineasConsulta),
       total: totalCorto,
       texto: mensaje,
     }),

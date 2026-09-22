@@ -22,16 +22,32 @@ export function plantillaConfigurada(): boolean {
   return Boolean(process.env.WHATSAPP_TEMPLATE);
 }
 
+export function plantillaAccesoConfigurada(): boolean {
+  return Boolean(process.env.WHATSAPP_TEMPLATE_ACCESO);
+}
+
 // Datos del aviso. Se pasan sueltos y no como un texto armado porque los
 // parámetros de una plantilla NO pueden tener saltos de línea ni tabs: Meta
 // rechaza el envío entero (error 132000 / "invalid parameter"). El texto largo
 // se sigue usando para el email y para el fallback sin plantilla.
 export type AvisoPedido = {
+  /** "pedido", "consulta" o "pedido con consultas": lo primero que necesita
+   *  saber el vendedor, porque le cambia qué tiene que hacer. */
+  tipo: string;
   cliente: string;
   entradas: number;
   detalle: string;
   total: string;
   /** Mensaje completo, multilínea: email y fallback de texto libre. */
+  texto: string;
+};
+
+/** Datos de una solicitud de acceso nueva desde la landing. */
+export type AvisoAcceso = {
+  nombre: string;
+  email: string;
+  telefono: string;
+  legajo: string;
   texto: string;
 };
 
@@ -47,13 +63,24 @@ export function limpiarParametro(valor: string, max = 300): string {
   return plano.slice(0, max - 1).trimEnd() + "…";
 }
 
-/** Los cuatro parámetros de la plantilla `nuevo_pedido`, ya saneados. */
+/** Los cinco parámetros de la plantilla `nuevo_pedido`, ya saneados. */
 export function parametrosPlantilla(aviso: AvisoPedido): string[] {
   return [
+    limpiarParametro(aviso.tipo, 40),
     limpiarParametro(aviso.cliente, 120),
     limpiarParametro(String(aviso.entradas), 10),
     limpiarParametro(aviso.detalle, 400),
     limpiarParametro(aviso.total, 60),
+  ];
+}
+
+/** Los cuatro parámetros de la plantilla `nuevo_acceso`, ya saneados. */
+export function parametrosAcceso(aviso: AvisoAcceso): string[] {
+  return [
+    limpiarParametro(aviso.nombre, 120),
+    limpiarParametro(aviso.email, 160),
+    limpiarParametro(aviso.telefono, 40),
+    limpiarParametro(aviso.legajo, 40),
   ];
 }
 
@@ -79,10 +106,16 @@ export type WhatsappResult =
   | { ok: true; enviados: number }
   | { ok: false; error: string; noConfigurado?: boolean };
 
-// Envía un mensaje de texto a cada vendedor. No lanza: cualquier fallo de un
+// Manda el mismo aviso a todos los vendedores. No lanza: cualquier fallo de un
 // destinatario se acumula y se reporta, pero nunca corta el flujo de negocio
-// (el pedido ya quedó registrado en la app antes de llamar acá).
-export async function notificarVendedores(aviso: AvisoPedido): Promise<WhatsappResult> {
+// (el pedido, o la solicitud, ya quedaron registrados antes de llamar acá).
+//
+// Si hay plantilla configurada se manda como plantilla; si no, texto libre.
+async function enviar(
+  plantilla: string | undefined,
+  parametros: string[],
+  texto: string
+): Promise<WhatsappResult> {
   if (!whatsappConfigurado()) {
     return {
       ok: false,
@@ -100,12 +133,12 @@ export async function notificarVendedores(aviso: AvisoPedido): Promise<WhatsappR
   let enviados = 0;
 
   const cuerpo = (to: string) => {
-    if (!plantillaConfigurada()) {
+    if (!plantilla) {
       return {
         messaging_product: "whatsapp",
         to,
         type: "text",
-        text: { preview_url: false, body: aviso.texto },
+        text: { preview_url: false, body: texto },
       };
     }
     return {
@@ -113,12 +146,12 @@ export async function notificarVendedores(aviso: AvisoPedido): Promise<WhatsappR
       to,
       type: "template",
       template: {
-        name: process.env.WHATSAPP_TEMPLATE,
+        name: plantilla,
         language: { code: process.env.WHATSAPP_TEMPLATE_LANG || "es_AR" },
         components: [
           {
             type: "body",
-            parameters: parametrosPlantilla(aviso).map((text) => ({ type: "text", text })),
+            parameters: parametros.map((text) => ({ type: "text", text })),
           },
         ],
       },
@@ -150,4 +183,14 @@ export async function notificarVendedores(aviso: AvisoPedido): Promise<WhatsappR
     return { ok: false, error: `WhatsApp no aceptó ningún envío. ${errores.join(" · ")}`.trim() };
   }
   return { ok: true, enviados };
+}
+
+/** Entró un pedido o una consulta desde la tienda. */
+export function notificarVendedores(aviso: AvisoPedido): Promise<WhatsappResult> {
+  return enviar(process.env.WHATSAPP_TEMPLATE, parametrosPlantilla(aviso), aviso.texto);
+}
+
+/** Alguien pidió acceso desde la landing y hay que aprobarlo o rechazarlo. */
+export function notificarSolicitudAcceso(aviso: AvisoAcceso): Promise<WhatsappResult> {
+  return enviar(process.env.WHATSAPP_TEMPLATE_ACCESO, parametrosAcceso(aviso), aviso.texto);
 }
