@@ -164,6 +164,14 @@ const en = {
   },
 
   // mapa mundial de eventos (/mapa)
+  zonaMapa: "Map zone",
+  plano: {
+    abrir: "Open the seating map",
+    cerrar: "Close",
+    acercar: "Zoom in",
+    alejar: "Zoom out",
+    ayuda: "Tap the map to zoom, drag to move",
+  },
   mapa: {
     nav: "Events map",
     eyebrow: "Worldwide",
@@ -517,6 +525,14 @@ const es: typeof en = {
     errRed: "Error de red. Probá de nuevo.",
   },
 
+  zonaMapa: "Zona del mapa",
+  plano: {
+    abrir: "Ver el mapa de sectores",
+    cerrar: "Cerrar",
+    acercar: "Acercar",
+    alejar: "Alejar",
+    ayuda: "Tocá el mapa para acercar, arrastrá para moverte",
+  },
   mapa: {
     nav: "Mapa de eventos",
     eyebrow: "Por el mundo",

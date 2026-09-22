@@ -7,6 +7,7 @@
 // el toggle del header se recuerda en localStorage.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -73,6 +74,118 @@ function Wordmark() {
     <Link className="wm" href="/entradas">
       <span className="ticketmark">▚</span> TICKET<em>MIRROR</em>
     </Link>
+  );
+}
+
+// Visor del mapa de sectores a pantalla completa.
+//
+// En PC el mapa de la tarjeta ya se agranda al pasar el mouse (CSS); esto es
+// para cuando eso no alcanza y para el celular, donde no hay hover: se toca la
+// imagen y se abre acá, con zoom y arrastre.
+//
+// El zoom es por pasos y no por pinch propio: adentro del visor el scroll
+// nativo hace el desplazamiento, así que alcanza con agrandar la imagen y
+// dejar que el contenedor scrollee. Menos código y no pelea con el navegador.
+const ZOOMS = [1, 2, 3];
+
+function PlanoLightbox({
+  src,
+  alt,
+  t,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  t: (typeof TX)[Lang];
+  onClose: () => void;
+}) {
+  const [nivel, setNivel] = useState(0);
+  const zoom = ZOOMS[nivel];
+
+  // Escape cierra, y mientras está abierto el fondo no scrollea.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const previo = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previo;
+    };
+  }, [onClose]);
+
+  // Cerrar al tocar afuera, pero SOLO si el clic fue en el vacío y no en algo
+  // de adentro: el área de scroll ocupa toda la pantalla, así que sin este
+  // chequeo o no cerraba nunca (si frenaba el evento) o cerraba al tocar la
+  // imagen (si no lo frenaba).
+  const cerrarSiEsElFondo = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  // Va al <body> y no donde está la tarjeta: la tarjeta (o alguno de sus
+  // padres) tiene transform para las animaciones de apertura, y un transform
+  // convierte al elemento en el marco de referencia de los `position: fixed`
+  // de adentro. Sin el portal el visor quedaba encerrado en la tarjeta, del
+  // tamaño de la tarjeta, en vez de ocupar la pantalla.
+  return createPortal(
+    <div
+      className="plano-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label={alt}
+      onClick={cerrarSiEsElFondo}
+    >
+      <div className="plano-bar">
+        <span className="plano-ayuda">{t.plano.ayuda}</span>
+        <span className="plano-acciones">
+          <button
+            type="button"
+            className="plano-btn"
+            onClick={() => setNivel((n) => Math.max(0, n - 1))}
+            disabled={nivel === 0}
+            aria-label={t.plano.alejar}
+            title={t.plano.alejar}
+          >
+            −
+          </button>
+          <span className="plano-zoom">{zoom}×</span>
+          <button
+            type="button"
+            className="plano-btn"
+            onClick={() => setNivel((n) => Math.min(ZOOMS.length - 1, n + 1))}
+            disabled={nivel === ZOOMS.length - 1}
+            aria-label={t.plano.acercar}
+            title={t.plano.acercar}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            className="plano-btn plano-btn--cerrar"
+            onClick={onClose}
+            aria-label={t.plano.cerrar}
+            title={t.plano.cerrar}
+          >
+            ✕
+          </button>
+        </span>
+      </div>
+      {/* El scroll del contenedor es el que permite recorrer la imagen cuando
+          está acercada. Clic en la imagen = siguiente nivel (y vuelve a 1×
+          cuando llegó al último), que es el gesto que se espera en celular. */}
+      <div className="plano-scroll" onClick={cerrarSiEsElFondo}>
+        <img
+          src={src}
+          alt={alt}
+          className="plano-img"
+          style={{ width: `${zoom * 100}%` }}
+          onClick={() => setNivel((n) => (n + 1) % ZOOMS.length)}
+        />
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -249,7 +362,14 @@ function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang 
       <span className="seat-name">
         {sector}
         {zona && (
-          <span className="seat-zona" title={`Zona del mapa: ${zona.texto}`}>
+          // Sin nombre de zona (el portal mandó un hexa) el chip es solo el
+          // círculo, y más grande: lo que sirve es comparar el color con el
+          // mapa, no leer "#E4572E".
+          <span
+            className={`seat-zona ${zona.texto ? "" : "seat-zona--solo"}`}
+            title={`${t.zonaMapa}: ${zona.texto ?? zona.crudo}`}
+            aria-label={`${t.zonaMapa}: ${zona.texto ?? zona.crudo}`}
+          >
             {zona.color && (
               <i className="seat-zona-dot" style={{ background: zona.color }} aria-hidden />
             )}
@@ -332,6 +452,8 @@ function TicketCard({
   const t = TX[lang];
   const [open, setOpen] = useState(defaultOpen);
   const [shared, setShared] = useState(false);
+  // Mapa de sectores abierto a pantalla completa.
+  const [plano, setPlano] = useState(false);
   const rollRef = useRef<HTMLDivElement>(null);
   const { title, context } = parseTitle(ev.evento, ev.comp);
   const date = fmtDate(ev.fecha, lang);
@@ -404,18 +526,40 @@ function TicketCard({
         <div className="roll-wrap" ref={rollRef} style={{ maxHeight: 0 }}>
           <span className="scroll-rod" aria-hidden />
           {ev.imagen && (
-            <img
+            // Botón y no <img> suelta: se abre con el dedo en celular y con
+            // Enter en teclado. En PC además crece al pasar el mouse (CSS),
+            // que para la mayoría de los mapas ya alcanza.
+            <button
+              type="button"
+              className="mapa-wrap"
+              onClick={() => setPlano(true)}
+              aria-label={t.plano.abrir}
+              title={t.plano.abrir}
+            >
+              <img
+                src={ev.imagen}
+                alt={`${title} — seating map`}
+                loading="lazy"
+                className="mapa-sectores"
+                // La animación de despliegue fija maxHeight con el alto medido
+                // al abrir; si la imagen (lazy) carga después, el contenido
+                // crecería recortado. Al cargar, re-medimos.
+                onLoad={() => {
+                  const roll = rollRef.current;
+                  if (roll && open) roll.style.maxHeight = roll.scrollHeight + "px";
+                }}
+              />
+              <span className="mapa-lupa" aria-hidden>
+                ⤢
+              </span>
+            </button>
+          )}
+          {plano && ev.imagen && (
+            <PlanoLightbox
               src={ev.imagen}
               alt={`${title} — seating map`}
-              loading="lazy"
-              className="mapa-sectores"
-              // La animación de despliegue fija maxHeight con el alto medido
-              // al abrir; si la imagen (lazy) carga después, el contenido
-              // crecería recortado. Al cargar, re-medimos.
-              onLoad={() => {
-                const roll = rollRef.current;
-                if (roll && open) roll.style.maxHeight = roll.scrollHeight + "px";
-              }}
+              t={t}
+              onClose={() => setPlano(false)}
             />
           )}
           <ul className="ladder">

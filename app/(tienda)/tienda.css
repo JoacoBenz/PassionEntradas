@@ -251,14 +251,94 @@
 .ticket.open .ladder { transform: none; opacity: 1; }
 
 /* Mapa de sectores del evento (importado del portal), arriba del ladder */
+/* El mapa de sectores es un botón: se toca y se abre a pantalla completa.
+   En PC, además, crece al pasar el mouse — para la mayoría de los mapas con
+   eso alcanza y no hace falta abrir nada. */
+.mapa-wrap {
+  display: block; position: relative; width: 100%;
+  padding: 0; border: 0; background: none; cursor: zoom-in;
+  margin: 10px 0 12px;
+}
 .mapa-sectores {
   display: block; width: 100%; height: auto; max-height: 340px;
   object-fit: contain; background: #fff;
   border: 1px solid #d8d4c6; border-radius: 10px;
-  margin: 10px 0 12px; opacity: 0;
-  transition: opacity .35s ease .1s;
+  opacity: 0;
+  transition: opacity .35s ease .1s, max-height .3s ease;
 }
 .ticket.open .mapa-sectores { opacity: 1; }
+
+/* Solo donde hay mouse de verdad: en touch el hover se queda "pegado" y
+   dejaría el mapa agrandado después de tocarlo. */
+@media (hover: hover) and (pointer: fine) {
+  .mapa-wrap:hover .mapa-sectores,
+  .mapa-wrap:focus-visible .mapa-sectores {
+    max-height: 620px;
+    border-color: var(--ink, #171b2b);
+  }
+}
+
+/* Señal de que se puede agrandar. */
+.mapa-lupa {
+  position: absolute; right: 10px; bottom: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 8px;
+  background: rgba(23, 27, 43, .72); color: #fff;
+  font-size: 13px; line-height: 1;
+  opacity: 0; transition: opacity .2s ease;
+  pointer-events: none;
+}
+.ticket.open .mapa-lupa { opacity: .85; }
+.mapa-wrap:hover .mapa-lupa { opacity: 1; }
+
+/* --- visor del mapa a pantalla completa --- */
+.plano-modal {
+  position: fixed; inset: 0; z-index: 90;
+  display: flex; flex-direction: column;
+  background: rgba(17, 19, 28, .93);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.plano-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px calc(10px) 14px;
+  padding-top: calc(10px + env(safe-area-inset-top));
+  color: rgba(255, 255, 255, .78);
+  font-size: 12px; font-weight: 600;
+}
+.plano-ayuda { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plano-acciones { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.plano-zoom {
+  min-width: 34px; text-align: center; font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+.plano-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  background: rgba(255, 255, 255, .08); color: #fff;
+  font-size: 17px; line-height: 1; cursor: pointer;
+  transition: background .15s ease;
+}
+.plano-btn:hover:not(:disabled) { background: rgba(255, 255, 255, .18); }
+.plano-btn:disabled { opacity: .35; cursor: default; }
+.plano-btn--cerrar { margin-left: 4px; font-size: 15px; }
+
+.plano-scroll {
+  flex: 1; min-height: 0; overflow: auto;
+  padding: 0 12px 16px;
+  /* Deja que el navegador maneje el pinch además del zoom por pasos. */
+  touch-action: pan-x pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+}
+.plano-img {
+  display: block; margin: 0 auto; height: auto;
+  background: #fff; border-radius: 10px;
+  cursor: zoom-in;
+  /* Sin esto el zoom no hace NADA: el preflight de Tailwind pone
+     `img { max-width: 100% }` global y recorta el ancho que le pasamos por
+     style. El <img> se agranda y el contenedor scrollea. */
+  max-width: none;
+}
 
 /* cada ubicación cae en cascada al desenrollar (de arriba hacia abajo) */
 .seat { opacity: 0; transform: translateY(-8px);
@@ -1104,9 +1184,22 @@
   vertical-align: 1px;
 }
 .seat-zona-dot {
-  width: 8px;
-  height: 8px;
+  /* Más grande que antes (era 8px): el color es el dato, y de 8px dos tonos
+     parecidos no se distinguen. */
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   border: 1px solid rgba(0, 0, 0, .18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .35);
   flex: none;
+}
+/* Sin nombre de zona el chip es SOLO el círculo: se agranda todavía más y se
+   saca el padding de texto. */
+.seat-zona--solo {
+  padding: 3px;
+  gap: 0;
+}
+.seat-zona--solo .seat-zona-dot {
+  width: 16px;
+  height: 16px;
 }

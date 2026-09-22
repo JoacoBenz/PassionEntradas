@@ -296,15 +296,28 @@ const ES_A_CSS: Record<string, string> = {
 };
 const colorCss = (c: string) => ES_A_CSS[c] ?? c;
 
-export type ZonaMapa = { texto: string; color: string | null };
+export type ZonaMapa = {
+  // Etiqueta legible de la zona ("Zona Azul"). null cuando el portal mandó
+  // SOLO un color en hexadecimal: "#E4572E" no le dice nada a nadie, con ver
+  // el círculo del color y buscarlo en el mapa alcanza.
+  texto: string | null;
+  color: string | null;
+  // El valor tal como vino, para el title/aria-label: aunque no se muestre,
+  // no se pierde.
+  crudo: string;
+};
 
 export function zonaDelMapa(valor: string | null | undefined): ZonaMapa | null {
   const v = String(valor ?? "").trim();
   if (!v) return null;
-  if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v)) return { texto: v.toUpperCase(), color: v };
+  // Hexa puro: solo color, sin texto.
+  if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v)) {
+    return { texto: null, color: v, crudo: v.toUpperCase() };
+  }
   const lower = v.toLowerCase();
-  if (COLORES_CSS.includes(lower)) return { texto: v, color: colorCss(lower) };
+  // Un color con nombre ("verde", "red") SÍ se muestra: es legible.
+  if (COLORES_CSS.includes(lower)) return { texto: v, color: colorCss(lower), crudo: v };
   // Nombre con el color adentro ("Zona Roja", "Sector Azul"): se pinta igual.
   const encontrado = COLORES_CSS.find((c) => lower.includes(c));
-  return { texto: v, color: encontrado ? colorCss(encontrado) : null };
+  return { texto: v, color: encontrado ? colorCss(encontrado) : null, crudo: v };
 }
