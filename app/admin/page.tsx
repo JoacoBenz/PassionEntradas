@@ -6,8 +6,14 @@ import AdminDashboard from "@/components/admin/AdminDashboard";
 import AppHeader from "@/components/AppHeader";
 import AutoRefresh from "@/components/AutoRefresh";
 import BottomNav from "@/components/BottomNav";
-import type { Operacion, OperacionItem } from "@/lib/operaciones";
-import { isMock, MOCK_USER, mockListItems, mockListOps } from "@/lib/mock-db";
+import type { Consulta, Operacion, OperacionItem } from "@/lib/operaciones";
+import {
+  isMock,
+  MOCK_USER,
+  mockListConsultas,
+  mockListItems,
+  mockListOps,
+} from "@/lib/mock-db";
 
 export const dynamic = "force-dynamic";
 
@@ -27,11 +33,15 @@ export default async function AdminPage() {
   let email: string | null | undefined;
   let ops: Operacion[];
   let items: OperacionItem[] = [];
+  // Consultas sin cotizar: van en la MISMA lista que las operaciones. Las ya
+  // convertidas no se traen — se ven como la operación que originaron.
+  let consultas: Consulta[] = [];
 
   if (isMock()) {
     email = MOCK_USER.email;
     ops = mockListOps();
     items = ops.flatMap((o) => mockListItems(o.id));
+    consultas = mockListConsultas().filter((c) => c.estado === "pendiente");
   } else {
     const supabase = createServerSupabase();
     const {
@@ -74,6 +84,16 @@ export default async function AdminPage() {
         .in("operacion_id", ops.map((o) => o.id));
       items = (filas ?? []) as OperacionItem[];
     }
+
+    const { data: cons } = await createAdminSupabase()
+      .from("consultas")
+      .select(
+        "id, code, envio_id, cliente_id, cliente_email, comprador_alias, ticket_id, evento, sector, fecha_evento, cantidad, notas, estado, operacion_id, resuelta_por, resuelta_at, created_at, updated_at"
+      )
+      .eq("estado", "pendiente")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    consultas = (cons ?? []) as Consulta[];
   }
 
   return (
@@ -84,7 +104,12 @@ export default async function AdminPage() {
           server component cuando hubo cambios; el dashboard sincroniza su
           estado local cuando cambia `initial`. */}
       <AutoRefresh intervalMs={15000} versionUrl="/api/operaciones/version" />
-      <AdminDashboard initial={ops} items={items} baseUrl={getBaseUrl()} />
+      <AdminDashboard
+        initial={ops}
+        items={items}
+        consultas={consultas}
+        baseUrl={getBaseUrl()}
+      />
       <BottomNav />
     </main>
   );

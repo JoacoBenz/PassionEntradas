@@ -253,8 +253,13 @@ export async function POST(
     cantidad,
     precio_unitario: Math.round((op.monto / cantidad) * 100) / 100,
     subtotal: op.monto,
+    // `fee` se guarda como registro interno de la comisión (métricas,
+    // contabilidad), pero NO se le suma al total ni se le muestra al cliente:
+    // el precio de la entrada ya viene con el markup adentro. Antes se
+    // desglosaba como "servicio y custodia" y se cobraba encima, que es
+    // cobrarle la comisión dos veces bajo el modelo costo + comisión.
     fee: op.fee,
-    total: op.monto + op.fee,
+    total: op.monto,
     metodo_pago: metodo,
     pago_confirmado_at: op.pago_confirmado_at,
   };

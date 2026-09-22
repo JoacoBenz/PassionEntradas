@@ -18,6 +18,8 @@ export type TicketMatch = {
   fecha: string | null;
   categoria: string | null;
   precio_final: number | null;
+  // Lo que nos costó: precarga el "precio de costo" al cargar la operación.
+  precio_costo: number | null;
   stock: number | null;
   source: "portal" | "manual";
 };
@@ -42,13 +44,16 @@ export async function GET(request: Request) {
             (t.categoria ?? "").toLowerCase().includes(ql))
       )
       .slice(0, LIMITE)
-      .map(({ id, evento, competicion, fecha, categoria, precio_final, stock, source }) => ({
+      // Las del portal no tienen costo propio (se compran al publicarse), así
+      // que solo las manuales traen `precio_costo`.
+      .map(({ id, evento, competicion, fecha, categoria, precio_final, stock, source, ...resto }) => ({
         id,
         evento,
         competicion,
         fecha,
         categoria,
         precio_final,
+        precio_costo: (resto as { precio_costo?: number | null }).precio_costo ?? null,
         stock,
         source,
       }));
@@ -78,7 +83,7 @@ export async function GET(request: Request) {
 
   let query = createAdminSupabase()
     .from("tickets")
-    .select("id, evento, competicion, fecha, categoria, precio_final, stock, source")
+    .select("id, evento, competicion, fecha, categoria, precio_final, precio_costo, stock, source")
     .or(`fecha.is.null,fecha.gte.${hoy}`);
   for (const p of palabras) {
     query = query.or(`evento.ilike.%${p}%,categoria.ilike.%${p}%`);

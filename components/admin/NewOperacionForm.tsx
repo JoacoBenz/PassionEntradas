@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { Moneda, Operacion } from "@/lib/operaciones";
+import { formatMonto, type Moneda, type Operacion } from "@/lib/operaciones";
 import { parseTitle } from "@/lib/tickets";
+import { parsePrecio } from "@/lib/precios";
 
 type Props = {
   onCreated: (op: Operacion) => void;
@@ -19,6 +20,7 @@ type TicketMatch = {
   fecha: string | null;
   categoria: string | null;
   precio_final: number | null;
+  precio_costo: number | null;
   stock: number | null;
   source: "portal" | "manual";
 };
@@ -139,7 +141,7 @@ const empty = {
   evento: "",
   comprador_alias: "",
   vendedor_alias: "",
-  monto: "",
+  costo: "",
   moneda: "USD",
   fee: "",
   fecha_evento: "",
@@ -164,7 +166,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
 
   // Elegir una entrada del buscador: vincula el ticket y autocompleta fecha
   // (siempre) y monto (solo si está vacío y la entrada es propia: las de
-  // Passion están en EUR en la base, no sirven como monto USD directo).
+  // Passion están en EUR en la base, no sirven como costo USD directo).
   function elegirTicket(t: TicketMatch) {
     setTicketId(t.id);
     setVinculo({ categoria: t.categoria, source: t.source });
@@ -172,10 +174,12 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
       ...f,
       evento: t.evento,
       fecha_evento: t.fecha ? t.fecha.slice(0, 10) : f.fecha_evento,
-      monto:
-        !f.monto.trim() && t.source === "manual" && t.precio_final != null
-          ? String(Math.round(t.precio_final))
-          : f.monto,
+      // Precarga el COSTO de la entrada propia, no su precio de venta: la
+      // comisión se carga aparte y el total se recalcula solo.
+      costo:
+        !f.costo.trim() && t.source === "manual" && t.precio_costo != null
+          ? String(t.precio_costo)
+          : f.costo,
     }));
   }
 
@@ -212,9 +216,11 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
       onError("El vendedor es obligatorio");
       return;
     }
-    const montoNum = Number(form.monto);
-    if (!form.monto.trim() || !Number.isFinite(montoNum) || montoNum <= 0) {
-      onError("El monto debe ser mayor a 0");
+    // Costo + comisión: al cliente se le cobra la suma, y eso es lo único
+    // que va a ver en la factura.
+    const precio = parsePrecio(form.costo, form.fee);
+    if (!precio.ok) {
+      onError(precio.error);
       return;
     }
     enviando.current = true;
@@ -227,8 +233,9 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
           evento: form.evento,
           comprador_alias: form.comprador_alias || null,
           vendedor_alias: form.vendedor_alias || null,
-          monto: Number(form.monto || 0),
-          fee: Number(form.fee || 0),
+          monto: precio.total,
+          fee: precio.comision,
+          moneda: form.moneda,
           ticket_id: ticketId,
           fecha_evento: form.fecha_evento || null,
           notas: form.notas || null,
@@ -249,10 +256,10 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
         comprador_alias: form.comprador_alias.trim() || null,
         vendedor_alias: form.vendedor_alias.trim() || null,
         cuenta_debitar: null,
-        monto: Math.trunc(Number(form.monto || 0)),
+        monto: precio.total,
         moneda: form.moneda as Moneda,
         cantidad: 1,
-        fee: Math.trunc(Number(form.fee || 0)),
+        fee: precio.comision,
         status: "esperando_entrada",
         entrada_recibida_at: null,
         pago_confirmado_at: null,
@@ -379,7 +386,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col justify-between">
               <label htmlFor="monto" className={labelCls}>
-                Monto *
+                Precio de costo
               </label>
               <div className="flex gap-2">
                 {/* La moneda es de la operación: no se convierte, se muestra
@@ -402,15 +409,15 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
                 min={0}
                 inputMode="numeric"
                 className={`${inputCls} font-mono`}
-                value={form.monto}
-                onChange={(e) => set("monto", e.target.value)}
-                placeholder="850"
+                value={form.costo}
+                onChange={(e) => set("costo", e.target.value)}
+                placeholder="0"
               />
               </div>
             </div>
             <div className="flex flex-col justify-between">
               <label htmlFor="fee" className={labelCls}>
-                Comisión (USD)
+                Comisión
               </label>
               <input
                 id="fee"
@@ -420,8 +427,19 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
                 className={`${inputCls} font-mono`}
                 value={form.fee}
                 onChange={(e) => set("fee", e.target.value)}
-                placeholder="60"
+                placeholder="0"
               />
+            </div>
+            {/* Lo que se le cobra al cliente. Se muestra armado para no tener
+                que sumarlo de cabeza: es el total que va a la factura. */}
+            <div className="col-span-2 flex items-center justify-between rounded-xl bg-canvas px-3 py-2">
+              <span className={`${labelCls} mb-0`}>Total al cliente</span>
+              <span className="font-display text-sm font-bold tabular-nums">
+                {(() => {
+                  const r = parsePrecio(form.costo, form.fee);
+                  return r.ok ? formatMonto(r.total, form.moneda as Moneda) : "—";
+                })()}
+              </span>
             </div>
           </div>
 

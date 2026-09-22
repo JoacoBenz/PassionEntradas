@@ -4,6 +4,8 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import { ToastViewport, useToast } from "./Toast";
+import { parsePrecio } from "@/lib/precios";
+import { formatMonto, type Moneda } from "@/lib/operaciones";
 
 // Autocompletado propio para la competición: las sugerencias se ven ADENTRO
 // de la página (un desplegable bajo el input), no en la barra del teclado
@@ -94,16 +96,27 @@ const empty = {
   proveedor: "",
 };
 
+// El precio de la entrada se carga en dos partes: lo que nos costó y lo que
+// ganamos. El precio de venta es la suma y no se escribe a mano — antes había
+// un campo "precio de venta" aparte del costo, y cargar solo el costo (que es
+// lo natural) reventaba con "El precio debe ser mayor a 0".
 type SectorForm = {
   categoria: string;
-  precio: string;
   // Moneda de esta entrada: se muestra en la suya, sin convertir.
   moneda: string;
-  // Lo que nos costó. Junto al precio de venta da el margen real por entrada.
+  // Lo que nos costó conseguirla.
   costo: string;
+  // Lo que le sumamos encima.
+  comision: string;
   stock: string;
 };
-const sectorVacio = (): SectorForm => ({ categoria: "", precio: "", moneda: "USD", costo: "", stock: "1" });
+const sectorVacio = (): SectorForm => ({
+  categoria: "",
+  moneda: "USD",
+  costo: "",
+  comision: "",
+  stock: "1",
+});
 const MAX_SECTORES = 20;
 
 // Panel de catálogo: carga de entradas propias (source=manual) junto a las
@@ -160,12 +173,17 @@ export default function TicketsPanel({
       ciudad: t.ciudad ?? "",
       proveedor: t.proveedor ?? "",
     });
+    // En la base vive el precio de VENTA (precio_final) y el costo. La
+    // comisión es la diferencia: se deriva para editar, no se guarda aparte.
+    const costo = t.precio_costo != null ? Number(t.precio_costo) : 0;
+    const venta = t.precio_final != null ? Number(t.precio_final) : 0;
+    const comision = Math.round((venta - costo) * 100) / 100;
     setSectores([
       {
         categoria: t.categoria ?? "",
-        precio: t.precio_final != null ? String(t.precio_final) : "",
         moneda: t.moneda_final ?? "USD",
         costo: t.precio_costo != null ? String(t.precio_costo) : "",
+        comision: comision > 0 ? String(comision) : "",
         stock: String(t.stock ?? 0),
       },
     ]);
@@ -207,9 +225,9 @@ export default function TicketsPanel({
         push("error", `El sector es obligatorio${n}`);
         return;
       }
-      const precioNum = Number(s.precio);
-      if (!s.precio.trim() || !Number.isFinite(precioNum) || precioNum <= 0) {
-        push("error", `El precio debe ser mayor a 0${n}`);
+      const precio = parsePrecio(s.costo, s.comision, n);
+      if (!precio.ok) {
+        push("error", precio.error);
         return;
       }
       const stockNum = Math.trunc(Number(s.stock));
@@ -237,7 +255,14 @@ export default function TicketsPanel({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ticket: { ...form, categoria: s.categoria, precio: s.precio, stock: s.stock },
+            ticket: {
+              ...form,
+              categoria: s.categoria,
+              costo: s.costo,
+              comision: s.comision,
+              moneda: s.moneda,
+              stock: s.stock,
+            },
           }),
         });
         const data = await res.json();
@@ -520,7 +545,7 @@ export default function TicketsPanel({
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className={labelCls}>Precio de venta *</label>
+                      <label className={labelCls}>Precio de costo</label>
                       <div className="flex gap-2">
                         {/* La entrada se muestra en SU moneda: no se convierte. */}
                         <select
@@ -535,26 +560,39 @@ export default function TicketsPanel({
                         </select>
                         <input
                           type="number"
-                          min={1}
-                          step={1}
+                          min={0}
+                          step="0.01"
+                          inputMode="decimal"
                           className={`${inputCls} font-mono`}
-                          value={s.precio}
-                          onChange={(e) => setSector(i, "precio", e.target.value)}
-                          placeholder="120"
+                          value={s.costo}
+                          onChange={(e) => setSector(i, "costo", e.target.value)}
+                          placeholder="0"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className={labelCls}>Precio de costo</label>
+                      <label className={labelCls}>Comisión</label>
                       <input
                         type="number"
                         min={0}
-                        step={1}
+                        step="0.01"
+                        inputMode="decimal"
                         className={`${inputCls} font-mono`}
-                        value={s.costo}
-                        onChange={(e) => setSector(i, "costo", e.target.value)}
-                        placeholder="Opcional"
+                        value={s.comision}
+                        onChange={(e) => setSector(i, "comision", e.target.value)}
+                        placeholder="0"
                       />
+                    </div>
+                    {/* El precio que ve el cliente es la suma: se muestra acá
+                        para no tener que hacer la cuenta de cabeza. */}
+                    <div className="col-span-2 flex items-center justify-between rounded-xl bg-canvas px-3 py-2">
+                      <span className={`${labelCls} mb-0`}>Precio de venta</span>
+                      <span className="font-display text-sm font-bold tabular-nums">
+                        {(() => {
+                          const r = parsePrecio(s.costo, s.comision);
+                          return r.ok ? formatMonto(r.total, s.moneda as Moneda) : "—";
+                        })()}
+                      </span>
                     </div>
                     <div>
                       <label className={labelCls}>Stock *</label>

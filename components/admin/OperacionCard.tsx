@@ -2,11 +2,9 @@
 
 import { useState } from "react";
 import {
-  ESTADO_LABEL,
   HITO_COLOR,
   diasHastaEvento,
   estadoDe,
-  estadoDotColor,
   formatMonto,
   formatFecha,
   quienDe,
@@ -20,7 +18,6 @@ import {
   type Operacion,
   type StatusAction,
 } from "@/lib/operaciones";
-import StatusChip from "@/components/StatusChip";
 import FacturaModal from "./FacturaModal";
 
 type Props = {
@@ -88,12 +85,12 @@ export default function OperacionCard({
 }: Props) {
   const link = `${baseUrl}/op/${op.id}`;
   const estado = estadoDe(op);
-  // Punto de la fila: color por GRUPO (abierta / en curso / cerrada /
-  // cancelada), para leer el estado de un vistazo.
-  const color = estadoDotColor(estado);
   const cancelada = estado === "cancelada";
   const cerrada = estado === "cerrada";
   const semaforo = semaforoDe(op);
+  // Quién pidió la entrada. El alias es lo que se muestra; el email queda
+  // para el detalle, cuando aporta algo distinto.
+  const cliente = op.comprador_alias ?? op.cliente_email ?? null;
   const entrada = !!op.entrada_recibida_at;
   const pago = !!op.pago_confirmado_at;
   const proveedor = !!op.pago_proveedor_at;
@@ -126,17 +123,28 @@ export default function OperacionCard({
         aria-expanded={open}
         className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-canvas/40"
       >
+        {/* UN solo indicador de estado por fila: el semáforo. Antes había
+            además un punto por grupo de estado y las dos cosas juntas
+            confundían más de lo que explicaban. */}
         <span
-          className="h-2 w-2 shrink-0 rounded-full"
-          style={{ backgroundColor: color }}
-          aria-hidden
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ background: SEMAFORO_COLOR[semaforo] }}
+          title={SEMAFORO_LABEL[semaforo]}
+          aria-label={SEMAFORO_LABEL[semaforo]}
         />
         <span className="min-w-0 flex-1">
           <span className="block truncate font-display text-[15px] font-semibold leading-tight tracking-tight">
             {op.evento}
           </span>
+          {/* El cliente va en la fila cerrada: saber con quién se está
+              trabajando no tiene que costar un click. */}
+          {cliente && (
+            <span className="mt-0.5 block truncate text-[11px] font-medium text-[#4A4E5E]">
+              {cliente}
+            </span>
+          )}
           <span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-wider text-muted">
-            {op.code} · {ESTADO_LABEL[estado]}
+            {op.code} · {SEMAFORO_LABEL[semaforo]}
             {op.fecha_evento ? ` · ${fechaCorta(op.fecha_evento)}` : ""}
           </span>
         </span>
@@ -153,14 +161,6 @@ export default function OperacionCard({
             {TIPO_LABEL[op.tipo]}
           </span>
         )}
-        {/* Semáforo: verde entregada, rojo vencida o encima, amarillo con el
-            pago hecho, gris el resto. Se lee sin desplegar la tarjeta. */}
-        <span
-          className="h-2.5 w-2.5 shrink-0 rounded-full"
-          style={{ background: SEMAFORO_COLOR[semaforo] }}
-          title={SEMAFORO_LABEL[semaforo]}
-          aria-label={SEMAFORO_LABEL[semaforo]}
-        />
         <span className="flex flex-col items-end leading-none">
           <span className="whitespace-nowrap font-display text-sm font-bold tabular-nums">
             {formatMonto(op.monto, op.moneda)}
@@ -189,10 +189,14 @@ export default function OperacionCard({
       {open && (
         <div className="border-t border-dashed border-[#C5C9D6]">
           <div className="p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusChip estado={estado} />
-              {enCurso && dias != null && dias <= 14 && <UrgenciaChip dias={dias} />}
-            </div>
+            {/* Sin chip de estado: el semáforo de la fila ya lo dice y los
+                cuatro hitos de abajo muestran el detalle. Lo que sí aporta
+                acá es la urgencia por fecha. */}
+            {enCurso && dias != null && dias <= 14 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <UrgenciaChip dias={dias} />
+              </div>
+            )}
 
             {/* Entradas del pedido. Con una sola línea la cabecera ya lo dice
                 todo, así que el detalle aparece recién desde dos. */}
@@ -334,23 +338,12 @@ export default function OperacionCard({
 
             {/* Los cuatro hitos internos, SIN orden: en la práctica la
                 secuencia varía (a veces se le paga al proveedor antes de
-                tener la entrada). Ninguno bloquea a otro. */}
+                tener la entrada). Ninguno bloquea a otro.
+                La grilla los ordena por con QUIÉN es cada uno: columna
+                izquierda el proveedor (le pagamos / nos manda la entrada),
+                columna derecha el cliente (nos paga / le entregamos). */}
             {!readOnly && !cancelada && !cerrada && (
               <div className="mt-4 grid grid-cols-2 gap-2">
-                <HitoButton
-                  label="Pago recibido"
-                  done={pago}
-                  por={quienDe(op.pago_confirmado_por)}
-                  color={HITO_COLOR.pago}
-                  busy={busy}
-                  onClick={() =>
-                    onAction?.(
-                      op,
-                      { action: "pago", done: !pago },
-                      !pago ? "Pago marcado como recibido" : "Pago desmarcado"
-                    )
-                  }
-                />
                 <HitoButton
                   label="Pago a proveedor"
                   done={proveedor}
@@ -362,6 +355,20 @@ export default function OperacionCard({
                       op,
                       { action: "proveedor", done: !proveedor },
                       !proveedor ? "Pago al proveedor marcado" : "Pago al proveedor desmarcado"
+                    )
+                  }
+                />
+                <HitoButton
+                  label="Pago recibido"
+                  done={pago}
+                  por={quienDe(op.pago_confirmado_por)}
+                  color={HITO_COLOR.pago}
+                  busy={busy}
+                  onClick={() =>
+                    onAction?.(
+                      op,
+                      { action: "pago", done: !pago },
+                      !pago ? "Pago marcado como recibido" : "Pago desmarcado"
                     )
                   }
                 />

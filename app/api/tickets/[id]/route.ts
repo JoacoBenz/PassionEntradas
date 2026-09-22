@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import { isMock, mockDeleteManual, mockUpdateManual } from "@/lib/mock-db";
+import { parsePrecio } from "@/lib/precios";
 
 // PATCH  /api/tickets/[id] — edita una entrada MANUAL (precio, stock, etc.)
 //        sin borrar y recrear (el id, y por lo tanto el link, no cambian).
@@ -42,8 +43,10 @@ export async function PATCH(
   const ciudad = String(t.ciudad ?? "").trim();
   const categoria = String(t.categoria ?? "").trim();
   const fecha = String(t.fecha ?? "").trim();
-  const precio = Number(t.precio);
   const stock = Math.trunc(Number(t.stock));
+  // Moneda de la entrada: se guarda, no se convierte.
+  const monedaRaw = String(t.moneda ?? "USD").toUpperCase();
+  const moneda = ["ARS", "USD", "EUR"].includes(monedaRaw) ? monedaRaw : "USD";
 
   if (!evento) {
     return NextResponse.json({ error: "El evento es obligatorio" }, { status: 400 });
@@ -69,11 +72,24 @@ export async function PATCH(
   if (!categoria) {
     return NextResponse.json({ error: "El sector es obligatorio" }, { status: 400 });
   }
-  if (!Number.isFinite(precio) || precio <= 0) {
-    return NextResponse.json(
-      { error: "El precio debe ser mayor a 0" },
-      { status: 400 }
-    );
+  // Costo + comisión: se vende por la suma. Se acepta `precio` suelto por
+  // compatibilidad con el formato viejo.
+  let costo: number | null;
+  let precio: number;
+  if (t.costo != null || t.comision != null) {
+    const p = parsePrecio(t.costo, t.comision);
+    if (!p.ok) return NextResponse.json({ error: p.error }, { status: 400 });
+    costo = p.costo;
+    precio = p.total;
+  } else {
+    precio = Number(t.precio);
+    if (!Number.isFinite(precio) || precio <= 0) {
+      return NextResponse.json(
+        { error: "El precio debe ser mayor a 0" },
+        { status: 400 }
+      );
+    }
+    costo = null;
   }
   // En edición se permite stock 0 (agotada pero visible "sin cupo"): puede
   // pasar por el descuento automático al cerrar operaciones.
@@ -90,6 +106,11 @@ export async function PATCH(
     fecha,
     precio_origen: precio,
     precio_final: precio,
+    // Solo se pisa el costo si vino en el body: una edición vieja sin el campo
+    // no tiene que borrar lo que ya estaba cargado.
+    ...(costo != null ? { precio_costo: costo } : {}),
+    moneda_origen: moneda,
+    moneda_final: moneda,
     stock,
     disponible: stock > 0,
   };

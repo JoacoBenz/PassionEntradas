@@ -211,6 +211,12 @@ export const SEMAFORO_LABEL: Record<Semaforo, string> = {
   gris: "Sin novedad",
 };
 
+// Leyenda del panel: SOLO los tres estados que el semáforo comunica. El gris
+// no está en la lista a propósito — no es un estado, es la ausencia de los
+// otros tres ("todavía no pasó nada"), y ponerlo en la leyenda obligaba a
+// explicar una cuarta cosa que no se acciona.
+export const SEMAFORO_LEYENDA: Semaforo[] = ["verde", "amarillo", "rojo"];
+
 export const SEMAFORO_COLOR: Record<Semaforo, string> = {
   verde: "#0D9377",
   amarillo: "#B07A14",

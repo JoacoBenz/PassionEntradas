@@ -664,7 +664,7 @@ export function mockCrearConsulta(input: {
 // Convierte una consulta en operación (espejo de /api/consultas/[id]/convertir).
 export function mockConvertirConsulta(
   id: string,
-  opts: { monto: number; fee: number; quien: string }
+  opts: { monto: number; fee: number; moneda?: Moneda; quien: string }
 ): { ok: true; op: Operacion } | { ok: false; status: number; error: string } {
   const d = db();
   const c = d.consultas.find((x) => x.id === id);
@@ -681,6 +681,7 @@ export function mockConvertirConsulta(
     vendedor_alias: null,
     monto: opts.monto,
     fee: opts.fee,
+    moneda: opts.moneda ?? "USD",
     cantidad,
     ticket_id: c.ticket_id,
     fecha_evento: c.fecha_evento,

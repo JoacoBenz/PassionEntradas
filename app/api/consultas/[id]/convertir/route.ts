@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { esStaff, getRol, nombreDe } from "@/lib/auth";
-import { generateCode } from "@/lib/operaciones";
+import { generateCode, type Moneda } from "@/lib/operaciones";
+import { parsePrecio } from "@/lib/precios";
 import { isMock, MOCK_USER, mockConvertirConsulta } from "@/lib/mock-db";
 
 // POST /api/consultas/[id]/convertir — SOLO staff. Le pone precio a una
@@ -34,19 +35,40 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  // El precio es el motivo de existir de esta ruta: sin monto no hay
+  // El precio es el motivo de existir de esta ruta: sin precio no hay
   // operación que crear.
-  const monto = Math.round(Number(body?.monto));
-  if (!Number.isFinite(monto) || monto <= 0) {
-    return NextResponse.json(
-      { error: "Ingresá el monto acordado para cargar la operación" },
-      { status: 400 }
-    );
+  //
+  // Se cotiza con COSTO + COMISIÓN: al cliente se le cobra la suma (es el
+  // `monto` de la operación, lo único que ve en la factura) y la comisión
+  // queda aparte como `fee` para las métricas. Se acepta también el formato
+  // viejo { monto, fee } por si quedó una pestaña abierta con el panel anterior.
+  let monto: number;
+  let fee: number;
+  if (body?.costo != null || body?.comision != null) {
+    const precio = parsePrecio(body.costo, body.comision);
+    if (!precio.ok) {
+      return NextResponse.json({ error: precio.error }, { status: 400 });
+    }
+    monto = precio.total;
+    fee = precio.comision;
+  } else {
+    monto = Math.round(Number(body?.monto));
+    if (!Number.isFinite(monto) || monto <= 0) {
+      return NextResponse.json(
+        { error: "Ingresá el precio acordado para cargar la operación" },
+        { status: 400 }
+      );
+    }
+    fee = Math.max(0, Math.round(Number(body?.fee)) || 0);
   }
-  const fee = Math.max(0, Math.round(Number(body?.fee)) || 0);
+
+  const monedaRaw = String(body?.moneda ?? "USD").toUpperCase();
+  const moneda: Moneda = (["ARS", "USD", "EUR"] as const).includes(monedaRaw as any)
+    ? (monedaRaw as Moneda)
+    : "USD";
 
   if (isMock()) {
-    const r = mockConvertirConsulta(params.id, { monto, fee, quien });
+    const r = mockConvertirConsulta(params.id, { monto, fee, moneda, quien });
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
     return NextResponse.json({ ok: true, operacion: { id: r.op.id, code: r.op.code } });
   }
@@ -86,6 +108,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         cliente_id: c.cliente_id,
         cliente_email: c.cliente_email,
         envio_id: c.envio_id,
+        moneda,
       })
       .select("id, code")
       .single();

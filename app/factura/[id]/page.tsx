@@ -204,10 +204,16 @@ export default async function FacturaPage({ params }: { params: { id: string } }
                   </td>
                   <td>{usd(d.subtotal)}</td>
                 </tr>
-                <tr>
-                  <td className="t-label">{t.fee}</td>
-                  <td>{usd(d.fee)}</td>
-                </tr>
+                {/* Solo las facturas VIEJAS desglosan el fee: se emitieron con
+                    el total = subtotal + fee y hay que seguir mostrándolas tal
+                    como se entregaron. Las nuevas cobran el precio de la
+                    entrada, que ya incluye la comisión. */}
+                {d.total > d.subtotal && (
+                  <tr>
+                    <td className="t-label">{t.fee}</td>
+                    <td>{usd(d.fee)}</td>
+                  </tr>
+                )}
                 <tr className="total-row">
                   <td>{t.total}</td>
                   <td>{usd(d.total)}</td>

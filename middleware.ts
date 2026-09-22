@@ -1,6 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getRol } from "@/lib/auth";
+import { esStaff, getRol } from "@/lib/auth";
 
 // Refresca la sesión de Supabase Auth y RUTEA los módulos:
 // - /admin: solo administrador (los moderadores van a /moderador), salvo
@@ -19,6 +19,10 @@ export async function middleware(request: NextRequest) {
     path.startsWith("/entradas") ||
     path.startsWith("/cuenta") ||
     path.startsWith("/mis-pedidos");
+  // La landing es para captar clientes nuevos: al staff logueado no le sirve
+  // de nada y era el motivo por el que un admin terminaba en la tienda en vez
+  // del panel (entra por la raíz, no por /ingresar).
+  const esLanding = path === "/";
   const esLoginAdmin = path === "/admin/login";
   const esLoginCliente = path === "/ingresar";
   const esLogin = esLoginAdmin || esLoginCliente;
@@ -35,6 +39,10 @@ export async function middleware(request: NextRequest) {
     if (esLoginCliente) return redirectTo("/entradas");
     return NextResponse.next();
   }
+
+  // Destino de cada rol cuando no pidió una página en particular.
+  const inicioDe = (rol: string | null) =>
+    rol === "administrador" ? "/admin" : rol === "moderador" ? "/moderador" : "/entradas";
 
   let response = NextResponse.next({ request });
 
@@ -75,6 +83,7 @@ export async function middleware(request: NextRequest) {
   if (!user) {
     if (esTienda) return redirectTo("/ingresar");
     if (esPanel) return redirectTo("/ingresar");
+    // La landing sigue siendo pública: es por donde se pide el acceso.
     return response;
   }
 
@@ -90,13 +99,15 @@ export async function middleware(request: NextRequest) {
 
   // Ya logueado y entrando a CUALQUIER login -> a su lugar.
   if (esLogin) {
-    return redirectTo(
-      rol === "administrador"
-        ? "/admin"
-        : rol === "moderador"
-          ? "/moderador"
-          : "/entradas"
-    );
+    return redirectTo(inicioDe(rol));
+  }
+
+  // Staff en la landing -> derecho a su panel. El cliente sí la puede ver
+  // (es la cara pública del sitio); el que trabaja acá no tiene nada que
+  // hacer en la página de captación.
+  if (esLanding) {
+    if (esStaff(rol)) return redirectTo(inicioDe(rol));
+    return response;
   }
 
   // Cliente: solo la tienda. El panel lo manda a las entradas.
@@ -117,6 +128,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    // La raíz entra al matcher solo para mandar al staff a su panel; el
+    // anónimo y el cliente siguen viendo la landing estática.
+    "/",
     "/admin/:path*",
     "/moderador/:path*",
     "/entradas/:path*",

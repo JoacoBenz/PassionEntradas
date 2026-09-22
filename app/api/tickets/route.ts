@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import { isMock, mockCreateManual } from "@/lib/mock-db";
+import { parsePrecio } from "@/lib/precios";
 
 // POST /api/tickets — publica una entrada manual en el catálogo.
 // Un evento puede traer VARIOS sectores (cada uno con su precio y stock):
@@ -25,7 +26,16 @@ function parseSectores(t: any): SectorInput[] | { error: string } {
   // Formato nuevo (lista) o viejo (campos planos = un sector).
   const crudos: any[] = Array.isArray(t.sectores)
     ? t.sectores
-    : [{ categoria: t.categoria, precio: t.precio, stock: t.stock }];
+    : [
+        {
+          categoria: t.categoria,
+          precio: t.precio,
+          costo: t.costo,
+          comision: t.comision,
+          moneda: t.moneda,
+          stock: t.stock,
+        },
+      ];
 
   if (crudos.length === 0) {
     return { error: "Cargá al menos un sector" };
@@ -39,20 +49,30 @@ function parseSectores(t: any): SectorInput[] | { error: string } {
   for (let i = 0; i < crudos.length; i++) {
     const n = crudos.length > 1 ? ` (sector ${i + 1})` : "";
     const categoria = String(crudos[i]?.categoria ?? "").trim();
-    const precio = Number(crudos[i]?.precio);
     const stock = Math.trunc(Number(crudos[i]?.stock));
     // Moneda de la entrada. Cualquier cosa que no sea una de las tres cae a
     // USD, que es como se cargaban antes.
     const monedaRaw = String(crudos[i]?.moneda ?? "USD").toUpperCase();
     const moneda = ["ARS", "USD", "EUR"].includes(monedaRaw) ? monedaRaw : "USD";
-    // El costo es opcional: sirve para el margen, no para vender.
-    const costoRaw = Number(crudos[i]?.costo);
-    const costo = Number.isFinite(costoRaw) && costoRaw >= 0 ? costoRaw : null;
     if (!categoria) {
       return { error: `El sector es obligatorio${n}` };
     }
-    if (!Number.isFinite(precio) || precio <= 0) {
-      return { error: `El precio debe ser mayor a 0${n}` };
+    // El precio se carga como COSTO + COMISIÓN y se vende por la suma. Se
+    // acepta `precio` suelto por compatibilidad con el formato viejo (una
+    // pestaña abierta con el panel anterior, o el PATCH de edición).
+    let costo: number | null;
+    let precio: number;
+    if (crudos[i]?.costo != null || crudos[i]?.comision != null) {
+      const p = parsePrecio(crudos[i].costo, crudos[i].comision, n);
+      if (!p.ok) return { error: p.error };
+      costo = p.costo;
+      precio = p.total;
+    } else {
+      precio = Number(crudos[i]?.precio);
+      if (!Number.isFinite(precio) || precio <= 0) {
+        return { error: `El precio debe ser mayor a 0${n}` };
+      }
+      costo = null;
     }
     if (!Number.isFinite(stock) || stock < 1) {
       return { error: `El stock debe ser al menos 1${n}` };
