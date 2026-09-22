@@ -165,6 +165,13 @@ const en = {
 
   // mapa mundial de eventos (/mapa)
   zonaMapa: "Map zone",
+  mapaPag: {
+    verTodas: (n: number) => `Show all ${n} cities`,
+    verMenos: "Show fewer",
+    pagina: (a: number, b: number) => `Page ${a} of ${b}`,
+    anteriores: "← Previous",
+    siguientes: "Next →",
+  },
   plano: {
     abrir: "Open the seating map",
     cerrar: "Close",
@@ -526,6 +533,13 @@ const es: typeof en = {
   },
 
   zonaMapa: "Zona del mapa",
+  mapaPag: {
+    verTodas: (n: number) => `Ver las ${n} ciudades`,
+    verMenos: "Ver menos",
+    pagina: (a: number, b: number) => `Página ${a} de ${b}`,
+    anteriores: "← Anteriores",
+    siguientes: "Siguientes →",
+  },
   plano: {
     abrir: "Ver el mapa de sectores",
     cerrar: "Cerrar",

@@ -57,6 +57,9 @@ type Ciudad = {
   eventos: EventoAgrupado[];
 };
 
+// Cuántas ciudades se ven en la tira antes de "ver todas" (solo en celular).
+const CHIPS_VISIBLES_MOVIL = 6;
+
 const RATIO = MAPA_H / MAPA_W;
 const ZOOM_MAX = 8; // ancho mínimo del viewBox = MAPA_W / 8
 
@@ -77,6 +80,13 @@ export function MapaEventos({ rows }: { rows: Ticket[] }) {
   const t = TX[lang];
   const [sel, setSel] = useState<string | null>(null);
   const [hov, setHov] = useState<string | null>(null);
+  // Página de la lista de eventos de la ciudad elegida. Una ciudad puede
+  // tener decenas y volcarlas todas de una hace un muro, sobre todo en
+  // celular.
+  const [pagina, setPagina] = useState(1);
+  // En celular la tira de ciudades se muestra recortada (ver CSS): esto la
+  // abre entera. En desktop no se usa — ahí entran todas.
+  const [chipsAbiertos, setChipsAbiertos] = useState(false);
 
   // --- zoom / paneo -----------------------------------------------------------
   const [vb, setVb] = useState<ViewBox>({ x: 0, y: 0, w: MAPA_W });
@@ -171,6 +181,17 @@ export function MapaEventos({ rows }: { rows: Ticket[] }) {
       return da - db;
     });
   }, [seleccionada]);
+
+  // Cambiar de ciudad vuelve a la primera página: quedarse en la 3 de una
+  // ciudad que tiene 2 mostraría una lista vacía.
+  useEffect(() => {
+    setPagina(1);
+  }, [sel]);
+
+  const POR_PAGINA = 10;
+  const totalPaginas = Math.max(1, Math.ceil(eventosSel.length / POR_PAGINA));
+  const pag = Math.min(pagina, totalPaginas);
+  const eventosPagina = eventosSel.slice((pag - 1) * POR_PAGINA, pag * POR_PAGINA);
 
   function elegir(label: string) {
     if (arrastrado.current) return; // fue un paneo, no un click
@@ -281,13 +302,16 @@ export function MapaEventos({ rows }: { rows: Ticket[] }) {
         {/* Chips de ciudades: selección precisa (los puntos de Europa quedan
             pegados entre sí, y en mobile el dedo no da esa precisión). El
             hover del chip resalta su punto en el mapa, y viceversa. */}
-        <div className="catstrip mapa-chips">
-          {ciudades.map((c) => (
+        {/* En celular se muestran las primeras y el resto queda detrás del
+            botón de abajo: con catorce ciudades la tira ocupaba media
+            pantalla antes de llegar al contenido. En desktop entran todas. */}
+        <div className={`catstrip mapa-chips ${chipsAbiertos ? "mapa-chips--abierta" : ""}`}>
+          {ciudades.map((c, i) => (
             <button
               key={c.label}
               className={`catlink ${sel === c.label ? "catlink--all" : ""} ${
                 hov === c.label && sel !== c.label ? "mapa-chip-hov" : ""
-              }`}
+              } ${i >= CHIPS_VISIBLES_MOVIL ? "mapa-chip--extra" : ""}`}
               onClick={() => setSel(sel === c.label ? null : c.label)}
               onMouseEnter={() => setHov(c.label)}
               onMouseLeave={() => setHov(null)}
@@ -297,6 +321,16 @@ export function MapaEventos({ rows }: { rows: Ticket[] }) {
             </button>
           ))}
         </div>
+        {ciudades.length > CHIPS_VISIBLES_MOVIL && (
+          <button
+            type="button"
+            className="mapa-chips-mas"
+            onClick={() => setChipsAbiertos((v) => !v)}
+            aria-expanded={chipsAbiertos}
+          >
+            {chipsAbiertos ? t.mapaPag.verMenos : t.mapaPag.verTodas(ciudades.length)}
+          </button>
+        )}
 
         {seleccionada ? (
           <div className="mapa-panel">
@@ -305,7 +339,7 @@ export function MapaEventos({ rows }: { rows: Ticket[] }) {
               <span>{t.eventos(eventosSel.length)}: {eventosSel.length}</span>
             </div>
             <ul className="mapa-lista">
-              {eventosSel.map((ev) => {
+              {eventosPagina.map((ev) => {
                 const { title, context } = parseTitle(ev.evento, ev.comp);
                 const date = fmtDate(ev.fecha, lang);
                 return (
@@ -331,6 +365,26 @@ export function MapaEventos({ rows }: { rows: Ticket[] }) {
                 );
               })}
             </ul>
+
+            {totalPaginas > 1 && (
+              <nav className="mapa-pag" aria-label={t.mapa.h2}>
+                <button
+                  type="button"
+                  onClick={() => setPagina(Math.max(1, pag - 1))}
+                  disabled={pag <= 1}
+                >
+                  {t.mapaPag.anteriores}
+                </button>
+                <span>{t.mapaPag.pagina(pag, totalPaginas)}</span>
+                <button
+                  type="button"
+                  onClick={() => setPagina(Math.min(totalPaginas, pag + 1))}
+                  disabled={pag >= totalPaginas}
+                >
+                  {t.mapaPag.siguientes}
+                </button>
+              </nav>
+            )}
           </div>
         ) : (
           <p className="mapa-hint">{t.mapa.elegi}</p>

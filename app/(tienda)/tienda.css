@@ -955,6 +955,53 @@
   color: var(--mute); text-transform: uppercase; letter-spacing: .08em;
 }
 .mapa-chips { margin-top: 12px; }
+
+/* Tira de ciudades: en desktop entran todas. En celular se muestran las
+   primeras y el resto aparece con el botón — con catorce ciudades la tira se
+   comía media pantalla antes de llegar a los eventos. */
+.mapa-chips-mas {
+  display: none;
+  margin: 8px 0 0;
+  padding: 10px 14px;
+  min-height: 40px;
+  align-items: center;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  color: var(--cobalt);
+  cursor: pointer;
+}
+.mapa-chips-mas:hover { background: var(--field); }
+
+@media (max-width: 640px) {
+  .mapa-chips:not(.mapa-chips--abierta) .mapa-chip--extra { display: none; }
+  .mapa-chips-mas { display: inline-flex; }
+}
+
+/* Paginado de los eventos de la ciudad elegida. */
+.mapa-pag {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+.mapa-pag span {
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.mapa-pag button {
+  min-height: 40px; padding: 8px 14px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--field); font: inherit; font-size: 12px; font-weight: 700;
+  color: var(--ink); cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+.mapa-pag button:hover:not(:disabled) { border-color: var(--ink); }
+.mapa-pag button:disabled { opacity: .4; cursor: default; }
 .mapa-hint { margin: 18px 0 0; color: var(--mute); font-size: 14px; }
 
 /* Panel de la ciudad seleccionada. */
