@@ -180,6 +180,30 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  // Llegando desde "Crear operación" de una entrada del catálogo, se traen
+  // sus datos igual que si se hubiera elegido del buscador. Antes solo venía
+  // el nombre del evento y había que cargar fecha, costo y comisión a mano,
+  // teniendo el sistema los tres.
+  useEffect(() => {
+    const id = prefill?.ticketId;
+    const nombre = prefill?.evento;
+    if (!id || !nombre) return;
+    let vivo = true;
+    fetch(`/api/tickets/buscar?q=${encodeURIComponent(nombre.slice(0, 60))}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: TicketMatch[]) => {
+        if (!vivo) return;
+        const t = rows.find((x) => x.id === id);
+        if (t) elegirTicket(t);
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+    // Solo al montar: después manda lo que el usuario elija en el buscador.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Si la lista no carga (red, permisos), el form no se traba: se cae al
   // campo de texto y la operación se puede cargar igual.
   useEffect(() => {

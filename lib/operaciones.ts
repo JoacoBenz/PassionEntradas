@@ -118,19 +118,42 @@ type Hitos = Pick<
 
 // Los hitos ya NO tienen orden: pueden marcarse en cualquier secuencia. El
 // estado es una lectura de cuántos están hechos, no una posición en una fila.
+//
+// CERRADA son los CUATRO hechos, no solo la entrega. `cerrada_at` es el hito
+// "entrada entregada"; tomarlo como el fin de la operación hacía que marcar la
+// entrega congelara los otros tres, y quedaban para siempre sin tildar cosas
+// que sí pasaron (típico: se entregó antes de pagarle al proveedor).
 export function estadoDe(op: Hitos): Estado {
   if (op.status === "cancelada") return "cancelada";
-  if (op.cerrada_at) return "cerrada";
   const entrada = !!op.entrada_recibida_at;
   const pago = !!op.pago_confirmado_at;
   const proveedor = !!op.pago_proveedor_at;
-  // Con los tres internos hechos solo falta entregar.
-  if (entrada && pago && proveedor) return "lista_para_cerrar";
+  const entregada = !!op.cerrada_at;
+  const hechos = [entrada, pago, proveedor, entregada].filter(Boolean).length;
+
+  if (hechos === 4) return "cerrada";
+  // Falta uno solo: la operación está a un paso de terminar.
+  if (hechos === 3) return "lista_para_cerrar";
   // Con alguno hecho, gana el que más habla del avance hacia la entrega:
   // tener la entrada en mano pesa más que haber cobrado.
   if (entrada) return "entrada_recibida";
-  if (pago || proveedor) return "pago_confirmado";
+  if (pago || proveedor || entregada) return "pago_confirmado";
   return "esperando";
+}
+
+/** Los cuatro hitos están hechos: la operación terminó y se congela. */
+export function operacionCompleta(op: Hitos): boolean {
+  return (
+    !!op.entrada_recibida_at &&
+    !!op.pago_confirmado_at &&
+    !!op.pago_proveedor_at &&
+    !!op.cerrada_at
+  );
+}
+
+/** Lo que habilita la factura: el cliente pagó y ya tiene su entrada. */
+export function sePuedeFacturar(op: Hitos): boolean {
+  return op.status !== "cancelada" && !!op.pago_confirmado_at;
 }
 
 // --- vocabulario PÚBLICO --------------------------------------------------
@@ -229,7 +252,7 @@ export const ESTADO_LABEL: Record<Estado, string> = {
   esperando: "En espera",
   entrada_recibida: "Entrada recibida",
   pago_confirmado: "Pago confirmado",
-  lista_para_cerrar: "Lista para entregar",
+  lista_para_cerrar: "Falta un hito",
   cerrada: "Entregada",
   cancelada: "Cancelada",
 };
@@ -239,7 +262,7 @@ export const ESTADO_LABEL: Record<Estado, string> = {
 // al comprador; el cierre es la entrega hecha.
 export const ESTADO_LABEL_PUBLICO: Record<Estado, string> = {
   ...ESTADO_LABEL,
-  lista_para_cerrar: "En entrega",
+  lista_para_cerrar: "En entrega",  // el cliente no ve los hitos internos
   cerrada: "Entradas entregadas",
 };
 

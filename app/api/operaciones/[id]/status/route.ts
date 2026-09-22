@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
-import { estadoDe, type Operacion, type StatusAction } from "@/lib/operaciones";
+import {
+  estadoDe,
+  operacionCompleta,
+  type Operacion,
+  type StatusAction,
+} from "@/lib/operaciones";
 import { getRol, nombreDe } from "@/lib/auth";
 import { isMock, mockApplyAction } from "@/lib/mock-db";
 
@@ -109,9 +114,12 @@ export async function PATCH(
           { status: 409 }
         );
       }
-      if (current.cerrada_at) {
+      // Congela recién con los CUATRO hechos: haber entregado no es haber
+      // terminado, y mientras falte alguno hay que poder seguir marcando
+      // (se entrega antes de pagarle al proveedor todo el tiempo).
+      if (operacionCompleta(current as any)) {
         return NextResponse.json(
-          { error: "La operación está cerrada; reabrí el cierre para editar hitos" },
+          { error: "La operación está completa; desmarcá un hito para volver a editarla" },
           { status: 409 }
         );
       }
@@ -238,13 +246,18 @@ function pickResult(
     | "entrada_recibida_por"
     | "pago_confirmado_por"
     | "cerrada_por"
-  > & { updated_at?: string }
+  > & { updated_at?: string; pago_proveedor_por?: string | null }
 ) {
   return {
     id: op.id,
     status: op.status,
     entrada_recibida_at: op.entrada_recibida_at,
     pago_confirmado_at: op.pago_confirmado_at,
+    // El hito del proveedor faltaba acá: el panel marcaba el check, el
+    // servidor lo guardaba, y la respuesta volvía sin él — así que la tarjeta
+    // mostraba el hito sin tildar hasta refrescar la página.
+    pago_proveedor_at: op.pago_proveedor_at,
+    pago_proveedor_por: (op as { pago_proveedor_por?: string | null }).pago_proveedor_por ?? null,
     cerrada_at: op.cerrada_at,
     entrada_recibida_por: op.entrada_recibida_por,
     pago_confirmado_por: op.pago_confirmado_por,

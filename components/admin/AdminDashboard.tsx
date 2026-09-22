@@ -193,6 +193,11 @@ export default function AdminDashboard({
                 status: data.status,
                 entrada_recibida_at: data.entrada_recibida_at,
                 pago_confirmado_at: data.pago_confirmado_at,
+                // Faltaba el hito del proveedor: se guardaba en el servidor
+                // pero la tarjeta lo seguía mostrando sin tildar hasta que uno
+                // refrescaba la página.
+                pago_proveedor_at: data.pago_proveedor_at ?? null,
+                pago_proveedor_por: data.pago_proveedor_por ?? null,
                 cerrada_at: data.cerrada_at,
                 entrada_recibida_por: data.entrada_recibida_por ?? null,
                 pago_confirmado_por: data.pago_confirmado_por ?? null,

@@ -57,6 +57,17 @@ export type SyncRun = {
   created_at: string;
 };
 
+// Un sector se puede comprar cuando tiene cupo, está reservable y tiene
+// precio. El mismo criterio que usa la fila de la tienda para decidir si
+// muestra "Agregar" o "Consultar".
+export function comprable(u: {
+  stock: number | null;
+  estado: TicketEstado;
+  precio_final: number | null;
+}): boolean {
+  return (u.stock ?? 0) > 0 && u.estado === "book" && Number(u.precio_final ?? 0) > 0;
+}
+
 // Evento agrupado (varias ubicaciones/sectores del mismo partido).
 export type EventoAgrupado = {
   evento: string;
@@ -266,7 +277,13 @@ export function buildEvents(rows: Ticket[]): EventoAgrupado[] {
       : todos.length
         ? Math.min(...todos)
         : null;
+    // Primero lo que se puede comprar, después lo que hay que consultar: el
+    // que entra a la tarjeta quiere ver qué hay disponible, no arrancar por
+    // los sectores sin cupo. Dentro de cada grupo, del más barato al más caro.
     ev.ubicaciones.sort((a, b) => {
+      const ca = comprable(a) ? 0 : 1;
+      const cb = comprable(b) ? 0 : 1;
+      if (ca !== cb) return ca - cb;
       const pa = a.precio_final == null ? Infinity : Number(a.precio_final);
       const pb = b.precio_final == null ? Infinity : Number(b.precio_final);
       return pa - pb;

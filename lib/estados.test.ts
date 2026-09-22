@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { estadoDe, estadoPublicoDe, semaforoDe } from "./operaciones";
+import {
+  estadoDe,
+  estadoPublicoDe,
+  semaforoDe,
+  operacionCompleta,
+  sePuedeFacturar,
+} from "./operaciones";
 
 // Los hitos dejaron de tener orden: estos tests fijan que cualquier
 // combinación sea válida y que el ticket del cliente NO vea los internos.
@@ -41,8 +47,74 @@ describe("estadoDe — sin orden obligatorio", () => {
     expect(e).toBe("lista_para_cerrar");
   });
 
-  it("cerrada gana sobre los hitos", () => {
-    expect(estadoDe(hitos({ cerrada_at: AYER }))).toBe("cerrada");
+  it("entregar NO cierra la operación por sí solo", () => {
+    // `cerrada_at` es el hito "entrada entregada". Tomarlo como el fin de la
+    // operación congelaba los otros tres, y quedaban sin tildar cosas que sí
+    // pasaron (se entrega antes de pagarle al proveedor todo el tiempo).
+    expect(estadoDe(hitos({ cerrada_at: AYER }))).not.toBe("cerrada");
+  });
+
+  it("cerrada son los CUATRO hitos", () => {
+    expect(
+      estadoDe(
+        hitos({
+          entrada_recibida_at: AYER,
+          pago_confirmado_at: AYER,
+          pago_proveedor_at: AYER,
+          cerrada_at: AYER,
+        })
+      )
+    ).toBe("cerrada");
+  });
+
+  it("con tres hechos, falta uno", () => {
+    // Entregada y cobrada, pero todavía no se le pagó al proveedor.
+    expect(
+      estadoDe(hitos({ entrada_recibida_at: AYER, pago_confirmado_at: AYER, cerrada_at: AYER }))
+    ).toBe("lista_para_cerrar");
+    // O al revés: todo lo interno hecho y falta entregar.
+    expect(
+      estadoDe(
+        hitos({ entrada_recibida_at: AYER, pago_confirmado_at: AYER, pago_proveedor_at: AYER })
+      )
+    ).toBe("lista_para_cerrar");
+  });
+
+  it("cancelada gana sobre todo", () => {
+    expect(
+      estadoDe(
+        hitos({
+          status: "cancelada",
+          entrada_recibida_at: AYER,
+          pago_confirmado_at: AYER,
+          pago_proveedor_at: AYER,
+          cerrada_at: AYER,
+        })
+      )
+    ).toBe("cancelada");
+  });
+});
+
+describe("operacionCompleta / sePuedeFacturar", () => {
+  it("completa solo con los cuatro", () => {
+    const tres = hitos({ entrada_recibida_at: AYER, pago_confirmado_at: AYER, cerrada_at: AYER });
+    expect(operacionCompleta(tres)).toBe(false);
+    expect(operacionCompleta({ ...tres, pago_proveedor_at: AYER })).toBe(true);
+  });
+
+  it("se factura con el pago del cliente, sin esperar al proveedor", () => {
+    // Lo que habilita la factura es que el cliente haya pagado; los hitos con
+    // el proveedor son asunto nuestro y no pueden trabar el comprobante.
+    expect(sePuedeFacturar(hitos({ pago_confirmado_at: AYER }))).toBe(true);
+    expect(sePuedeFacturar(hitos({ pago_confirmado_at: AYER, cerrada_at: AYER }))).toBe(true);
+  });
+
+  it("sin pago del cliente no hay factura", () => {
+    expect(sePuedeFacturar(hitos({ cerrada_at: AYER }))).toBe(false);
+  });
+
+  it("una cancelada no se factura aunque tenga el pago", () => {
+    expect(sePuedeFacturar(hitos({ status: "cancelada", pago_confirmado_at: AYER }))).toBe(false);
   });
 
   it("cancelada gana sobre todo, incluso sobre cerrada", () => {

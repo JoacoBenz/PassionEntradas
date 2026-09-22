@@ -10,6 +10,7 @@ import {
   type OperacionItem,
   type OperacionPublica,
   type StatusAction,
+  operacionCompleta,
 } from "@/lib/operaciones";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import type { Factura, FacturaDatos } from "@/lib/factura";
@@ -325,8 +326,13 @@ export function mockApplyAction(
       if (cancelada) {
         return { ok: false, status: 409, error: "La operación está cancelada; reabrila para editar hitos" };
       }
-      if (op.cerrada_at) {
-        return { ok: false, status: 409, error: "La operación está cerrada; reabrí el cierre para editar hitos" };
+      // Espejo de la API: congela recién con los cuatro hechos.
+      if (operacionCompleta(op)) {
+        return {
+          ok: false,
+          status: 409,
+          error: "La operación está completa; desmarcá un hito para volver a editarla",
+        };
       }
       // Sin orden: espejo de la API y del trigger, que ya no lo imponen.
       const COLS = {
@@ -351,8 +357,8 @@ export function mockApplyAction(
       break;
     case "cancelar":
       if (cancelada) return { ok: false, status: 409, error: "La operación ya está cancelada" };
-      if (op.cerrada_at) {
-        return { ok: false, status: 409, error: "La operación está cerrada; reabrí el cierre antes de cancelar" };
+      if (operacionCompleta(op)) {
+        return { ok: false, status: 409, error: "La operación está completa; no se puede cancelar" };
       }
       op.status = "cancelada";
       break;

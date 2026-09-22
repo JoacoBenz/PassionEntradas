@@ -191,10 +191,10 @@ export function CartBar() {
               <div className="cart-ok">
                 <h2>{c.okTitulo}</h2>
                 <p>{c.okP}</p>
-                <Link className="btn-primary" href="/mis-pedidos" onClick={cerrar}>
-                  {c.okCta}
-                </Link>
-                <div style={{ marginTop: 12 }}>
+                <div className="cart-ok-acciones">
+                  <Link className="btn-primary" href="/mis-pedidos" onClick={cerrar}>
+                    {c.okCta}
+                  </Link>
                   <button type="button" className="cart-keep" onClick={cerrar}>
                     {c.cerrar}
                   </button>

@@ -13,6 +13,7 @@ import {
   SEMAFORO_COLOR,
   SEMAFORO_LABEL,
   semaforoDe,
+  sePuedeFacturar,
   totalItem,
   type OperacionItem,
   type Operacion,
@@ -95,6 +96,9 @@ export default function OperacionCard({
   const entrada = !!op.entrada_recibida_at;
   const pago = !!op.pago_confirmado_at;
   const proveedor = !!op.pago_proveedor_at;
+  // La entrega es un hito más, no el fin de la operación: la tarjeta sigue
+  // editable hasta que los cuatro estén tildados.
+  const entregada = !!op.cerrada_at;
   const dias = diasHastaEvento(op.fecha_evento);
   const enCurso = !cerrada && !cancelada;
 
@@ -391,35 +395,27 @@ export default function OperacionCard({
                 />
                 <HitoButton
                   label="Entrada entregada"
-                  done={false}
+                  done={entregada}
+                  por={quienDe(op.cerrada_por)}
                   color={HITO_COLOR.listo}
                   busy={busy}
                   onClick={() =>
-                    onAction?.(op, { action: "cerrar", done: true }, "Entrega registrada — operación cerrada")
+                    onAction?.(
+                      op,
+                      { action: "cerrar", done: !entregada },
+                      !entregada ? "Entrega registrada" : "Entrega desmarcada"
+                    )
                   }
                 />
               </div>
             )}
 
-            {/* Atajo de cierre cuando ya están los tres internos. */}
-            {!readOnly && estado === "lista_para_cerrar" && (
-              <button
-                onClick={() =>
-                  onAction?.(op, { action: "cerrar", done: true }, "Entrega registrada — operación cerrada")
-                }
-                disabled={busy}
-                className="mt-2 w-full rounded-xl bg-cobalt px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-cobalt-deep disabled:opacity-60"
-              >
-                ✓ Entradas entregadas — cerrar
-              </button>
-            )}
-
-            {/* Cerrada: resumen con opción de reabrir el cierre. Con los
-                botones de hitos ocultos, el "quién hizo qué" vive acá. */}
+            {/* Completa (los cuatro hitos): resumen con opción de reabrir.
+                Con los botones ocultos, el "quién hizo qué" vive acá. */}
             {!readOnly && cerrada && (
               <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-ink px-4 py-3 text-white">
                 <span className="min-w-0 text-sm font-semibold">
-                  ✓ Operación cerrada
+                  ✓ Operación completa
                   {op.cerrada_at && (
                     <span className="ml-2 font-normal text-white/60">
                       {fechaDia(op.cerrada_at)}
@@ -442,7 +438,7 @@ export default function OperacionCard({
                 </span>
                 <button
                   onClick={() =>
-                    onAction?.(op, { action: "cerrar", done: false }, "Cierre reabierto")
+                    onAction?.(op, { action: "cerrar", done: false }, "Operación reabierta")
                   }
                   disabled={busy}
                   className="rounded-lg border border-white/25 px-3 py-1.5 text-xs font-medium text-white/85 transition-colors hover:bg-white/10 disabled:opacity-60"
@@ -475,8 +471,10 @@ export default function OperacionCard({
             >
               Copiar WhatsApp
             </button>
-            {/* Recibo/factura: recién cuando el pago está confirmado. */}
-            {!readOnly && pago && !cancelada && (
+            {/* Recibo/factura: la habilita el pago del CLIENTE. No espera a que
+                la operación esté completa — los hitos con el proveedor son
+                asunto nuestro y no pueden trabar el comprobante. */}
+            {!readOnly && sePuedeFacturar(op) && (
               <button onClick={() => setFacturaAbierta(true)} className={secondaryBtn}>
                 Factura
               </button>
