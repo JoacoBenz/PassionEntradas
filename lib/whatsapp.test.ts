@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   armarParametros,
+  idiomaAcceso,
+  idiomaPedido,
   limpiarParametro,
   parametrosAcceso,
   parametrosPlantilla,
@@ -154,5 +156,37 @@ describe("armarParametros", () => {
     expect(PARAMS_ACCESO).toHaveLength(parametrosAcceso({
       nombre: "a", email: "b", telefono: "c", legajo: "d", texto: "",
     }).length);
+  });
+});
+
+// El idioma es parte de la identidad de la plantilla: `nuevo_pedido` en "es" y
+// en "es_AR" son dos plantillas distintas. Las nuestras quedaron creadas en
+// idiomas distintos, así que una sola variable para las dos hacía fallar una.
+describe("idioma de cada plantilla", () => {
+  const limpiar = () => {
+    delete process.env.WHATSAPP_TEMPLATE_LANG;
+    delete process.env.WHATSAPP_TEMPLATE_ACCESO_LANG;
+  };
+
+  it("sin configurar, las dos caen a es_AR", () => {
+    limpiar();
+    expect(idiomaPedido()).toBe("es_AR");
+    expect(idiomaAcceso()).toBe("es_AR");
+  });
+
+  it("cada plantilla puede tener el suyo", () => {
+    limpiar();
+    process.env.WHATSAPP_TEMPLATE_LANG = "es";
+    process.env.WHATSAPP_TEMPLATE_ACCESO_LANG = "es_AR";
+    expect(idiomaPedido()).toBe("es");
+    expect(idiomaAcceso()).toBe("es_AR");
+    limpiar();
+  });
+
+  it("si acceso no tiene el suyo, usa el general", () => {
+    limpiar();
+    process.env.WHATSAPP_TEMPLATE_LANG = "es";
+    expect(idiomaAcceso()).toBe("es");
+    limpiar();
   });
 });

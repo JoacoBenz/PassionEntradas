@@ -142,6 +142,7 @@ export type WhatsappResult =
 // Si hay plantilla configurada se manda como plantilla; si no, texto libre.
 async function enviar(
   plantilla: string | undefined,
+  idioma: string,
   nombres: readonly string[],
   valores: string[],
   texto: string
@@ -177,7 +178,7 @@ async function enviar(
       type: "template",
       template: {
         name: plantilla,
-        language: { code: process.env.WHATSAPP_TEMPLATE_LANG || "es_AR" },
+        language: { code: idioma },
         components: [
           {
             type: "body",
@@ -215,10 +216,27 @@ async function enviar(
   return { ok: true, enviados };
 }
 
+// El idioma es parte de la identidad de la plantilla: `nuevo_pedido` en "es" y
+// en "es_AR" son dos plantillas distintas, y pedir la que no es devuelve
+// "template not found". Cada una tiene el suyo porque en la práctica quedaron
+// creadas en idiomas distintos, y rehacer una cuesta otra aprobación.
+export function idiomaPedido(): string {
+  return process.env.WHATSAPP_TEMPLATE_LANG || "es_AR";
+}
+
+export function idiomaAcceso(): string {
+  return (
+    process.env.WHATSAPP_TEMPLATE_ACCESO_LANG ||
+    process.env.WHATSAPP_TEMPLATE_LANG ||
+    "es_AR"
+  );
+}
+
 /** Entró un pedido o una consulta desde la tienda. */
 export function notificarVendedores(aviso: AvisoPedido): Promise<WhatsappResult> {
   return enviar(
     process.env.WHATSAPP_TEMPLATE,
+    idiomaPedido(),
     PARAMS_PEDIDO,
     parametrosPlantilla(aviso),
     aviso.texto
@@ -229,6 +247,7 @@ export function notificarVendedores(aviso: AvisoPedido): Promise<WhatsappResult>
 export function notificarSolicitudAcceso(aviso: AvisoAcceso): Promise<WhatsappResult> {
   return enviar(
     process.env.WHATSAPP_TEMPLATE_ACCESO,
+    idiomaAcceso(),
     PARAMS_ACCESO,
     parametrosAcceso(aviso),
     aviso.texto
