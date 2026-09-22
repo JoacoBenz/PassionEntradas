@@ -44,6 +44,15 @@ export function sesionCaida(error: ErrorAuth): boolean {
     return true;
   }
 
-  // La sesión no está ni en la cookie: no hay nada que refrescar.
-  return error.name === "AuthSessionMissingError";
+  // AuthSessionMissingError es el caso normal de un visitante sin cookie
+  // (la landing pública, alguien que nunca inició sesión): no hay NADA que
+  // borrar ni ninguna sesión que "murió", así que NO cuenta como caída. Antes
+  // sí contaba, y esa fue la rotura grande: el middleware llamaba a esto en
+  // TODAS las rutas del matcher, incluida /, y cualquier visita sin cookie
+  // (o sea, casi cualquier visita nueva) terminaba en signOut + redirect a
+  // /ingresar. Como /ingresar también está en el matcher, esa misma visita
+  // sin cookie volvía a dar AuthSessionMissingError ahí, y el middleware la
+  // volvía a mandar a /ingresar: bucle infinito, ERR_TOO_MANY_REDIRECTS en
+  // TODO el sitio para cualquiera sin sesión.
+  return false;
 }

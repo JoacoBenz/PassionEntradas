@@ -36,8 +36,13 @@ describe("sesionCaida", () => {
     expect(sesionCaida({ name: "AuthApiError", status: 403 })).toBe(true);
   });
 
-  it("una sesión que no está en la cookie cuenta como caída", () => {
-    expect(sesionCaida({ name: "AuthSessionMissingError" })).toBe(true);
+  it("NO borra nada por falta de cookie: es un visitante sin sesión, no una sesión muerta", () => {
+    // Este es el caso de CUALQUIER visita sin cookie (la landing pública,
+    // alguien que nunca inició sesión). Tratarlo como "caída" fue el bug que
+    // tiró abajo producción: en / y en /ingresar, el getUser() de un
+    // visitante anónimo devuelve justo este error, así que el middleware
+    // terminaba mandando /ingresar -> /ingresar -> /ingresar sin parar.
+    expect(sesionCaida({ name: "AuthSessionMissingError" })).toBe(false);
   });
 
   it("NO borra la sesión si el servidor de Auth está caído", () => {
