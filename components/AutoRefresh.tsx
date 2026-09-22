@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 // Refresca los datos del Server Component en intervalo, sin recargar la página.
@@ -20,6 +20,8 @@ export default function AutoRefresh({
   const router = useRouter();
   // Última versión vista. null = todavía no tenemos línea de base.
   const lastVersion = useRef<string | null>(null);
+  // La sesión se cayó: se deja de preguntar y se avisa.
+  const [sesionCaida, setSesionCaida] = useState(false);
 
   useEffect(() => {
     let vivo = true;
@@ -35,6 +37,24 @@ export default function AutoRefresh({
 
       try {
         const res = await fetch(versionUrl, { cache: "no-store" });
+
+        // La sesión se cayó (la cerraron, borraron el usuario, venció de
+        // verdad). Sin esto la pestaña se queda pidiendo cada 12 segundos para
+        // siempre: cada pedido vuelve a intentar refrescar un token muerto y
+        // deja un error en el log del servidor, y mientras tanto el panel
+        // muestra datos viejos como si todo anduviera.
+        //
+        // Se corta el intervalo y se avisa, pero NO se recarga sola: si el 401
+        // vuelve a aparecer después de recargar, eso es un loop de recargas
+        // contra el servidor. Recargar es decisión de la persona, con el
+        // botón, y ahí el middleware borra la cookie y la manda al login.
+        if (res.status === 401 || res.status === 403) {
+          if (!vivo) return;
+          clearInterval(id);
+          setSesionCaida(true);
+          return;
+        }
+
         if (!res.ok || !vivo) return;
         const data = (await res.json()) as { v?: string };
         const v = typeof data.v === "string" ? data.v : null;
@@ -53,10 +73,11 @@ export default function AutoRefresh({
       }
     };
 
+    const id = setInterval(() => void tick(), intervalMs);
+
     // Fijar línea de base apenas monta (no refresca: la página recién cargó).
     void tick();
 
-    const id = setInterval(() => void tick(), intervalMs);
     // Al volver a la pestaña, chequear de inmediato.
     const onVisible = () => void tick();
     document.addEventListener("visibilitychange", onVisible);
@@ -68,5 +89,51 @@ export default function AutoRefresh({
     };
   }, [router, intervalMs, versionUrl]);
 
-  return null;
+  if (!sesionCaida) return null;
+
+  // Estilos en línea a propósito: este componente se monta tanto en el panel
+  // (Tailwind) como en la tienda (CSS propio), y el cartel tiene que verse
+  // igual en los dos.
+  return (
+    <div
+      role="alert"
+      style={{
+        position: "fixed",
+        left: 16,
+        right: 16,
+        bottom: 16,
+        zIndex: 9999,
+        margin: "0 auto",
+        maxWidth: 420,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "12px 14px",
+        borderRadius: 10,
+        background: "#1f2937",
+        color: "#fff",
+        boxShadow: "0 8px 24px rgba(0,0,0,.25)",
+        fontSize: 14,
+        lineHeight: 1.35,
+      }}
+    >
+      <span style={{ flex: 1 }}>
+        Se cerró tu sesión, así que esta página dejó de actualizarse.
+      </span>
+      <a
+        href="/ingresar"
+        style={{
+          flexShrink: 0,
+          padding: "7px 12px",
+          borderRadius: 8,
+          background: "#fff",
+          color: "#1f2937",
+          fontWeight: 600,
+          textDecoration: "none",
+        }}
+      >
+        Entrar
+      </a>
+    </div>
+  );
 }

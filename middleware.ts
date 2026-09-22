@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getRol } from "@/lib/auth";
 import { decidirRuteo } from "@/lib/ruteo";
+import { sesionCaida } from "@/lib/sesion";
 
 // Refresca la sesión de Supabase Auth y RUTEA los módulos:
 // - /admin: solo administrador (los moderadores van a /moderador), salvo
@@ -19,10 +20,22 @@ import { decidirRuteo } from "@/lib/ruteo";
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
+  // `response` es donde Supabase escribe las cookies: la sesión refrescada, o
+  // el borrado de la cookie cuando la sesión ya no existe. Se declara ANTES de
+  // cualquier redirect porque redirectTo las tiene que arrastrar.
+  let response = NextResponse.next({ request });
+
   function redirectTo(pathname: string) {
     const url = request.nextUrl.clone();
     url.pathname = pathname;
-    return NextResponse.redirect(url);
+    const redirect = NextResponse.redirect(url);
+    // Un NextResponse.redirect nuevo NO hereda nada de `response`. Si se
+    // devuelve pelado, el Set-Cookie que borra la sesión muerta nunca llega al
+    // navegador: la cookie vieja vuelve en el request siguiente, Supabase
+    // intenta refrescarla de nuevo y el 400 refresh_token_not_found se repite
+    // para siempre. Por eso las cookies viajan con la redirección.
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
   }
 
   // Modo demo sin Supabase: todo abierto; los logins mandan a su módulo.
@@ -31,8 +44,6 @@ export async function middleware(request: NextRequest) {
     if (path === "/ingresar") return redirectTo("/entradas");
     return NextResponse.next();
   }
-
-  let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,7 +74,18 @@ export async function middleware(request: NextRequest) {
   // reafirma con getUser()+rol (defensa en profundidad).
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
+
+  // La cookie apunta a una sesión que Auth ya no tiene (usuario borrado,
+  // sesión revocada, clave rotada). Hay que sacarle la cookie al navegador acá
+  // mismo: si sigue mandándola, cada request vuelve a intentar el refresh y
+  // vuelve a fallar. signOut local borra la cookie sin pedirle nada al servidor
+  // de Auth, que para esta sesión ya no tiene nada que decir.
+  if (sesionCaida(error)) {
+    await supabase.auth.signOut({ scope: "local" });
+    return redirectTo("/ingresar");
+  }
 
   const decision = decidirRuteo(path, user ? getRol(user) : null, !!user);
 
