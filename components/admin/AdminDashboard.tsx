@@ -315,7 +315,9 @@ export default function AdminDashboard({
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
       {/* Mini stats: tira única estilo talón, dividida por líneas punteadas */}
       <section className="card-shadow mb-5 overflow-hidden rounded-2xl bg-white">
-        <div className="grid grid-cols-4 divide-x divide-dashed divide-line">
+        {/* 2×2 en celular: cuatro columnas en 390px dejaban las etiquetas
+            partidas en dos renglones y el número sin aire. */}
+        <div className="grid grid-cols-2 divide-x divide-dashed divide-line sm:grid-cols-4">
           {/* "A cotizar" son las consultas: entradas que el cliente pidió y
               todavía hay que chequear si están y a cuánto. */}
           <Stat label="A cotizar" value={stats.aCotizar} accent="#B07A14" />
@@ -325,7 +327,8 @@ export default function AdminDashboard({
         </div>
       </section>
 
-      {/* Búsqueda + orden */}
+      {/* Búsqueda + orden. En celular el buscador va SOLO en su renglón: en
+          una fila de tres quedaba en 60px de ancho, inservible. */}
       <div className="mb-3 flex flex-wrap gap-2">
         <input
           type="search"
@@ -333,13 +336,13 @@ export default function AdminDashboard({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Buscar por evento, code o alias…"
           aria-label="Buscar operaciones"
-          className="min-w-0 flex-1 rounded-xl border border-line bg-white px-3.5 py-2 text-sm shadow-sm outline-none transition-colors placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/15"
+          className="w-full min-w-0 rounded-xl border border-line bg-white px-3.5 py-2 text-sm shadow-sm outline-none transition-colors placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/15 sm:w-auto sm:flex-1"
         />
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as "recientes" | "urgentes")}
           aria-label="Ordenar operaciones"
-          className="rounded-xl border border-line bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-brand"
+          className="min-w-0 flex-1 rounded-xl border border-line bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-brand sm:flex-none"
         >
           <option value="recientes">Más recientes</option>
           <option value="urgentes">Evento más próximo</option>
@@ -349,7 +352,7 @@ export default function AdminDashboard({
         <a
           href="/api/operaciones/export"
           download
-          className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-medium text-[#4A4E5E] shadow-sm transition-colors hover:bg-canvas"
+          className="flex shrink-0 items-center rounded-xl border border-line bg-white px-3 py-2 text-sm font-medium text-[#4A4E5E] shadow-sm transition-colors hover:bg-canvas"
           title="Descargar todas las operaciones en CSV"
         >
           Exportar CSV

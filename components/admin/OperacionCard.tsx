@@ -150,9 +150,11 @@ export default function OperacionCard({
           </span>
         </span>
         {op.tipo !== "operacion" && (
-          // Origen: pedido/consulta del cliente desde la tienda.
+          // Origen: pedido/consulta del cliente desde la tienda. Se esconde en
+          // celular: entre el chip y el monto le comían 90px al nombre del
+          // evento, que es lo que sirve para reconocer la fila ("Match 12, …").
           <span
-            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+            className="hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide sm:inline-block"
             style={
               op.tipo === "pedido"
                 ? { color: "#1F33E0", backgroundColor: "#1F33E014" }
