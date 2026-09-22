@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatMonto, type Moneda, type Operacion } from "@/lib/operaciones";
 import { parseTitle } from "@/lib/tickets";
 import { parsePrecio } from "@/lib/precios";
@@ -23,6 +23,9 @@ type TicketMatch = {
   precio_costo: number | null;
   stock: number | null;
   source: "portal" | "manual";
+  // Ya convertidos a USD por la API (la tienda cobra en USD).
+  costo_usd: number | null;
+  precio_usd: number | null;
 };
 
 // Autocompletado del evento contra el catálogo: elegir un resultado vincula
@@ -137,10 +140,20 @@ function EventoCombo({
   );
 }
 
+// Quién vende, por defecto. Hoy carga siempre el mismo; se puede cambiar en el
+// campo, y el día que sean varios esto sale de la sesión.
+const VENDEDOR_POR_DEFECTO = "Nacho";
+
+// Valor centinela del desplegable de comprador para cargar a alguien que no
+// está en la lista.
+const OTRO = "__otro__";
+
+type ClienteOpcion = { id: string; nombre: string; email: string; operaciones: number };
+
 const empty = {
   evento: "",
   comprador_alias: "",
-  vendedor_alias: "",
+  vendedor_alias: VENDEDOR_POR_DEFECTO,
   costo: "",
   moneda: "USD",
   fee: "",
@@ -156,6 +169,9 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
   // prefill de "Crear operación" no lo trae y muestra un texto genérico).
   const [vinculo, setVinculo] = useState<{ categoria: string | null; source: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  // Clientes para el desplegable de comprador, ya rankeados por la API.
+  const [clientes, setClientes] = useState<ClienteOpcion[]>([]);
+  const [escribiendoComprador, setEscribiendoComprador] = useState(false);
   // El disabled de React llega tarde si dos taps caen en el mismo tick:
   // el ref corta el segundo submit antes de que dispare otro POST.
   const enviando = useRef(false);
@@ -164,22 +180,46 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  // Elegir una entrada del buscador: vincula el ticket y autocompleta fecha
-  // (siempre) y monto (solo si está vacío y la entrada es propia: las de
-  // Passion están en EUR en la base, no sirven como costo USD directo).
+  // Si la lista no carga (red, permisos), el form no se traba: se cae al
+  // campo de texto y la operación se puede cargar igual.
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/clientes")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!vivo) return;
+        const lista = (d?.clientes ?? []) as ClienteOpcion[];
+        if (lista.length === 0) setEscribiendoComprador(true);
+        setClientes(lista);
+      })
+      .catch(() => {
+        if (vivo) setEscribiendoComprador(true);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  // Elegir una entrada del buscador trae TODO lo que ya sabemos de ella:
+  // fecha, costo y comisión. Para las de Passion también — la API las devuelve
+  // ya pasadas a USD, así que la operación queda con los mismos números que vio
+  // el cliente en la tienda, y la comisión es el markup que se le aplicó.
+  // Se pisa lo que haya: elegir una entrada es decir "cargá ESTA".
   function elegirTicket(t: TicketMatch) {
     setTicketId(t.id);
     setVinculo({ categoria: t.categoria, source: t.source });
+    const costo = t.costo_usd;
+    const precio = t.precio_usd;
+    const comision = costo != null && precio != null ? Math.round((precio - costo) * 100) / 100 : null;
     setForm((f) => ({
       ...f,
       evento: t.evento,
       fecha_evento: t.fecha ? t.fecha.slice(0, 10) : f.fecha_evento,
-      // Precarga el COSTO de la entrada propia, no su precio de venta: la
-      // comisión se carga aparte y el total se recalcula solo.
-      costo:
-        !f.costo.trim() && t.source === "manual" && t.precio_costo != null
-          ? String(t.precio_costo)
-          : f.costo,
+      moneda: "USD",
+      costo: costo != null ? String(costo) : f.costo,
+      // Solo si da positiva: una entrada sin costo cargado no tiene comisión
+      // conocida, y poner 0 sería afirmar que no ganamos nada.
+      fee: comision != null && comision > 0 ? String(comision) : f.fee,
     }));
   }
 
@@ -353,13 +393,58 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
               <label htmlFor="comprador" className={labelCls}>
                 Comprador *
               </label>
-              <input
-                id="comprador"
-                className={inputCls}
-                value={form.comprador_alias}
-                onChange={(e) => set("comprador_alias", e.target.value)}
-                placeholder="Nombre o alias"
-              />
+              {/* Lista cerrada de clientes, los que más compraron arriba. Antes
+                  se escribía a mano y el mismo cliente terminaba cargado como
+                  "Juan Perez", "juan perez" y "Juan P.". Queda la opción de
+                  escribirlo para los que todavía no tienen cuenta. */}
+              {escribiendoComprador ? (
+                <div className="flex gap-2">
+                  <input
+                    id="comprador"
+                    autoFocus
+                    className={`${inputCls} min-w-0`}
+                    value={form.comprador_alias}
+                    onChange={(e) => set("comprador_alias", e.target.value)}
+                    placeholder="Nombre o alias"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEscribiendoComprador(false);
+                      set("comprador_alias", "");
+                    }}
+                    className="shrink-0 rounded-lg border border-line px-2.5 text-xs font-semibold text-[#4A4E5E] transition-colors hover:bg-canvas"
+                    title="Volver a la lista de clientes"
+                  >
+                    Lista
+                  </button>
+                </div>
+              ) : (
+                <select
+                  id="comprador"
+                  className={inputCls}
+                  value={form.comprador_alias}
+                  onChange={(e) => {
+                    if (e.target.value === OTRO) {
+                      setEscribiendoComprador(true);
+                      set("comprador_alias", "");
+                      return;
+                    }
+                    set("comprador_alias", e.target.value);
+                  }}
+                >
+                  <option value="">
+                    {clientes.length ? "Elegí un cliente…" : "Cargando clientes…"}
+                  </option>
+                  {clientes.map((c) => (
+                    <option key={c.id} value={c.nombre}>
+                      {c.nombre}
+                      {c.operaciones > 0 ? ` · ${c.operaciones} ${c.operaciones === 1 ? "op." : "ops."}` : ""}
+                    </option>
+                  ))}
+                  <option value={OTRO}>Otro (escribir)…</option>
+                </select>
+              )}
             </div>
             <div className="flex flex-col justify-between">
               <label htmlFor="vendedor" className={labelCls}>

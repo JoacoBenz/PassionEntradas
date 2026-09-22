@@ -131,34 +131,39 @@ export default function ConsultaCard({ consulta: c, busy = false, onCargar, onEr
 
           {/* Precio = costo + comisión. Se cobra el total; el desglose es
               interno (la factura muestra solo el total). */}
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          {/* Cada campo en su celda: la moneda pegada al importe dejaba el
+              input de costo en 22px en pantalla de celular. */}
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            <div>
+              <label className={labelCls} htmlFor={`moneda-${c.id}`}>
+                Moneda
+              </label>
+              <select
+                id={`moneda-${c.id}`}
+                className={inputCls}
+                value={moneda}
+                onChange={(e) => setMoneda(e.target.value as Moneda)}
+              >
+                <option value="USD">USD</option>
+                <option value="ARS">ARS</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </div>
             <div>
               <label className={labelCls} htmlFor={`costo-${c.id}`}>
-                Precio de costo
+                Costo
               </label>
-              <div className="flex gap-2">
-                <select
-                  aria-label="Moneda"
-                  className={`${inputCls} w-20 shrink-0`}
-                  value={moneda}
-                  onChange={(e) => setMoneda(e.target.value as Moneda)}
-                >
-                  <option value="USD">USD</option>
-                  <option value="ARS">ARS</option>
-                  <option value="EUR">EUR</option>
-                </select>
-                <input
-                  id={`costo-${c.id}`}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  inputMode="decimal"
-                  className={`${inputCls} font-mono`}
-                  value={costo}
-                  onChange={(e) => setCosto(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
+              <input
+                id={`costo-${c.id}`}
+                type="number"
+                min={0}
+                step="0.01"
+                inputMode="decimal"
+                className={`${inputCls} font-mono`}
+                value={costo}
+                onChange={(e) => setCosto(e.target.value)}
+                placeholder="0"
+              />
             </div>
             <div>
               <label className={labelCls} htmlFor={`comision-${c.id}`}>

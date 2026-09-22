@@ -18,6 +18,13 @@ export type Ticket = {
   stock: number | null;
   estado: TicketEstado;
   source: TicketSource;
+  // Lo que nos cuesta la entrada antes del markup. En el portal es lo que
+  // cobra Passion; en las propias lo carga el admin (ahí se llama
+  // precio_costo). La diferencia con precio_final es nuestra comisión.
+  precio_origen?: number | null;
+  // Entradas propias: lo que nos costó. Mismo rol que precio_origen en las del
+  // portal; se separa porque una la carga el admin y la otra el worker.
+  precio_costo?: number | null;
   // Mapa de sectores del evento (URL pública del bucket `mapas`), si hay.
   imagen_url?: string | null;
   // Zona coloreada del mapa a la que pertenece este sector. El mapa ya viene
@@ -27,10 +34,8 @@ export type Ticket = {
 };
 
 export type TicketFull = Ticket & {
-  precio_origen: number | null;
-  // Entradas propias: lo que nos costó y a quién se la compramos. Juntos con
-  // precio_final dan el margen real por entrada.
-  precio_costo?: number | null;
+  // A quién se la compramos. Junto con precio_costo y precio_final da el
+  // margen real por entrada.
   proveedor?: string | null;
   moneda_origen: string;
   moneda_final: string | null;

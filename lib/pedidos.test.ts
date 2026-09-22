@@ -309,3 +309,122 @@ describe("separarPorTipo", () => {
     expect(consultas).toHaveLength(2);
   });
 });
+
+// La comisión es la razón por la que el negocio existe y NO se estaba
+// guardando: `fee` iba en 0 para todo lo que entraba por la tienda, así que el
+// tablero decía "comisión ganada: US$ 0" aunque cada entrada tuviera su markup
+// adentro del precio.
+describe("comisión de la línea (precio − costo)", () => {
+  const base = {
+    tipo: "pedido" as const,
+    evento: "X",
+    sector: null,
+    ticket_id: "t1",
+    monto: 0,
+    cantidad: 1,
+    fecha_evento: null,
+  };
+
+  it("portal: precio y costo se convierten con la misma tasa", () => {
+    // Passion cobra 100 EUR, se vende a 120 EUR, tasa 1,10 -> 132 y 110 USD.
+    const r = reconciliarItem(
+      { ...base },
+      {
+        evento: "X",
+        categoria: null,
+        precio_final: 120,
+        precio_origen: 100,
+        stock: 5,
+        fecha: null,
+        source: "portal",
+      },
+      1.1
+    );
+    expect(r.monto).toBe(132);
+    expect(r.comision).toBe(22);
+  });
+
+  it("propia: costo y precio ya están en la misma moneda", () => {
+    const r = reconciliarItem(
+      { ...base },
+      {
+        evento: "X",
+        categoria: null,
+        precio_final: 155,
+        precio_costo: 120,
+        stock: 5,
+        fecha: null,
+        source: "manual",
+      },
+      1.1
+    );
+    expect(r.monto).toBe(155);
+    expect(r.comision).toBe(35);
+  });
+
+  it("monto = costo + comisión, también con cantidad", () => {
+    const r = reconciliarItem(
+      { ...base, cantidad: 3 },
+      {
+        evento: "X",
+        categoria: null,
+        precio_final: 155,
+        precio_costo: 120,
+        stock: 10,
+        fecha: null,
+        source: "manual",
+      },
+      1.1
+    );
+    expect(r.monto).toBe(465);
+    expect(r.comision).toBe(105);
+    expect(r.monto - r.comision!).toBe(360); // el costo, 120 × 3
+  });
+
+  it("sin costo cargado no se inventa comisión", () => {
+    // Las filas viejas del portal no tienen precio_origen: preferimos un 0
+    // honesto antes que una ganancia imaginaria en el tablero.
+    const r = reconciliarItem(
+      { ...base },
+      { evento: "X", categoria: null, precio_final: 120, stock: 5, fecha: null, source: "portal" },
+      1.1
+    );
+    expect(r.monto).toBe(132);
+    expect(r.comision).toBe(0);
+  });
+
+  it("si el costo fuera mayor al precio, la comisión no es negativa", () => {
+    const r = reconciliarItem(
+      { ...base },
+      {
+        evento: "X",
+        categoria: null,
+        precio_final: 100,
+        precio_costo: 130,
+        stock: 5,
+        fecha: null,
+        source: "manual",
+      },
+      1
+    );
+    expect(r.comision).toBe(0);
+  });
+
+  it("una consulta no tiene precio ni comisión", () => {
+    const r = reconciliarItem(
+      { ...base, tipo: "consulta" },
+      {
+        evento: "X",
+        categoria: null,
+        precio_final: 155,
+        precio_costo: 120,
+        stock: 5,
+        fecha: null,
+        source: "manual",
+      },
+      1
+    );
+    expect(r.monto).toBe(0);
+    expect(r.comision).toBe(0);
+  });
+});

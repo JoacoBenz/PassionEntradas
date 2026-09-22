@@ -19,6 +19,7 @@ import {
   type StatusAction,
 } from "@/lib/operaciones";
 import FacturaModal from "./FacturaModal";
+import { fechaDia } from "@/lib/fechas";
 
 type Props = {
   op: Operacion;
@@ -419,11 +420,7 @@ export default function OperacionCard({
                   ✓ Operación cerrada
                   {op.cerrada_at && (
                     <span className="ml-2 font-normal text-white/60">
-                      {new Date(op.cerrada_at).toLocaleDateString("es-AR", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        timeZone: "America/Argentina/Buenos_Aires",
-                      })}
+                      {fechaDia(op.cerrada_at)}
                     </span>
                   )}
                   {quienDe(op.cerrada_por) && (

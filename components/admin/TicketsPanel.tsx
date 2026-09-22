@@ -731,21 +731,21 @@ export default function TicketsPanel({
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         href={`/moderador?evento=${encodeURIComponent(t.evento)}&ticket=${encodeURIComponent(t.id)}`}
-                        className="rounded-lg border border-brand px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/5"
+                        className="inline-flex min-h-[38px] items-center rounded-lg border border-brand px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/5"
                       >
                         Crear operación
                       </Link>
                       <button
                         onClick={() => empezarEdicion(t)}
                         disabled={busyId === t.id}
-                        className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-semibold text-[#4A4E5E] transition-colors hover:bg-canvas disabled:opacity-60"
+                        className="inline-flex min-h-[38px] items-center rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-semibold text-[#4A4E5E] transition-colors hover:bg-canvas disabled:opacity-60"
                       >
                         Editar
                       </button>
                       <button
                         onClick={() => onDelete(t.id)}
                         disabled={busyId === t.id}
-                        className="rounded-lg border border-estado-cancelada px-3 py-1.5 text-xs font-semibold text-estado-cancelada transition-colors hover:bg-estado-cancelada/5 disabled:opacity-60"
+                        className="inline-flex min-h-[38px] items-center rounded-lg border border-estado-cancelada px-3 py-1.5 text-xs font-semibold text-estado-cancelada transition-colors hover:bg-estado-cancelada/5 disabled:opacity-60"
                       >
                         {busyId === t.id ? "Borrando…" : "Borrar"}
                       </button>

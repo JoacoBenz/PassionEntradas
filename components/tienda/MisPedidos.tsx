@@ -10,6 +10,7 @@ import Link from "next/link";
 import AutoRefresh from "@/components/AutoRefresh";
 import { LANGS, LOCALE, TX, type Lang } from "@/lib/tienda-i18n";
 import type { EstadoPublico } from "@/lib/operaciones";
+import { fechaDia, fechaHora } from "@/lib/fechas";
 
 export type PedidoView = {
   id: string;
@@ -52,16 +53,20 @@ function useLang(): [Lang, (l: Lang) => void] {
 
 function fmtDate(value: string | null, lang: Lang, withTime = false): string {
   if (!value) return "—";
-  // fecha_evento viene como YYYY-MM-DD (sin hora); created_at es timestamp.
-  const iso = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString(LOCALE[lang], {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
-  });
+  // fecha_evento viene como YYYY-MM-DD (sin hora) y se muestra como ese día,
+  // sin corrimientos. created_at es un timestamp y va en hora de Argentina:
+  // sin zona explícita el servidor escribía una hora y el navegador otra, y
+  // React tiraba todo el HTML del servidor para rehacerlo en el cliente.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, d] = value.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(LOCALE[lang], {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+  return withTime ? fechaHora(value, LOCALE[lang]) : fechaDia(value, LOCALE[lang]);
 }
 
 export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {

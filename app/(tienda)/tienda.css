@@ -1203,3 +1203,52 @@
   width: 16px;
   height: 16px;
 }
+
+/* --- zonas de toque en celular ---------------------------------------------
+   En una pantalla táctil el dedo no apunta como el mouse: varios links de la
+   tienda medían 16-24px de alto y había que acertarles. Se agranda SOLO el
+   área tocable (padding y alto mínimo), no la letra, y solo donde el puntero
+   es "grueso" — en desktop la barra se ve igual que siempre. */
+@media (pointer: coarse) {
+  .wm,
+  .back,
+  .lp-nav-login,
+  .lang-btn,
+  .mapa-nav {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .mp-link {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  /* Los legales son chicos a propósito, pero el renglón tiene que ser
+     agarrable: se separa y se le da alto, sin tocar el tamaño de letra. */
+  .legal-links {
+    row-gap: 2px;
+  }
+  .legal-links a {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+  }
+  /* El check de términos es obligatorio para pedir acceso: con 17px había que
+     apuntarle. Se agranda el cuadrito y el renglón entero queda tocable. */
+  .lp-consent input {
+    width: 24px;
+    height: 24px;
+    margin-top: 0;
+  }
+  .lp-consent {
+    align-items: center;
+    padding: 4px 0;
+  }
+  .lp-consent a {
+    display: inline-block;
+    padding: 6px 0;
+  }
+}

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { SolicitudAcceso } from "@/lib/acceso";
+import { fechaHora } from "@/lib/fechas";
 
 // Cola de solicitudes de acceso a la tienda. El admin aprueba (crea el usuario
 // cliente y muestra las credenciales UNA vez) o rechaza. Al aprobar se ofrecen
@@ -25,12 +26,9 @@ type EmailEstado =
 
 function fmtFecha(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("es-AR", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    // Con zona explícita: sin ella el servidor escribía una hora y el
+    // navegador otra, y React descartaba el HTML del servidor.
+    return fechaHora(iso);
   } catch {
     return iso;
   }

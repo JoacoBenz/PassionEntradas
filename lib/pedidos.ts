@@ -17,6 +17,13 @@ export type TicketRef = {
   fecha: string | null;
   // Define la moneda: el portal guarda EUR, las entradas propias ya USD.
   source: TicketSource;
+  // Lo que nos cuesta la entrada, para saber cuánto ganamos con ella:
+  // - portal: `precio_origen` es lo que cobra Passion, y precio_final le suma
+  //   el markup configurado en márgenes;
+  // - propias: `precio_costo` es lo que cargó el admin.
+  // Sin este dato no se puede saber la comisión y se asume 0 (no se inventa).
+  precio_origen?: number | null;
+  precio_costo?: number | null;
 };
 
 // Un item del carrito ya validado/normalizado por el route.
@@ -28,6 +35,10 @@ export type ItemPedido = {
   monto: number; // total de la línea (unitario × cantidad)
   cantidad: number;
   fecha_evento: string | null;
+  // Lo que ganamos en esta línea = monto − costo. Se calcula al reconciliar
+  // contra la fila real y termina en el `fee` de la operación, que es de donde
+  // sale "comisión ganada" en el tablero.
+  comision?: number;
 };
 
 // --- precio ------------------------------------------------------------------
@@ -35,10 +46,21 @@ export type ItemPedido = {
 // (ver normalizarPreciosUsd): las filas del portal están en EUR y se convierten
 // con la cotización del panel; las propias ya vienen en USD.
 export function precioUsd(t: TicketRef, tasa: number): number | null {
-  if (t.precio_final == null) return null;
-  const bruto = Number(t.precio_final);
+  return aUsd(t.precio_final, t.source, tasa);
+}
+
+// Lo que NOS cuesta la entrada, en USD y con el mismo criterio de conversión
+// que el precio de venta. null cuando no hay dato de costo cargado.
+export function costoUsd(t: TicketRef, tasa: number): number | null {
+  const crudo = t.source === "portal" ? t.precio_origen : t.precio_costo;
+  return aUsd(crudo ?? null, t.source, tasa);
+}
+
+function aUsd(valor: number | null, source: TicketSource, tasa: number): number | null {
+  if (valor == null) return null;
+  const bruto = Number(valor);
   if (!Number.isFinite(bruto)) return null;
-  const factor = t.source === "portal" ? (tasa > 0 ? tasa : DEFAULT_EUR_USD) : 1;
+  const factor = source === "portal" ? (tasa > 0 ? tasa : DEFAULT_EUR_USD) : 1;
   const usd = bruto * factor;
   return Number.isFinite(usd) && usd > 0 ? usd : null;
 }
@@ -69,6 +91,16 @@ export function reconciliarItem(p: ItemPedido, t: TicketRef | undefined, tasa: n
   const usd = precioUsd(t, tasa);
   const unit = out.tipo === "pedido" && usd != null ? Math.round(usd) : 0;
   out.monto = unit * out.cantidad;
+
+  // Comisión de la línea = lo que se cobra − lo que cuesta, con el costo
+  // redondeado igual que el precio para que monto = costo + comisión cierre
+  // exacto (es el mismo modelo que el alta manual).
+  //
+  // Sin costo conocido la comisión es 0, NO el precio entero: un costo
+  // desconocido no es un costo de cero, y tomarlo como tal le inventaría al
+  // tablero una ganancia igual a toda la venta.
+  const costo = out.tipo === "pedido" ? costoUsd(t, tasa) : null;
+  out.comision = costo == null ? 0 : Math.max(0, (unit - Math.round(costo)) * out.cantidad);
   return out;
 }
 

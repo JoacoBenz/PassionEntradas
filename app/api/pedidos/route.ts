@@ -94,6 +94,8 @@ async function buscarTickets(ids: string[]): Promise<Map<string, TicketRef>> {
       stock: t.stock ?? null,
       fecha: t.fecha ?? null,
       source: t.source === "manual" ? "manual" : "portal",
+      precio_origen: t.precio_origen ?? null,
+      precio_costo: t.precio_costo ?? null,
     });
 
   if (isMock()) {
@@ -105,7 +107,7 @@ async function buscarTickets(ids: string[]): Promise<Map<string, TicketRef>> {
   }
   const { data } = await createAdminSupabase()
     .from("tickets")
-    .select("id, evento, categoria, precio_final, stock, fecha, source")
+    .select("id, evento, categoria, precio_final, stock, fecha, source, precio_origen, precio_costo")
     .in("id", ids);
   for (const t of (data ?? []) as any[]) guardar(t);
   return map;
@@ -195,6 +197,13 @@ export async function POST(request: Request) {
     parsed[i] = reconciliarItem(p, p.ticket_id ? refs.get(p.ticket_id) : undefined, tasa);
   }
 
+  // Comisión de la operación = suma de la de cada línea (precio − costo). Sin
+  // esto el tablero mostraba "comisión ganada: 0" para TODO lo que entra por la
+  // tienda, que es casi todo: el markup del portal y el de las entradas propias
+  // viven dentro del precio y nadie los estaba registrando.
+  const comisionDe = (lineas: ItemPedido[]) =>
+    lineas.reduce((acc, l) => acc + (l.comision ?? 0), 0);
+
   const quien = `${ctx.comprador}${ctx.cliente_email ? ` (${ctx.cliente_email})` : ""}`;
   const detalle = (p: Parsed) =>
     `${p.evento}${p.sector ? ` — ${p.sector}` : ""}${p.cantidad > 1 ? ` ×${p.cantidad}` : ""}`;
@@ -224,7 +233,7 @@ export async function POST(request: Request) {
         vendedor_alias: null,
         monto: resumen.monto,
         cantidad: resumen.cantidad,
-        fee: 0,
+        fee: comisionDe(lineasPedido),
         ticket_id: resumen.ticket_id,
         fecha_evento: resumen.fecha_evento,
         notas: notasDePedido(lineasPedido),
@@ -274,7 +283,7 @@ export async function POST(request: Request) {
             comprador_alias: ctx.comprador,
             monto: resumen.monto,
             cantidad: resumen.cantidad,
-            fee: 0,
+            fee: comisionDe(lineasPedido),
             ticket_id: resumen.ticket_id,
             fecha_evento: resumen.fecha_evento,
             notas: notasDePedido(lineasPedido),
