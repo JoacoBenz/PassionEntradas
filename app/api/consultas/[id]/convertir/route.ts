@@ -47,7 +47,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   if (isMock()) {
     const r = mockConvertirConsulta(params.id, { monto, fee, quien });
-    if (!r) return NextResponse.json({ error: "Consulta no encontrada" }, { status: 404 });
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
     return NextResponse.json({ ok: true, operacion: { id: r.op.id, code: r.op.code } });
   }
 

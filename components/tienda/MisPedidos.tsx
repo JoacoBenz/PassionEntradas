@@ -23,10 +23,14 @@ export type PedidoView = {
   estado: EstadoPublico;
   // Factura emitida para este pedido (si el staff ya la generó).
   facturaId: string | null;
+  // Una consulta sin precio todavía no es una operación: no hay link público
+  // de seguimiento que mostrar hasta que el staff la cargue.
+  seguible: boolean;
 };
 
 // Color del chip de estado, alineado con el agrupado del panel.
 const ESTADO_CLASS: Record<EstadoPublico, string> = {
+  consulta_recibida: "mp-e-abierta",
   pedido_recibido: "mp-e-abierta",
   pago_recibido: "mp-e-curso",
   entregada: "mp-e-cerrada",
@@ -151,15 +155,19 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
                 <div className="mp-foot">
                   <span className="mp-code">N.º {p.code}</span>
                   <span className="mp-links">
-                    {/* Link público de seguimiento (mismo que comparte el staff). */}
-                    <a
-                      className="mp-link"
-                      href={`/op/${p.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {mp.verSeguimiento}
-                    </a>
+                    {/* Link público de seguimiento (mismo que comparte el
+                        staff). La consulta sin precio todavía no tiene
+                        operación detrás, así que no hay nada que seguir. */}
+                    {p.seguible && (
+                      <a
+                        className="mp-link"
+                        href={`/op/${p.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {mp.verSeguimiento}
+                      </a>
+                    )}
                     {/* Factura: solo si el staff ya la emitió. */}
                     {p.facturaId && (
                       <a

@@ -617,6 +617,22 @@ export function mockListConsultas(): Consulta[] {
   return db().consultas;
 }
 
+// Consultas PENDIENTES del cliente (las convertidas ya se ven como operación,
+// mostrarlas otra vez sería duplicar el mismo pedido en la lista).
+export function mockListConsultasCliente(
+  clienteId: string | null,
+  email: string | null
+): Consulta[] {
+  return db()
+    .consultas.filter(
+      (c) =>
+        c.estado === "pendiente" &&
+        ((clienteId && c.cliente_id === clienteId) ||
+          (email && c.cliente_email?.toLowerCase() === email.toLowerCase()))
+    )
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
 export function mockCrearConsulta(input: {
   envio_id: string | null;
   cliente_id: string | null;
@@ -649,10 +665,15 @@ export function mockCrearConsulta(input: {
 export function mockConvertirConsulta(
   id: string,
   opts: { monto: number; fee: number; quien: string }
-): { op: Operacion } | null {
+): { ok: true; op: Operacion } | { ok: false; status: number; error: string } {
   const d = db();
   const c = d.consultas.find((x) => x.id === id);
-  if (!c || c.estado !== "pendiente") return null;
+  // Distinguir "no existe" de "ya resuelta": el mock tiene que dar el mismo
+  // código que la API real o el demo miente sobre el comportamiento.
+  if (!c) return { ok: false, status: 404, error: "Consulta no encontrada" };
+  if (c.estado !== "pendiente") {
+    return { ok: false, status: 409, error: "Esta consulta ya fue resuelta" };
+  }
   const cantidad = Math.max(1, c.cantidad || 1);
   const op = mockCreateOp({
     evento: c.evento,
@@ -686,5 +707,5 @@ export function mockConvertirConsulta(
   c.resuelta_por = opts.quien;
   c.resuelta_at = new Date().toISOString();
   c.updated_at = c.resuelta_at;
-  return { op };
+  return { ok: true, op };
 }

@@ -139,7 +139,16 @@ export function estadoDe(op: Hitos): Estado {
 // proveedor) son asunto nuestro y no se muestran. Por eso es un tipo aparte y
 // no una traducción de `Estado`: si fuera lo mismo con otras etiquetas, el día
 // que se agregue un hito interno se filtraría solo al ticket.
-export type EstadoPublico = "pedido_recibido" | "pago_recibido" | "entregada" | "cancelada";
+// Lo que ve el cliente. `consulta_recibida` es el único que no sale de una
+// operación: es una consulta todavía sin precio, que aún no nació como
+// operación (ver `consultas`). Se expone igual para que el cliente vea que su
+// pedido no se perdió mientras el staff le busca precio.
+export type EstadoPublico =
+  | "consulta_recibida"
+  | "pedido_recibido"
+  | "pago_recibido"
+  | "entregada"
+  | "cancelada";
 
 type HitosPublicos = {
   status: Status;
@@ -155,6 +164,7 @@ export function estadoPublicoDe(op: HitosPublicos): EstadoPublico {
 }
 
 export const ESTADO_PUBLICO_LABEL: Record<EstadoPublico, string> = {
+  consulta_recibida: "Consulta recibida",
   pedido_recibido: "Pedido recibido",
   pago_recibido: "Pago recibido",
   entregada: "Entregada",
@@ -162,6 +172,7 @@ export const ESTADO_PUBLICO_LABEL: Record<EstadoPublico, string> = {
 };
 
 export const ESTADO_PUBLICO_COLOR: Record<EstadoPublico, string> = {
+  consulta_recibida: "#5F6577",
   pedido_recibido: "#5F6577",
   pago_recibido: "#6C5BF2",
   entregada: "#171B2B",

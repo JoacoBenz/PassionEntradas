@@ -120,7 +120,9 @@ export default async function FacturaPage({ params }: { params: { id: string } }
         </section>
 
         <section className="fac-item-wrap">
-          <p className="fac-label">{t.ticketPurchased}</p>
+          <p className="fac-label">
+            {lineas.length === 1 ? t.ticketPurchased : t.ticketsPurchased}
+          </p>
           {lineas.length === 1 ? (
             <div className="fac-ticket">
               <div className="fac-t-body">
@@ -162,7 +164,7 @@ export default async function FacturaPage({ params }: { params: { id: string } }
             <table className="fac-lineas">
               <thead>
                 <tr>
-                  <th>{t.ticketPurchased}</th>
+                  <th>{t.lineCol}</th>
                   <th className="num">{t.qty}</th>
                   <th className="num">{t.unitPrice}</th>
                   <th className="num">{t.total}</th>
@@ -194,9 +196,11 @@ export default async function FacturaPage({ params }: { params: { id: string } }
               <tbody>
                 <tr>
                   <td className="t-label">
+                    {/* Con varias líneas no hay UN precio unitario que
+                        mostrar: el subtotal va sin él. */}
                     {lineas.length === 1
                       ? t.subtotal(d.cantidad, usd(d.precio_unitario))
-                      : `${t.subtotal(d.cantidad, "")}`.replace(/\s*×\s*$/, "")}
+                      : t.subtotal(d.cantidad, "")}
                   </td>
                   <td>{usd(d.subtotal)}</td>
                 </tr>

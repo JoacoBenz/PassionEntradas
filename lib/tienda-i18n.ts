@@ -263,6 +263,7 @@ const en = {
     // Mismos tres pasos que el ticket público: el comprador ve su pedido,
     // no nuestra gestión con el proveedor.
     estados: {
+      consulta_recibida: "Enquiry received — we are pricing it",
       pedido_recibido: "Order received — a seller will reach out",
       pago_recibido: "Payment received",
       entregada: "Delivered",
@@ -610,6 +611,7 @@ const es: typeof en = {
     verSeguimiento: "Ver seguimiento ↗",
     verFactura: "Ver factura ↗",
     estados: {
+      consulta_recibida: "Consulta recibida — te pasamos el precio",
       pedido_recibido: "Pedido recibido — un vendedor te contacta",
       pago_recibido: "Pago recibido",
       entregada: "Entregada",

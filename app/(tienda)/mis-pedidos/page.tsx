@@ -6,6 +6,7 @@ import { MisPedidos, type PedidoView } from "@/components/tienda/MisPedidos";
 import {
   isMock,
   mockFacturaDeOperacion,
+  mockListConsultasCliente,
   mockListPedidosCliente,
   MOCK_USER,
 } from "@/lib/mock-db";
@@ -14,6 +15,11 @@ import {
 // estado de cada uno (que se actualiza a medida que el staff acciona la
 // operación), el link público de seguimiento y la factura si ya se emitió.
 // Acceso reafirmado en el servidor (área privada).
+//
+// La lista junta DOS orígenes: las operaciones (pedidos con precio cerrado, y
+// las consultas que el staff ya cargó) y las consultas todavía pendientes, que
+// viven en su propia tabla y aún no son una operación. Sin esto último el
+// cliente manda una consulta desde la tienda y no la ve en ningún lado.
 export const dynamic = "force-dynamic";
 
 type OpRow = {
@@ -31,6 +37,16 @@ type OpRow = {
   cerrada_at: string | null;
 };
 
+type ConsultaRow = {
+  id: string;
+  code: string;
+  evento: string;
+  sector: string | null;
+  cantidad: number | null;
+  fecha_evento: string | null;
+  created_at: string;
+};
+
 function toView(o: OpRow, facturaId: string | null): PedidoView {
   return {
     id: o.id,
@@ -43,8 +59,29 @@ function toView(o: OpRow, facturaId: string | null): PedidoView {
     created_at: o.created_at,
     estado: estadoPublicoDe(o),
     facturaId,
+    seguible: true,
   };
 }
+
+// Consulta pendiente: sin operación detrás no hay seguimiento ni factura.
+function consultaToView(c: ConsultaRow): PedidoView {
+  return {
+    id: c.id,
+    code: c.code,
+    tipo: "consulta",
+    evento: c.evento,
+    sector: c.sector ?? null,
+    cantidad: c.cantidad ?? 1,
+    fecha_evento: c.fecha_evento ?? null,
+    created_at: c.created_at,
+    estado: "consulta_recibida",
+    facturaId: null,
+    seguible: false,
+  };
+}
+
+const masNuevoPrimero = (a: PedidoView, b: PedidoView) =>
+  b.created_at.localeCompare(a.created_at);
 
 export default async function MisPedidosPage() {
   let pedidos: PedidoView[] = [];
@@ -54,9 +91,16 @@ export default async function MisPedidosPage() {
       "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       MOCK_USER.email
     );
-    pedidos = ops.map((o) =>
-      toView(o as unknown as OpRow, mockFacturaDeOperacion(o.id)?.id ?? null)
+    const consultas = mockListConsultasCliente(
+      "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      MOCK_USER.email
     );
+    pedidos = [
+      ...ops.map((o) =>
+        toView(o as unknown as OpRow, mockFacturaDeOperacion(o.id)?.id ?? null)
+      ),
+      ...consultas.map((c) => consultaToView(c as unknown as ConsultaRow)),
+    ].sort(masNuevoPrimero);
   } else {
     const supabase = createServerSupabase();
     const {
@@ -64,8 +108,8 @@ export default async function MisPedidosPage() {
     } = await supabase.auth.getUser();
     if (!user || !puedeVerTienda(getRol(user))) redirect("/ingresar");
 
-    // La tabla es deny-all para el cliente; leemos sus propios pedidos con
-    // service role, filtrando por su cliente_id (nunca ve los de otros).
+    // Las tablas son deny-all para el cliente; leemos lo suyo con service role,
+    // filtrando por su cliente_id (nunca ve los de otros).
     const admin = createAdminSupabase();
     const { data } = await admin
       .from("operaciones")
@@ -77,6 +121,17 @@ export default async function MisPedidosPage() {
       .order("created_at", { ascending: false })
       .limit(200);
     const ops = (data ?? []) as OpRow[];
+
+    // Solo las PENDIENTES: una consulta ya convertida se ve como la operación
+    // que originó, y mostrar las dos duplicaría el mismo pedido.
+    const { data: dataC } = await admin
+      .from("consultas")
+      .select("id, code, evento, sector, cantidad, fecha_evento, created_at")
+      .eq("cliente_id", user.id)
+      .eq("estado", "pendiente")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    const consultas = (dataC ?? []) as ConsultaRow[];
 
     // Facturas emitidas para estos pedidos (map operacion_id -> factura_id),
     // así el cliente accede al recibo desde su seguimiento.
@@ -94,7 +149,10 @@ export default async function MisPedidosPage() {
       }
     }
 
-    pedidos = ops.map((o) => toView(o, facturaPorOp.get(o.id) ?? null));
+    pedidos = [
+      ...ops.map((o) => toView(o, facturaPorOp.get(o.id) ?? null)),
+      ...consultas.map(consultaToView),
+    ].sort(masNuevoPrimero);
   }
 
   return <MisPedidos pedidos={pedidos} />;

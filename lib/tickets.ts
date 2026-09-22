@@ -275,16 +275,24 @@ export function buildEvents(rows: Ticket[]): EventoAgrupado[] {
 // ("Zona Roja"). Si es un color se puede pintar una muestra; si no, se
 // muestra el texto tal cual. Se resuelve acá y no en el componente para no
 // tener que adivinar el formato en cada lugar que la use.
+// Los que concuerdan en género van en las dos formas: la zona es femenina
+// ("Zona Roja") y el sector masculino ("Sector Rojo"), y con una sola de las
+// dos la mitad de los casos quedaba sin pintar.
 const COLORES_CSS = [
   "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown",
   "black", "white", "grey", "gray", "cyan", "magenta", "violet", "gold",
-  "rojo", "azul", "verde", "amarillo", "naranja", "violeta", "blanca", "negra",
+  "rojo", "roja", "azul", "verde", "amarillo", "amarilla", "naranja",
+  "violeta", "blanco", "blanca", "negro", "negra", "gris", "dorado", "dorada",
+  "rosa", "marron", "celeste",
 ];
 
 // El worker puede mandar el color en castellano; CSS solo entiende inglés.
 const ES_A_CSS: Record<string, string> = {
-  rojo: "red", azul: "blue", verde: "green", amarillo: "yellow",
-  naranja: "orange", violeta: "violet", blanca: "white", negra: "black",
+  rojo: "red", roja: "red", azul: "blue", verde: "green",
+  amarillo: "yellow", amarilla: "yellow", naranja: "orange", violeta: "violet",
+  blanco: "white", blanca: "white", negro: "black", negra: "black",
+  gris: "gray", dorado: "gold", dorada: "gold", rosa: "pink",
+  marron: "brown", celeste: "skyblue",
 };
 const colorCss = (c: string) => ES_A_CSS[c] ?? c;
 
