@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { esStaff, getRol } from "@/lib/auth";
+import { getRol } from "@/lib/auth";
+import { decidirRuteo } from "@/lib/ruteo";
 
 // Refresca la sesión de Supabase Auth y RUTEA los módulos:
 // - /admin: solo administrador (los moderadores van a /moderador), salvo
@@ -9,23 +10,14 @@ import { esStaff, getRol } from "@/lib/auth";
 // - /entradas y /buscar (la tienda): staff o CLIENTE aprobado. Anónimo -> al
 //   login de cliente (/ingresar). La tienda dejó de ser pública.
 // - Sesión SIN rol: no es de nadie, se corta y afuera.
-// La landing (/), /op/[id] y la factura pública quedan fuera del matcher.
+// - La landing (/) es pública, pero al staff lo manda a su panel.
+//
+// La REGLA en sí (qué rol va a dónde) vive en lib/ruteo.ts, pura y con tests:
+// es lo que sostiene los permisos del sitio, y acá no se puede verificar — el
+// modo demo saltea la autenticación entera. Este archivo solo la aplica.
+// /op/[id] y la factura pública quedan fuera del matcher.
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
-  const esPanel = path.startsWith("/admin") || path.startsWith("/moderador");
-  const esTienda =
-    path === "/buscar" ||
-    path === "/mapa" ||
-    path.startsWith("/entradas") ||
-    path.startsWith("/cuenta") ||
-    path.startsWith("/mis-pedidos");
-  // La landing es para captar clientes nuevos: al staff logueado no le sirve
-  // de nada y era el motivo por el que un admin terminaba en la tienda en vez
-  // del panel (entra por la raíz, no por /ingresar).
-  const esLanding = path === "/";
-  const esLoginAdmin = path === "/admin/login";
-  const esLoginCliente = path === "/ingresar";
-  const esLogin = esLoginAdmin || esLoginCliente;
 
   function redirectTo(pathname: string) {
     const url = request.nextUrl.clone();
@@ -35,14 +27,10 @@ export async function middleware(request: NextRequest) {
 
   // Modo demo sin Supabase: todo abierto; los logins mandan a su módulo.
   if (process.env.MOCK_DATA === "1") {
-    if (esLoginAdmin) return redirectTo("/admin");
-    if (esLoginCliente) return redirectTo("/entradas");
+    if (path === "/admin/login") return redirectTo("/admin");
+    if (path === "/ingresar") return redirectTo("/entradas");
     return NextResponse.next();
   }
-
-  // Destino de cada rol cuando no pidió una página en particular.
-  const inicioDe = (rol: string | null) =>
-    rol === "administrador" ? "/admin" : rol === "moderador" ? "/moderador" : "/entradas";
 
   let response = NextResponse.next({ request });
 
@@ -77,52 +65,17 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Sin sesión: la tienda y el panel van al login único. /admin/login es solo
-  // un alias, así que también se resuelve acá (evita depender del redirect de
-  // la página, que al ser estática no emitía Location).
-  if (!user) {
-    if (esTienda) return redirectTo("/ingresar");
-    if (esPanel) return redirectTo("/ingresar");
-    // La landing sigue siendo pública: es por donde se pide el acceso.
-    return response;
-  }
+  const decision = decidirRuteo(path, user ? getRol(user) : null, !!user);
 
-  const rol = getRol(user);
-
-  // Sesión sin rol (cuenta creada por fuera): se corta y afuera. Se cierra la
-  // sesión para que el login no la recicle en loop.
-  if (rol == null) {
-    if (esLogin) return response; // dejar re-loguear
+  if (decision.accion === "cerrar-sesion") {
+    // Sesión que no es de nadie: se cierra para que el login no la recicle en
+    // un loop de redirecciones.
     await supabase.auth.signOut();
-    return redirectTo("/ingresar");
+    return redirectTo(decision.a);
   }
-
-  // Ya logueado y entrando a CUALQUIER login -> a su lugar.
-  if (esLogin) {
-    return redirectTo(inicioDe(rol));
+  if (decision.accion === "redirigir") {
+    return redirectTo(decision.a);
   }
-
-  // Staff en la landing -> derecho a su panel. El cliente sí la puede ver
-  // (es la cara pública del sitio); el que trabaja acá no tiene nada que
-  // hacer en la página de captación.
-  if (esLanding) {
-    if (esStaff(rol)) return redirectTo(inicioDe(rol));
-    return response;
-  }
-
-  // Cliente: solo la tienda. El panel lo manda a las entradas.
-  if (rol === "cliente") {
-    if (esPanel) return redirectTo("/entradas");
-    return response;
-  }
-
-  // Moderador en el panel de administración -> a su módulo, con la excepción
-  // de /admin/cuenta (cambiar su propia contraseña).
-  if (rol === "moderador" && path.startsWith("/admin") && path !== "/admin/cuenta") {
-    return redirectTo("/moderador");
-  }
-
-  // Staff en la tienda: permitido (además de su panel).
   return response;
 }
 
