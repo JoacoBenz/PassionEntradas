@@ -39,8 +39,19 @@ jobs:
 
       # MOCK_DATA=1: el build no necesita credenciales de Supabase, así que el
       # CI no tiene que guardar secretos para compilar.
+      #
+      # Se reintenta porque `next/font` baja las fuentes de Google durante el
+      # build y Google le corta a los runners cada tanto: el build muere con
+      # "An error occurred in next/font" sin que haya nada roto en el código.
+      # Un error de compilación real falla los tres intentos igual.
       - name: Build
-        run: npm run build
+        run: |
+          for intento in 1 2 3; do
+            if npm run build; then exit 0; fi
+            echo "::warning::el build falló en el intento $intento, reintentando"
+            sleep $((intento * 15))
+          done
+          exit 1
         env:
           MOCK_DATA: "1"
 
