@@ -422,9 +422,12 @@ export async function POST(request: Request) {
       count: totalEntradas,
       operacion: operacion ? { id: operacion.id, code: operacion.code } : null,
       consultas: consultasCreadas.map((c) => ({ id: c.id, code: c.code })),
+      // El error se manda al cliente (no solo el booleano) para poder ver el
+      // motivo real desde la pestaña Network sin tener que ir a buscar los
+      // logs del servidor — Meta no dice mucho más que "rejected" en la UI.
       whatsapp: wa.ok
         ? { ok: true, enviados: wa.enviados }
-        : { ok: false, noConfigurado: wa.noConfigurado ?? false },
+        : { ok: false, noConfigurado: wa.noConfigurado ?? false, error: wa.error },
       email: mail.ok
         ? { ok: true }
         : { ok: false, noConfigurado: mail.noConfigurado ?? false },

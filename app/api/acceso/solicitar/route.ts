@@ -42,10 +42,20 @@ export async function POST(request: Request) {
       `Legajo/CUIT: ${legajo}` +
       (mensaje ? `\nMensaje: ${mensaje}` : "") +
       `\n\nAprobala desde el panel.`;
-    await Promise.all([
+    const [wa, mail] = await Promise.all([
       notificarSolicitudAcceso({ nombre, email, telefono, legajo, texto }),
       notificarVendedoresEmail(`Nueva solicitud de acceso — ${nombre}`, texto),
-    ]).catch(() => undefined);
+    ]).catch(() => [] as const);
+    // Antes se descartaba el resultado entero: si fallaba, no quedaba
+    // ningún rastro. El log de whatsapp.ts ya cubre el motivo detallado; acá
+    // alcanza con dejar una línea que diga que el aviso de ESTA solicitud
+    // no salió, para no tener que adivinar mirando el panel.
+    if (wa && !wa.ok) {
+      console.error(`[acceso] aviso de WhatsApp no salió para ${email}: ${wa.error}`);
+    }
+    if (mail && !mail.ok) {
+      console.error(`[acceso] aviso por email no salió para ${email}: ${mail.error}`);
+    }
   };
 
   if (isMock()) {

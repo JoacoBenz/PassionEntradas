@@ -156,6 +156,7 @@ async function enviar(
   }
   const destinos = vendedores();
   if (destinos.length === 0) {
+    console.error("[whatsapp] WHATSAPP_VENDEDORES está vacío o mal formado, no hay a quién avisar");
     return { ok: false, error: "No hay vendedores cargados en WHATSAPP_VENDEDORES." };
   }
 
@@ -203,10 +204,18 @@ async function enviar(
         enviados++;
       } else {
         const detail = await res.text().catch(() => "");
-        errores.push(`${to}: ${res.status} ${detail}`.trim());
+        const linea = `${to}: ${res.status} ${detail}`.trim();
+        // Sin esto el motivo real (plantilla no encontrada, número sin
+        // permiso, token vencido) se perdía: las rutas que llaman acá lo
+        // descartan o solo devuelven un booleano al cliente. Esta línea es la
+        // única forma de verlo, en los logs de Vercel (Function Logs).
+        console.error(`[whatsapp] envío rechazado — ${linea}`);
+        errores.push(linea);
       }
     } catch (err) {
-      errores.push(`${to}: ${String(err)}`);
+      const linea = `${to}: ${String(err)}`;
+      console.error(`[whatsapp] error de red al enviar — ${linea}`);
+      errores.push(linea);
     }
   }
 
