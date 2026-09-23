@@ -129,6 +129,41 @@ function vendedores(): string[] {
     .filter(Boolean);
 }
 
+// Un mismo celular argentino se escribe de varias formas: 549 11 2388-5910
+// (como se marca internacional), 54 11 15 2388-5910 (con el 15 local) o
+// 54 11 2388-5910. Meta guarda el número de la lista de permitidos en su
+// propia forma normalizada, y si mandamos otra la rechaza con 131030 ("no está
+// en la lista") aunque sea el mismo teléfono. Pasó exactamente eso: el widget
+// de Meta le mandaba bien y nosotros no, con el mismo número, token y ID.
+//
+// Devuelve el número tal cual primero y después sus equivalentes. Para otros
+// países devuelve solo el original.
+export function variantesNumero(numero: string): string[] {
+  const n = numero.replace(/[^\d]/g, "");
+  const out = [n];
+  let resto: string | null = null; // código de área + número, sin 54 ni 9
+  if (n.startsWith("549") && n.length === 13) resto = n.slice(3);
+  else if (n.startsWith("54") && n.length === 12) resto = n.slice(2);
+  if (resto) {
+    // El código de área es 11 en AMBA; en el resto del país, 3 o 4 dígitos.
+    const largos = resto.startsWith("11") ? [2] : [3, 4];
+    for (const l of largos) out.push("54" + resto.slice(0, l) + "15" + resto.slice(l));
+    out.push("54" + resto);
+    out.push("549" + resto);
+  }
+  return out.filter((v, i) => out.indexOf(v) === i);
+}
+
+/** El código de error de Meta dentro del cuerpo de la respuesta, si hay. */
+export function codigoDeError(cuerpo: string): number | null {
+  try {
+    const c = JSON.parse(cuerpo)?.error?.code;
+    return typeof c === "number" ? c : null;
+  } catch {
+    return null;
+  }
+}
+
 const GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION || "v21.0";
 
 export type WhatsappResult =
@@ -190,20 +225,34 @@ async function enviar(
     };
   };
 
-  for (const to of destinos) {
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(cuerpo(to)),
-      });
-      if (res.ok) {
-        enviados++;
-      } else {
+  for (const destino of destinos) {
+    // Se prueban las formas equivalentes del número solo si Meta lo rechaza
+    // por "no está en la lista de permitidos" (131030): ese rechazo significa
+    // que no se mandó nada, así que reintentar no duplica mensajes.
+    const variantes = variantesNumero(destino);
+    for (let i = 0; i < variantes.length; i++) {
+      const to = variantes[i];
+      const hayOtra = i < variantes.length - 1;
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(cuerpo(to)),
+        });
+        if (res.ok) {
+          enviados++;
+          if (to !== destino) {
+            console.warn(
+              `[whatsapp] ${destino} solo lo aceptó Meta como ${to}: conviene cargarlo así en WHATSAPP_VENDEDORES`
+            );
+          }
+          break;
+        }
         const detail = await res.text().catch(() => "");
+        if (hayOtra && codigoDeError(detail) === 131030) continue;
         const linea = `${to}: ${res.status} ${detail}`.trim();
         // Sin esto el motivo real (plantilla no encontrada, número sin
         // permiso, token vencido) se perdía: las rutas que llaman acá lo
@@ -211,11 +260,13 @@ async function enviar(
         // única forma de verlo, en los logs de Vercel (Function Logs).
         console.error(`[whatsapp] envío rechazado — ${linea}`);
         errores.push(linea);
+        break;
+      } catch (err) {
+        const linea = `${to}: ${String(err)}`;
+        console.error(`[whatsapp] error de red al enviar — ${linea}`);
+        errores.push(linea);
+        break;
       }
-    } catch (err) {
-      const linea = `${to}: ${String(err)}`;
-      console.error(`[whatsapp] error de red al enviar — ${linea}`);
-      errores.push(linea);
     }
   }
 
