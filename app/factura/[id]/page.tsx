@@ -3,6 +3,7 @@ import { createPublicSupabase } from "@/lib/supabase/public";
 import {
   FACTURA_TX,
   fmtMontoFactura,
+  fmtArsFactura,
   numeroFactura,
   type Factura,
 } from "@/lib/factura";
@@ -218,10 +219,34 @@ export default async function FacturaPage({ params }: { params: { id: string } }
                   <td>{t.total}</td>
                   <td>{usd(d.total)}</td>
                 </tr>
+                {/* Dólar del día que cargó el admin al emitir. Las facturas
+                    anteriores no lo tienen y se ven como siempre. */}
+                {d.cotizacion && (
+                  <>
+                    <tr className="fx-row">
+                      <td className="t-label">
+                        {t.exchangeRate(fechaCorta(d.cotizacion.fecha, d.idioma))}
+                      </td>
+                      <td>
+                        {usd(1)} = {fmtArsFactura(d.cotizacion.ars_por_usd, d.idioma)}
+                      </td>
+                    </tr>
+                    <tr className="fx-row">
+                      <td className="t-label">{t.totalArs}</td>
+                      <td>
+                        {fmtArsFactura(
+                          Math.round(d.total * d.cotizacion.ars_por_usd * 100) / 100,
+                          d.idioma
+                        )}
+                      </td>
+                    </tr>
+                  </>
+                )}
               </tbody>
             </table>
           </div>
           <p className="fac-usd-note">{t.usdNote}</p>
+          {d.cotizacion && <p className="fac-usd-note">{t.arsNote}</p>}
         </section>
 
         <section className="fac-pay">

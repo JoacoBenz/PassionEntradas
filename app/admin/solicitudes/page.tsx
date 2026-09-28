@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import AppHeader from "@/components/AppHeader";
+import AutoRefresh from "@/components/AutoRefresh";
 import BottomNav from "@/components/BottomNav";
 import SolicitudesAcceso from "@/components/admin/SolicitudesAcceso";
 import type { SolicitudAcceso } from "@/lib/acceso";
@@ -44,6 +45,7 @@ export default async function SolicitudesPage() {
       <div className="mx-auto w-full max-w-5xl px-4 py-5">
         <SolicitudesAcceso initial={solicitudes} />
       </div>
+      <AutoRefresh intervalMs={20000} />
       <BottomNav />
     </main>
   );

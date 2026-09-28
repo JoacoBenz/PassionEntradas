@@ -46,6 +46,11 @@ export type FacturaDatos = {
   total: number;
   metodo_pago: string;
   pago_confirmado_at: string | null;
+  // Dólar del día que carga el admin al emitir: cuántos pesos vale un dólar
+  // ese día. Queda fijo en la factura (reabrirla meses después muestra el de
+  // su emisión, no el de hoy). Opcional porque las facturas emitidas antes no
+  // lo tienen.
+  cotizacion?: { ars_por_usd: number; fecha: string } | null;
 };
 
 export type Factura = {
@@ -64,6 +69,48 @@ export function numeroFactura(numero: number, createdAt: string): string {
 export function fmtMontoFactura(n: number, idioma: FacturaIdioma): string {
   return (
     "US$ " +
+    new Intl.NumberFormat(idioma === "en" ? "en-US" : "es-AR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n)
+  );
+}
+
+// Lo que tipea el admin: "1465", "1465.5", "1.465", "1.465,50", "$ 1.465,50".
+// La convención argentina (punto de miles, coma decimal) y la anglosajona
+// conviven, así que la regla es: si hay punto y coma, el último separador es
+// el decimal; una coma sola es decimal; un punto solo seguido de exactamente
+// tres dígitos es de miles (un dólar a "1.465" pesos no existe). Fuera de un
+// rango razonable devuelve null: mejor rechazar que facturar con un typo.
+export function parseCotizacion(raw: unknown): number | null {
+  if (typeof raw === "number") return raw >= 1 && raw <= 100000 ? Math.round(raw * 100) / 100 : null;
+  if (typeof raw !== "string") return null;
+  let s = raw.replace(/ars|ar\$|\$|\s/gi, "");
+  if (!/^[\d.,]+$/.test(s)) return null;
+  const punto = s.lastIndexOf(".");
+  const coma = s.lastIndexOf(",");
+  if (punto >= 0 && coma >= 0) {
+    const dec = punto > coma ? "." : ",";
+    const mil = dec === "." ? "," : ".";
+    s = s.split(mil).join("").replace(dec, ".");
+  } else if (coma >= 0) {
+    if (s.indexOf(",") !== coma) return null;
+    s = s.replace(",", ".");
+  } else if (punto >= 0) {
+    const partes = s.split(".");
+    const miles = partes.length > 1 && partes.slice(1).every((p) => p.length === 3);
+    if (miles) s = partes.join("");
+    else if (partes.length > 2) return null;
+  }
+  const n = Number(s);
+  if (!Number.isFinite(n) || n < 1 || n > 100000) return null;
+  return Math.round(n * 100) / 100;
+}
+
+// Monto en pesos con decimales ("AR$ 1,465.00" / "AR$ 1.465,00").
+export function fmtArsFactura(n: number, idioma: FacturaIdioma): string {
+  return (
+    "AR$ " +
     new Intl.NumberFormat(idioma === "en" ? "en-US" : "es-AR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -96,6 +143,9 @@ export const FACTURA_TX = {
     fee: "Service & escrow fee",
     total: "Total",
     usdNote: "All amounts in US dollars (USD).",
+    exchangeRate: (fecha: string) => `Exchange rate (${fecha})`,
+    totalArs: "Total in Argentine pesos",
+    arsNote: "Peso amount for reference, at the exchange rate of the issue date.",
     payMethod: "Payment method",
     payConfirmed: "Payment confirmed",
     track: "Track your operation",
@@ -127,6 +177,9 @@ export const FACTURA_TX = {
     fee: "Servicio y custodia",
     total: "Total",
     usdNote: "Todos los montos en dólares estadounidenses (USD).",
+    exchangeRate: (fecha: string) => `Dólar del día (${fecha})`,
+    totalArs: "Total en pesos",
+    arsNote: "Monto en pesos de referencia, al dólar del día de emisión.",
     payMethod: "Método de pago",
     payConfirmed: "Pago confirmado",
     track: "Seguimiento de tu operación",

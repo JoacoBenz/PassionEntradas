@@ -47,7 +47,7 @@ export async function fetchTickets(): Promise<Ticket[]> {
       const { data, error } = await supabase
         .from("tickets")
         .select(
-          "id,evento,competicion,fecha,ciudad,categoria,precio_final,stock,estado,source,disponible,imagen_url,zona_color"
+          "id,evento,competicion,fecha,ciudad,categoria,precio_final,moneda_final,stock,estado,source,disponible,imagen_url,zona_color"
         )
         // Eventos vigentes (sin fecha o de hoy en adelante, día argentino).
         .or(`fecha.is.null,fecha.gte.${hoy}`)
@@ -73,35 +73,38 @@ export async function fetchTickets(): Promise<Ticket[]> {
 }
 
 // Config de la tienda (tabla config, editable desde el panel):
-// - eurUsd: cotización EUR->USD para las entradas de Passion.
+// - eurUsd: cotización EUR->USD (portal Passion y propias en euros).
+// - arsPorUsd: pesos por dólar (propias en pesos). null = no cargada.
 // - portalActivo: si las entradas de Passion se muestran (false = solo propias).
 // Ante cualquier error caen a defaults seguros: la tienda nunca se rompe.
-export type ConfigTienda = { eurUsd: number; portalActivo: boolean };
+export type ConfigTienda = { eurUsd: number; arsPorUsd: number | null; portalActivo: boolean };
 
 export async function fetchConfigTienda(): Promise<ConfigTienda> {
   if (process.env.MOCK_DATA === "1") {
-    const { mockGetEurUsd, mockGetPortalActivo } = await import("@/lib/mock-db");
-    return { eurUsd: mockGetEurUsd(), portalActivo: mockGetPortalActivo() };
+    const { mockGetEurUsd, mockGetArsPorUsd, mockGetPortalActivo } = await import("@/lib/mock-db");
+    return { eurUsd: mockGetEurUsd(), arsPorUsd: mockGetArsPorUsd(), portalActivo: mockGetPortalActivo() };
   }
   try {
     const supabase = createPublicSupabase();
     const { data, error } = await supabase
       .from("config")
       .select("key, value")
-      .in("key", ["eur_usd", "portal_activo"]);
-    if (error || !data) return { eurUsd: DEFAULT_EUR_USD, portalActivo: true };
+      .in("key", ["eur_usd", "ars_por_usd", "portal_activo"]);
+    if (error || !data) return { eurUsd: DEFAULT_EUR_USD, arsPorUsd: null, portalActivo: true };
     const de = (key: string) => {
       const v = Number(data.find((r) => r.key === key)?.value);
       return Number.isFinite(v) ? v : null;
     };
     const eurUsd = de("eur_usd");
+    const ars = de("ars_por_usd");
     const activo = de("portal_activo");
     return {
       eurUsd: eurUsd != null && eurUsd > 0 ? eurUsd : DEFAULT_EUR_USD,
+      arsPorUsd: ars != null && ars > 0 ? ars : null,
       // Sin fila = activado (default histórico).
       portalActivo: activo == null ? true : activo !== 0,
     };
   } catch {
-    return { eurUsd: DEFAULT_EUR_USD, portalActivo: true };
+    return { eurUsd: DEFAULT_EUR_USD, arsPorUsd: null, portalActivo: true };
   }
 }

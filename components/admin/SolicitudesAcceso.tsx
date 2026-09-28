@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SolicitudAcceso } from "@/lib/acceso";
 import { fechaHora } from "@/lib/fechas";
 
@@ -36,6 +36,12 @@ function fmtFecha(iso: string): string {
 
 export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcceso[] }) {
   const [items, setItems] = useState<SolicitudAcceso[]>(initial);
+  // Lista viva: AutoRefresh vuelve a pedir la página cada tanto y `initial`
+  // llega con los datos nuevos (solicitudes nuevas desde la landing). Sin
+  // esto la lista quedaba congelada en lo que había al abrir la página.
+  useEffect(() => {
+    setItems(initial);
+  }, [initial]);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [reveal, setReveal] = useState<Record<string, Reveal>>({});
   const [emailEstado, setEmailEstado] = useState<Record<string, EmailEstado>>({});

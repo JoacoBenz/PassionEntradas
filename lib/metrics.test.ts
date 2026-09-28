@@ -127,3 +127,40 @@ describe("metricasDominantes — lo que devuelve el RPC", () => {
     expect(m.ticketPromedio).toBe(0);
   });
 });
+
+describe("computeMetrics — misma definición que el RPC (0035)", () => {
+  const b = {
+    monto: 300,
+    fee: 30,
+    status: "esperando_entrada" as const,
+    pago_confirmado_at: null as string | null,
+    cerrada_at: null as string | null,
+    moneda: "USD" as const,
+  };
+
+  it("la plata se mueve cuando el cliente paga, aunque la entrada no se haya entregado", () => {
+    const m = computeMetrics([{ ...b, pago_confirmado_at: "2026-09-20T15:00:00Z" }]);
+    expect(m.plataMovida).toBe(300);
+  });
+
+  it("entregada sin pago no es plata movida", () => {
+    const m = computeMetrics([{ ...b, cerrada_at: "2026-09-20T15:00:00Z" }]);
+    expect(m.plataMovida).toBe(0);
+  });
+
+  it("entradas vendidas suma cantidades: un pedido de 3 son 3 entradas", () => {
+    const m = computeMetrics([
+      { ...b, cantidad: 3, pago_confirmado_at: "2026-09-20T15:00:00Z" },
+      { ...b, cantidad: 1, pago_confirmado_at: "2026-09-20T15:00:00Z" },
+    ]);
+    expect(m.entradasVendidas).toBe(4);
+    expect(m.ticketPromedio).toBe(150); // 600 / 4
+  });
+
+  it("el rango usa el día del pago en hora argentina", () => {
+    // 01:30 UTC del 21 = 22:30 del 20 en Buenos Aires.
+    const op = { ...b, pago_confirmado_at: "2026-09-21T01:30:00Z" };
+    expect(computeMetrics([op], "2026-09-20", "2026-09-20").plataMovida).toBe(300);
+    expect(computeMetrics([op], "2026-09-21", "2026-09-21").plataMovida).toBe(0);
+  });
+});

@@ -99,6 +99,7 @@ async function buscarTickets(ids: string[]): Promise<Map<string, TicketRef>> {
       source: t.source === "manual" ? "manual" : "portal",
       precio_origen: t.precio_origen ?? null,
       precio_costo: t.precio_costo ?? null,
+      moneda_final: t.moneda_final ?? null,
     });
 
   if (isMock()) {
@@ -110,7 +111,7 @@ async function buscarTickets(ids: string[]): Promise<Map<string, TicketRef>> {
   }
   const { data } = await createAdminSupabase()
     .from("tickets")
-    .select("id, evento, categoria, precio_final, stock, fecha, source, precio_origen, precio_costo")
+    .select("id, evento, categoria, precio_final, stock, fecha, source, precio_origen, precio_costo, moneda_final")
     .in("id", ids);
   for (const t of (data ?? []) as any[]) guardar(t);
   return map;
@@ -185,15 +186,12 @@ export async function POST(request: Request) {
   const refs = await buscarTickets(
     parsed.map((p) => p.ticket_id).filter((id): id is string => !!id)
   );
-  // La tienda muestra TODO en USD: las filas del portal están en EUR y se
-  // convierten con la cotización del panel; las propias ya están en USD. Hay que
-  // aplicar la misma conversión acá o el monto guardado quedaría por debajo del
+  // La tienda muestra TODO en USD: el portal está en EUR y las propias en la
+  // moneda con que se cargaron, y se convierten con las cotizaciones del panel.
+  // Hay que aplicar la misma conversión acá o el monto guardado no sería el
   // precio que vio el cliente.
-  const tasa = refs.size
-    ? await fetchConfigTienda()
-        .then((c) => (c.eurUsd > 0 ? c.eurUsd : DEFAULT_EUR_USD))
-        .catch(() => DEFAULT_EUR_USD)
-    : DEFAULT_EUR_USD;
+  const sinConfig = { eurUsd: DEFAULT_EUR_USD, arsPorUsd: null };
+  const tasa = refs.size ? await fetchConfigTienda().catch(() => sinConfig) : sinConfig;
 
   for (let i = 0; i < parsed.length; i++) {
     const p = parsed[i];

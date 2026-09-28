@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import { ToastViewport, useToast } from "./Toast";
@@ -170,6 +170,13 @@ export default function TicketsPanel({
   competiciones,
 }: Props) {
   const [tickets, setTickets] = useState<TicketFull[]>(initial);
+  // Lista viva: AutoRefresh vuelve a pedir la página cada tanto y `initial`
+  // llega con los datos nuevos (entradas cargadas por otro admin). El
+  // formulario de edición tiene su propio estado, así que no se pisa. Sin
+  // esto la lista quedaba congelada en lo que había al abrir la página.
+  useEffect(() => {
+    setTickets(initial);
+  }, [initial]);
   // Sugerencias del dropdown de competición. Una nueva se suma al publicar,
   // así aparece en la próxima carga sin recargar la página.
   const [comps, setComps] = useState<string[]>(competiciones);

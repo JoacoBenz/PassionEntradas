@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import AppHeader from "@/components/AppHeader";
+import AutoRefresh from "@/components/AutoRefresh";
 import BottomNav from "@/components/BottomNav";
 import TicketsPanel from "@/components/admin/TicketsPanel";
 import MargenesPanel from "@/components/admin/MargenesPanel";
@@ -115,6 +116,7 @@ export default async function AdminEntradasPage() {
       <div className="mx-auto w-full max-w-5xl px-4 pb-6">
         <MargenesPanel />
       </div>
+      <AutoRefresh intervalMs={30000} />
       <BottomNav />
     </main>
   );

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol, nombreDe } from "@/lib/auth";
-import type { FacturaDatos, FacturaIdioma } from "@/lib/factura";
+import { parseCotizacion, type FacturaDatos, type FacturaIdioma } from "@/lib/factura";
 import {
   isMock,
   MOCK_USER,
@@ -89,6 +89,10 @@ export async function POST(
   const cantidad = Math.trunc(Number(body.cantidad));
   const metodo = String(body.metodo_pago ?? "").trim().slice(0, 80);
   const idioma: FacturaIdioma = body.idioma === "es" ? "es" : "en";
+  // Dólar del día: lo carga el admin a mano en cada emisión. Obligatorio,
+  // porque la factura existe justamente para dejar asentado el valor de ese
+  // día. La fecha es la de emisión, en hora argentina.
+  const arsPorUsd = parseCotizacion(body.cotizacion);
 
   if (!nombre) {
     return NextResponse.json(
@@ -105,6 +109,15 @@ export async function POST(
       { status: 400 }
     );
   }
+  if (arsPorUsd == null) {
+    return NextResponse.json(
+      { error: "Cargá el dólar del día (pesos por dólar), por ejemplo 1465,50" },
+      { status: 400 }
+    );
+  }
+  const hoyAr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date());
 
   // Operación + entrada vinculada (para sede/competición/sector).
   type OpFactura = {
@@ -262,6 +275,7 @@ export async function POST(
     total: op.monto,
     metodo_pago: metodo,
     pago_confirmado_at: op.pago_confirmado_at,
+    cotizacion: { ars_por_usd: arsPorUsd, fecha: hoyAr },
   };
 
   if (isMock()) {

@@ -154,9 +154,9 @@ export async function POST(request: Request) {
     fecha,
     ciudad,
     categoria: s.categoria,
-    // La entrada propia se carga en la moneda que elige el admin y se muestra
-    // en esa: no se convierte. (El portal es el único que convierte, EUR->USD,
-    // y eso lo hace el worker.)
+    // La entrada propia se guarda en la moneda que elige el admin. La tienda la
+    // pasa a dólares al mostrarla, con las cotizaciones del panel (ver
+    // factorAUsd en lib/tickets.ts).
     precio_origen: s.precio,
     moneda_origen: s.moneda ?? "USD",
     precio_final: s.precio,

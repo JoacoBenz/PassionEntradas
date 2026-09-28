@@ -5,7 +5,7 @@
 // avisos se disparan), y así se pueden testear sin levantar Next ni Supabase.
 // El route se queda con lo que no es puro: leer la base y responder HTTP.
 
-import { DEFAULT_EUR_USD, type TicketSource } from "@/lib/tickets";
+import { factorAUsd, type Tasas, type TicketSource } from "@/lib/tickets";
 import type { TipoOperacion } from "@/lib/operaciones";
 
 // La fila real de `tickets` contra la que se reconcilia un item del carrito.
@@ -15,8 +15,10 @@ export type TicketRef = {
   precio_final: number | null;
   stock: number | null;
   fecha: string | null;
-  // Define la moneda: el portal guarda EUR, las entradas propias ya USD.
+  // Define la moneda: el portal guarda EUR; las propias, la que eligió el
+  // admin (moneda_final: USD, EUR o ARS).
   source: TicketSource;
+  moneda_final?: string | null;
   // Lo que nos cuesta la entrada, para saber cuánto ganamos con ella:
   // - portal: `precio_origen` es lo que cobra Passion, y precio_final le suma
   //   el markup configurado en márgenes;
@@ -43,24 +45,25 @@ export type ItemPedido = {
 
 // --- precio ------------------------------------------------------------------
 // Pasa a USD el precio crudo de `tickets`, con el mismo criterio que la tienda
-// (ver normalizarPreciosUsd): las filas del portal están en EUR y se convierten
-// con la cotización del panel; las propias ya vienen en USD.
-export function precioUsd(t: TicketRef, tasa: number): number | null {
-  return aUsd(t.precio_final, t.source, tasa);
+// (ver factorAUsd): si no, el monto guardado no sería el precio que vio el
+// cliente.
+export function precioUsd(t: TicketRef, tasa: number | Tasas): number | null {
+  return aUsd(t.precio_final, t, tasa);
 }
 
-// Lo que NOS cuesta la entrada, en USD y con el mismo criterio de conversión
-// que el precio de venta. null cuando no hay dato de costo cargado.
-export function costoUsd(t: TicketRef, tasa: number): number | null {
+// Lo que NOS cuesta la entrada, en USD. El costo de una entrada propia está en
+// la misma moneda que su precio. null cuando no hay dato de costo cargado.
+export function costoUsd(t: TicketRef, tasa: number | Tasas): number | null {
   const crudo = t.source === "portal" ? t.precio_origen : t.precio_costo;
-  return aUsd(crudo ?? null, t.source, tasa);
+  return aUsd(crudo ?? null, t, tasa);
 }
 
-function aUsd(valor: number | null, source: TicketSource, tasa: number): number | null {
+function aUsd(valor: number | null, t: TicketRef, tasa: number | Tasas): number | null {
   if (valor == null) return null;
   const bruto = Number(valor);
   if (!Number.isFinite(bruto)) return null;
-  const factor = source === "portal" ? (tasa > 0 ? tasa : DEFAULT_EUR_USD) : 1;
+  const factor = factorAUsd(t.source, t.moneda_final, tasa);
+  if (factor == null) return null;
   const usd = bruto * factor;
   return Number.isFinite(usd) && usd > 0 ? usd : null;
 }
@@ -70,7 +73,7 @@ function aUsd(valor: number | null, source: TicketSource, tasa: number): number 
 // guardan a ciegas. Cuando el item trae `ticket_id` y esa fila existe, los
 // campos se toman de la base. Si la entrada ya no está (el catálogo rota en
 // cada sync), se respeta lo que mandó el cliente para no perder el pedido.
-export function reconciliarItem(p: ItemPedido, t: TicketRef | undefined, tasa: number): ItemPedido {
+export function reconciliarItem(p: ItemPedido, t: TicketRef | undefined, tasa: number | Tasas): ItemPedido {
   if (!t) return p;
   const out: ItemPedido = { ...p };
 
@@ -89,6 +92,11 @@ export function reconciliarItem(p: ItemPedido, t: TicketRef | undefined, tasa: n
   // monto guardado coincida con el precio que vio el cliente. La consulta queda
   // en 0: es "a confirmar", no una compra.
   const usd = precioUsd(t, tasa);
+  // Un pedido de una entrada que no tiene precio en dólares (por ejemplo, en
+  // pesos sin cotización cargada) no se puede cobrar: pasa a consulta. La
+  // tienda ya la mostraba "a consultar"; esto cubre un carrito viejo o
+  // manipulado, que si no terminaba en una operación de US$ 0.
+  if (out.tipo === "pedido" && usd == null) out.tipo = "consulta";
   const unit = out.tipo === "pedido" && usd != null ? Math.round(usd) : 0;
   out.monto = unit * out.cantidad;
 

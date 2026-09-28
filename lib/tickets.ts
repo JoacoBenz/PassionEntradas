@@ -31,6 +31,9 @@ export type Ticket = {
   // con las zonas pintadas: esto le dice al agente cuál mirar. Lo escribe el
   // worker; puede venir como color (#E4572E, "red") o como nombre de zona.
   zona_color?: string | null;
+  // Moneda del precio. El portal es siempre EUR; una propia, la que eligió el
+  // admin. La tienda la usa para pasar todo a dólares (ver factorAUsd).
+  moneda_final?: string | null;
 };
 
 export type TicketFull = Ticket & {
@@ -38,7 +41,6 @@ export type TicketFull = Ticket & {
   // margen real por entrada.
   proveedor?: string | null;
   moneda_origen: string;
-  moneda_final: string | null;
   disponible: boolean;
   url_origen: string | null;
   scraped_at: string;
@@ -87,11 +89,42 @@ export type EventoAgrupado = {
 };
 
 // ---- moneda -----------------------------------------------------------------
-// La tienda trabaja SIEMPRE en dólares. El único origen en euros es el portal
-// Passion; sus precios se convierten a USD con la cotización editable del panel
-// (tabla `config`, clave eur_usd). Las entradas propias ya se cargan en USD.
-// Este default solo cubre el caso de no poder leer la cotización.
+// La tienda trabaja SIEMPRE en dólares. Lo que no está en dólares se convierte
+// con las cotizaciones editables del panel (tabla `config`):
+// - portal Passion: siempre en euros -> clave eur_usd;
+// - entradas propias: en la moneda que eligió el admin al cargarlas (USD, EUR
+//   o ARS) -> eur_usd para euros, ars_por_usd (pesos por dólar) para pesos.
+// Este default solo cubre el caso de no poder leer la cotización del euro.
 export const DEFAULT_EUR_USD = 1.08;
+
+export type Tasas = {
+  eurUsd: number;
+  // Pesos por dólar. Sin cargar, una entrada en pesos no tiene precio en
+  // dólares y se muestra "a consultar": mejor eso que un número inventado.
+  arsPorUsd?: number | null;
+};
+
+function tasasDe(t: number | Tasas): Tasas {
+  return typeof t === "number" ? { eurUsd: t } : t;
+}
+
+// Por cuánto hay que multiplicar un monto de esa fila para tenerlo en USD.
+// null = no se puede convertir (pesos sin cotización cargada). Antes las
+// entradas propias se trataban siempre como dólares: una cargada en ARS a
+// 150.000 aparecía en la tienda a US$ 150,000.
+export function factorAUsd(
+  source: TicketSource,
+  moneda: string | null | undefined,
+  tasas: number | Tasas
+): number | null {
+  const { eurUsd, arsPorUsd } = tasasDe(tasas);
+  const eur = eurUsd > 0 ? eurUsd : DEFAULT_EUR_USD;
+  if (source === "portal") return eur;
+  const m = (moneda ?? "USD").toUpperCase();
+  if (m === "EUR") return eur;
+  if (m === "ARS") return arsPorUsd != null && arsPorUsd > 0 ? 1 / arsPorUsd : null;
+  return 1;
+}
 
 // Formatea un monto que YA está en USD (ver normalizarPreciosUsd).
 // El agrupado de miles sigue el idioma de la tienda (en: 1,234 / es: 1.234).
@@ -103,18 +136,18 @@ export function fmtPrice(usd: number | null, lang: Lang = "en"): string | null {
   );
 }
 
-// Normaliza el catálogo a USD: convierte los precios del portal (EUR) con la
-// cotización y deja el resto (entradas propias, ya en USD) como está. Así la
-// tienda muestra, ordena y calcula "desde" en una sola moneda.
+// Normaliza el catálogo a USD (ver factorAUsd). Así la tienda muestra, ordena
+// y calcula "desde" en una sola moneda. Una fila que no se puede convertir
+// queda sin precio y la tienda la ofrece "a consultar".
 export function normalizarPreciosUsd<
-  T extends { precio_final: number | null; source: TicketSource }
->(rows: T[], eurUsd: number): T[] {
-  const tasa = eurUsd > 0 ? eurUsd : DEFAULT_EUR_USD;
-  return rows.map((t) =>
-    t.source === "portal" && t.precio_final != null
-      ? { ...t, precio_final: t.precio_final * tasa }
-      : t
-  );
+  T extends { precio_final: number | null; source: TicketSource; moneda_final?: string | null }
+>(rows: T[], tasas: number | Tasas): T[] {
+  return rows.map((t) => {
+    if (t.precio_final == null) return t;
+    const f = factorAUsd(t.source, t.moneda_final, tasas);
+    if (f === 1) return t;
+    return { ...t, precio_final: f == null ? null : t.precio_final * f };
+  });
 }
 
 // Día calendario de HOY en Argentina (en-CA da formato YYYY-MM-DD).

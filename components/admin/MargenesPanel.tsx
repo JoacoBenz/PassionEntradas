@@ -24,6 +24,8 @@ export default function MargenesPanel() {
   const [nuevoPct, setNuevoPct] = useState("");
   const [eurUsd, setEurUsd] = useState<number | null>(null);
   const [eurUsdDraft, setEurUsdDraft] = useState<string | null>(null);
+  const [arsPorUsd, setArsPorUsd] = useState<number | null>(null);
+  const [arsDraft, setArsDraft] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "ok" | "error"; msg: string } | null>(null);
   const enviando = useRef(false);
@@ -39,6 +41,7 @@ export default function MargenesPanel() {
         setMargenes(data.margenes ?? []);
         setCompeticiones(data.competiciones ?? []);
         if (typeof cot.eurUsd === "number") setEurUsd(cot.eurUsd);
+        if (typeof cot.arsPorUsd === "number") setArsPorUsd(cot.arsPorUsd);
       })
       .catch(() => vivo && setAviso({ tipo: "error", msg: "No se pudieron cargar los precios" }))
       .finally(() => vivo && setCargando(false));
@@ -147,6 +150,34 @@ export default function MargenesPanel() {
     }
   }
 
+  // Pesos por dólar: convierte las entradas propias cargadas en pesos. Sin
+  // cargar, esas entradas se ofrecen "a consultar" (no se inventa un precio).
+  async function guardarArs() {
+    if (enviando.current || arsDraft === null) return;
+    enviando.current = true;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/cotizacion", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arsPorUsd: arsDraft }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        avisar("error", data.error ?? "No se pudo guardar la cotización");
+        return;
+      }
+      setArsPorUsd(data.arsPorUsd);
+      setArsDraft(null);
+      avisar("ok", `Cotización guardada: 1 US$ = ${data.arsPorUsd} pesos`);
+    } catch {
+      avisar("error", "Error de red al guardar");
+    } finally {
+      enviando.current = false;
+      setBusy(false);
+    }
+  }
+
   const keyDe = (competicion: string | null) => competicion ?? "__general__";
   const general = margenes.find((m) => m.competicion === null);
   const reglas = useMemo(
@@ -228,6 +259,31 @@ export default function MargenesPanel() {
                     disabled={busy || eurUsdDraft === null}
                     className={btnCls}
                   >
+                    Guardar
+                  </button>
+                </div>
+              </div>
+
+              {/* Cotización USD -> ARS (entradas propias en pesos) */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-canvas px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-semibold">Cotización dólar-peso</p>
+                  <p className="text-xs text-muted">
+                    Para las entradas propias cargadas en pesos. Sin cargar, se ofrecen a consultar
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted">1 US$ =</span>
+                  <input
+                    aria-label="Cotización USD a ARS"
+                    className={inputPctCls.replace("w-20", "w-28")}
+                    inputMode="decimal"
+                    placeholder="1465,50"
+                    value={arsDraft ?? (arsPorUsd != null ? String(arsPorUsd) : "")}
+                    onChange={(e) => setArsDraft(e.target.value)}
+                  />
+                  <span className="text-sm text-muted">$</span>
+                  <button onClick={guardarArs} disabled={busy || arsDraft === null} className={btnCls}>
                     Guardar
                   </button>
                 </div>

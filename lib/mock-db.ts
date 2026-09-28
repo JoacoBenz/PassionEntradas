@@ -42,6 +42,7 @@ type MockDB = {
   syncRuns: SyncRun[];
   margenes: MockMargen[];
   eurUsd: number;
+  arsPorUsd: number | null;
   portalActivo: boolean;
   facturas: MockFactura[];
   facturaNumero: number;
@@ -218,6 +219,7 @@ function seed(): MockDB {
     syncRuns,
     margenes,
     eurUsd: 1.08,
+    arsPorUsd: null,
     portalActivo: true,
     facturas: [],
     facturaNumero: 0,
@@ -486,6 +488,15 @@ export function mockGuardarFactura(opId: string, datos: FacturaDatos): MockFactu
 // ---- cotización EUR->USD ------------------------------------------------------------
 export function mockGetEurUsd(): number {
   return db().eurUsd;
+}
+
+export function mockGetArsPorUsd(): number | null {
+  return db().arsPorUsd ?? null;
+}
+
+export function mockSetArsPorUsd(v: number | null): number | null {
+  db().arsPorUsd = v;
+  return v;
 }
 
 export function mockSetEurUsd(v: number): number {

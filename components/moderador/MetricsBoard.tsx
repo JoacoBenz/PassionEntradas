@@ -197,9 +197,9 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
           />
           <Tile
             big
-            label="Ventas concretadas"
+            label="Entradas vendidas"
             value={String(metrics.entradasVendidas).padStart(2, "0")}
-            detail="Operaciones cobradas"
+            detail="Con pago confirmado"
             accent="#B07A14"
           />
         </div>
@@ -218,9 +218,9 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
             className="border-r border-dashed border-line"
           />
           <Tile
-            label="Valor promedio"
+            label="Precio promedio"
             value={formatUSD(metrics.ticketPromedio)}
-            detail="Por operación concretada"
+            detail="Por entrada vendida"
             accent="#5F6577"
           />
         </div>

@@ -14,28 +14,35 @@ export type Metrics = {
   moneda: string;
   plataMovida: number; // suma de monto con pago confirmado
   comisionGanada: number; // suma de fee de esas operaciones
-  entradasVendidas: number; // cantidad de operaciones con pago confirmado
+  entradasVendidas: number; // entradas (suma de cantidades) con pago confirmado
   enJuegoMonto: number; // monto comprometido en operaciones abiertas sin pago
   enJuegoOps: number; // cuántas operaciones abiertas sin pago
-  ticketPromedio: number; // plataMovida / entradasVendidas (0 si no hay)
+  ticketPromedio: number; // plataMovida / entradasVendidas: precio medio por entrada
 };
 
 type OpMetrica = Pick<
   Operacion,
-  "monto" | "fee" | "status" | "pago_confirmado_at" | "cerrada_at" | "moneda">;
+  "monto" | "fee" | "status" | "pago_confirmado_at" | "cerrada_at" | "moneda"
+> & { cantidad?: number | null };
+
+// Día (YYYY-MM-DD) en hora argentina: un pago confirmado a las 22 h de
+// Buenos Aires ya es el día siguiente en UTC, y caía en el rango equivocado.
+function diaAr(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(
+    new Date(iso)
+  );
+}
 
 // Rango opcional (fechas YYYY-MM-DD, inclusive): filtra las métricas de
-// venta por CUÁNDO se confirmó el pago. "En juego" no depende del rango
-// (es exposición actual).
+// venta por el DÍA en que se confirmó el pago, en hora argentina. "En juego"
+// no depende del rango (es exposición actual).
 //
 // Agrupa por moneda y devuelve la dominante, igual que el RPC: sumar pesos
 // con dólares en un solo pozo y etiquetarlo con la moneda de la primera
 // operación daba un número que no significaba nada (y mentía sobre la unidad).
 //
-// OJO: el RPC `metricas_operaciones` todavía cuenta la plata movida por
-// `cerrada_at` y las entradas por suma de `cantidad`; acá se usa el criterio
-// documentado arriba (pago confirmado, una por operación). Son dos
-// definiciones distintas del mismo tablero y hay que unificarlas.
+// Es el mismo criterio que el RPC `metricas_operaciones` (migración 0035):
+// producción calcula en la base y el modo demo acá, y tienen que coincidir.
 export function computeMetrics(
   ops: OpMetrica[],
   desde?: string | null,
@@ -71,12 +78,12 @@ export function computeMetrics(
     const a = acum(op.moneda ?? "USD");
 
     if (op.pago_confirmado_at) {
-      const dia = op.pago_confirmado_at.slice(0, 10);
+      const dia = diaAr(op.pago_confirmado_at);
       if (desde && dia < desde) continue;
       if (hasta && dia > hasta) continue;
       a.plata_movida += op.monto;
       a.comision_ganada += op.fee;
-      a.entradas_vendidas += 1;
+      a.entradas_vendidas += op.cantidad && op.cantidad > 0 ? op.cantidad : 1;
     } else if (!op.cerrada_at) {
       a.en_juego_monto += op.monto;
       a.en_juego_ops += 1;
