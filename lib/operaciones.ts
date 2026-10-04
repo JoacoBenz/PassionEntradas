@@ -68,6 +68,13 @@ export type Operacion = {
   cliente_email: string | null;
   // Sector/categoría de la entrada pedida, tal como se ve en la tienda.
   sector: string | null;
+  // Confirmación del pedido por un admin. Solo los pedidos de la tienda pasan
+  // por este paso (ver `necesitaConfirmar`); null = "Nuevo".
+  confirmada_at?: string | null;
+  confirmada_por?: string | null;
+  // Quién y cuándo canceló: 'cliente' o el nombre del admin. Reabrir limpia.
+  cancelada_at?: string | null;
+  cancelada_por?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -96,7 +103,11 @@ export type OperacionPublica = Pick<
   | "cerrada_at"
   | "fecha_evento"
   | "updated_at"
->;
+> & {
+  // Para mostrar el paso "Pedido confirmado" (solo los pedidos lo esperan).
+  tipo?: TipoOperacion | null;
+  confirmada_at?: string | null;
+};
 
 // Estado visible, derivado de cancelada + los hitos + el cierre.
 export type Estado =
@@ -169,26 +180,78 @@ export function sePuedeFacturar(op: Hitos): boolean {
 export type EstadoPublico =
   | "consulta_recibida"
   | "pedido_recibido"
+  | "pedido_confirmado"
+  | "listo_para_pagar"
   | "pago_recibido"
   | "entregada"
   | "cancelada";
 
 type HitosPublicos = {
   status: Status;
+  entrada_recibida_at?: string | null;
   pago_confirmado_at: string | null;
   cerrada_at: string | null;
+  tipo?: TipoOperacion | null;
+  confirmada_at?: string | null;
 };
 
+type ParaConfirmar = {
+  status: Status;
+  tipo?: TipoOperacion | null;
+  confirmada_at?: string | null;
+  entrada_recibida_at?: string | null;
+  pago_confirmado_at?: string | null;
+  cerrada_at?: string | null;
+};
+
+/**
+ * Pedido de la tienda que todavía nadie confirmó ("Nuevo" en el panel). Las
+ * operaciones del staff y las consultas cotizadas nacen confirmadas. Si ya
+ * tiene algún hito, se trabajó: cuenta como confirmado aunque falte la marca.
+ */
+export function necesitaConfirmar(op: ParaConfirmar): boolean {
+  return (
+    op.tipo === "pedido" &&
+    op.status !== "cancelada" &&
+    !op.confirmada_at &&
+    !op.entrada_recibida_at &&
+    !op.pago_confirmado_at &&
+    !op.cerrada_at
+  );
+}
+
+// Pasos que ve el cliente, en orden: recibido → confirmado → listo para pagar
+// (ya tenemos la entrada del proveedor) → pago recibido → entregada. El pago
+// gana sobre "listo para pagar": a veces se cobra antes de tener la entrada.
 export function estadoPublicoDe(op: HitosPublicos): EstadoPublico {
   if (op.status === "cancelada") return "cancelada";
   if (op.cerrada_at) return "entregada";
   if (op.pago_confirmado_at) return "pago_recibido";
-  return "pedido_recibido";
+  if (op.entrada_recibida_at) return "listo_para_pagar";
+  if (necesitaConfirmar(op)) return "pedido_recibido";
+  return "pedido_confirmado";
 }
+
+/** El cliente puede cancelar solo antes de que se le pida pagar (pasos 1–2). */
+export function clientePuedeCancelar(op: HitosPublicos): boolean {
+  const e = estadoPublicoDe(op);
+  return e === "pedido_recibido" || e === "pedido_confirmado";
+}
+
+// Línea de tiempo del cliente (sin consulta_recibida ni cancelada).
+export const PASOS_PUBLICOS: EstadoPublico[] = [
+  "pedido_recibido",
+  "pedido_confirmado",
+  "listo_para_pagar",
+  "pago_recibido",
+  "entregada",
+];
 
 export const ESTADO_PUBLICO_LABEL: Record<EstadoPublico, string> = {
   consulta_recibida: "Consulta recibida",
   pedido_recibido: "Pedido recibido",
+  pedido_confirmado: "Pedido confirmado",
+  listo_para_pagar: "Listo para pagar",
   pago_recibido: "Pago recibido",
   entregada: "Entregada",
   cancelada: "Cancelada",
@@ -197,6 +260,8 @@ export const ESTADO_PUBLICO_LABEL: Record<EstadoPublico, string> = {
 export const ESTADO_PUBLICO_COLOR: Record<EstadoPublico, string> = {
   consulta_recibida: "#5F6577",
   pedido_recibido: "#5F6577",
+  pedido_confirmado: "#1F33E0",
+  listo_para_pagar: "#B07A14",
   pago_recibido: "#6C5BF2",
   entregada: "#171B2B",
   cancelada: "#D14D68",
@@ -320,6 +385,7 @@ export type StatusAction =
   | { action: "pago"; done: boolean }
   | { action: "proveedor"; done: boolean }
   | { action: "cerrar"; done: boolean }
+  | { action: "confirmar" }
   | { action: "cancelar" }
   | { action: "reabrir" };
 
@@ -425,7 +491,7 @@ export function totalItem(i: Pick<OperacionItem, "cantidad" | "precio_unitario">
 // Una consulta NO es una operación: es una entrada pedida sin precio cerrado.
 // Cuando se arregla el precio, se convierte en operación y queda apuntando a
 // ella por `operacion_id`.
-export type EstadoConsulta = "pendiente" | "convertida" | "descartada";
+export type EstadoConsulta = "pendiente" | "convertida" | "descartada" | "cancelada";
 
 export type Consulta = {
   id: string;
@@ -457,6 +523,7 @@ export const ESTADO_CONSULTA_LABEL: Record<EstadoConsulta, string> = {
   pendiente: "Pendiente",
   convertida: "Convertida en operación",
   descartada: "Descartada",
+  cancelada: "Cancelada por el cliente",
 };
 
 // Línea tal como la ve el comprador en el link público: sin ticket_id ni ids

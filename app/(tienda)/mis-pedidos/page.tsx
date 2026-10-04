@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol, puedeVerTienda } from "@/lib/auth";
-import { estadoPublicoDe } from "@/lib/operaciones";
+import { clientePuedeCancelar, estadoPublicoDe, type Moneda } from "@/lib/operaciones";
+import { textoPagoDe } from "@/lib/textos";
 import { MisPedidos, type PedidoView } from "@/components/tienda/MisPedidos";
 import {
   isMock,
   mockFacturaDeOperacion,
+  mockGetTextosPago,
   mockListConsultasCliente,
   mockListPedidosCliente,
   MOCK_USER,
@@ -35,6 +37,10 @@ type OpRow = {
   entrada_recibida_at: string | null;
   pago_confirmado_at: string | null;
   cerrada_at: string | null;
+  confirmada_at: string | null;
+  cancelada_por: string | null;
+  monto: number;
+  moneda: Moneda;
 };
 
 type ConsultaRow = {
@@ -45,19 +51,32 @@ type ConsultaRow = {
   cantidad: number | null;
   fecha_evento: string | null;
   created_at: string;
+  estado: string;
 };
 
-function toView(o: OpRow, facturaId: string | null): PedidoView {
+function toView(
+  o: OpRow,
+  facturaId: string | null,
+  textos: Record<string, string>
+): PedidoView {
+  const estado = estadoPublicoDe(o as any);
   return {
     id: o.id,
     code: o.code,
+    // Una carga del staff a su nombre es un pedido más para el cliente.
     tipo: o.tipo === "consulta" ? "consulta" : "pedido",
     evento: o.evento,
     sector: o.sector ?? null,
     cantidad: o.cantidad ?? 1,
     fecha_evento: o.fecha_evento ?? null,
     created_at: o.created_at,
-    estado: estadoPublicoDe(o),
+    estado,
+    monto: Number(o.monto) || null,
+    moneda: o.moneda ?? null,
+    puedeCancelar: clientePuedeCancelar(o as any),
+    canceladaPorCliente: o.cancelada_por === "cliente",
+    // Las instrucciones de pago aparecen recién cuando le pedimos que pague.
+    textoPago: estado === "listo_para_pagar" ? textoPagoDe(textos, o.moneda) : null,
     facturaId,
     seguible: true,
   };
@@ -74,7 +93,17 @@ function consultaToView(c: ConsultaRow): PedidoView {
     cantidad: c.cantidad ?? 1,
     fecha_evento: c.fecha_evento ?? null,
     created_at: c.created_at,
-    estado: "consulta_recibida",
+    estado:
+      c.estado === "cancelada"
+        ? "cancelada"
+        : c.estado === "descartada"
+          ? "consulta_descartada"
+          : "consulta_recibida",
+    monto: null,
+    moneda: null,
+    puedeCancelar: c.estado === "pendiente",
+    canceladaPorCliente: c.estado === "cancelada",
+    textoPago: null,
     facturaId: null,
     seguible: false,
   };
@@ -95,9 +124,10 @@ export default async function MisPedidosPage() {
       "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       MOCK_USER.email
     );
+    const textos = mockGetTextosPago();
     pedidos = [
       ...ops.map((o) =>
-        toView(o as unknown as OpRow, mockFacturaDeOperacion(o.id)?.id ?? null)
+        toView(o as unknown as OpRow, mockFacturaDeOperacion(o.id)?.id ?? null, textos)
       ),
       ...consultas.map((c) => consultaToView(c as unknown as ConsultaRow)),
     ].sort(masNuevoPrimero);
@@ -114,21 +144,22 @@ export default async function MisPedidosPage() {
     const { data } = await admin
       .from("operaciones")
       .select(
-        "id, code, tipo, evento, sector, cantidad, fecha_evento, created_at, status, entrada_recibida_at, pago_confirmado_at, cerrada_at"
+        "id, code, tipo, evento, sector, cantidad, fecha_evento, created_at, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, confirmada_at, cancelada_por, monto, moneda"
       )
       .eq("cliente_id", user.id)
-      .in("tipo", ["pedido", "consulta"])
       .order("created_at", { ascending: false })
       .limit(200);
     const ops = (data ?? []) as OpRow[];
 
-    // Solo las PENDIENTES: una consulta ya convertida se ve como la operación
-    // que originó, y mostrar las dos duplicaría el mismo pedido.
+    // Las pendientes, y las canceladas/descartadas del último mes (para que
+    // vea qué pasó con ellas). Una consulta ya convertida se ve como la
+    // operación que originó; mostrar las dos duplicaría el mismo pedido.
+    const haceUnMes = new Date(Date.now() - 30 * 86400_000).toISOString();
     const { data: dataC } = await admin
       .from("consultas")
-      .select("id, code, evento, sector, cantidad, fecha_evento, created_at")
+      .select("id, code, evento, sector, cantidad, fecha_evento, created_at, estado")
       .eq("cliente_id", user.id)
-      .eq("estado", "pendiente")
+      .or(`estado.eq.pendiente,and(estado.in.(cancelada,descartada),updated_at.gte.${haceUnMes})`)
       .order("created_at", { ascending: false })
       .limit(200);
     const consultas = (dataC ?? []) as ConsultaRow[];
@@ -149,8 +180,15 @@ export default async function MisPedidosPage() {
       }
     }
 
+    // Instrucciones de pago: solo si algún pedido está listo para pagar.
+    const textos: Record<string, string> = {};
+    if (ops.some((o) => estadoPublicoDe(o as any) === "listo_para_pagar")) {
+      const { data: tx } = await admin.from("textos_config").select("key, value").like("key", "pago_%");
+      for (const r of (tx ?? []) as { key: string; value: string }[]) textos[r.key] = r.value;
+    }
+
     pedidos = [
-      ...ops.map((o) => toView(o, facturaPorOp.get(o.id) ?? null)),
+      ...ops.map((o) => toView(o, facturaPorOp.get(o.id) ?? null, textos)),
       ...consultas.map(consultaToView),
     ].sort(masNuevoPrimero);
   }

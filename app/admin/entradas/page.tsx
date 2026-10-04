@@ -6,6 +6,7 @@ import AutoRefresh from "@/components/AutoRefresh";
 import BottomNav from "@/components/BottomNav";
 import TicketsPanel from "@/components/admin/TicketsPanel";
 import MargenesPanel from "@/components/admin/MargenesPanel";
+import TextosPagoPanel from "@/components/admin/TextosPagoPanel";
 import { hoyArgentina, type SyncRun, type TicketFull } from "@/lib/tickets";
 import {
   isMock,
@@ -115,6 +116,7 @@ export default async function AdminEntradasPage() {
       />
       <div className="mx-auto w-full max-w-5xl px-4 pb-6">
         <MargenesPanel />
+        <TextosPagoPanel />
       </div>
       <AutoRefresh intervalMs={30000} />
       <BottomNav />

@@ -73,6 +73,25 @@ export default function ModeradorDashboard({
     }
   }
 
+  // Consulta sin entrada: se cierra y el cliente la ve como "No disponible".
+  async function descartar(c: Consulta) {
+    setCotizando(c.id);
+    try {
+      const res = await fetch(`/api/consultas/${c.id}/descartar`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        push("error", data.error ?? "No se pudo descartar la consulta");
+        return;
+      }
+      setConsultas((prev) => prev.filter((x) => x.id !== c.id));
+      push("success", `Consulta ${c.code} marcada como no disponible`);
+    } catch {
+      push("error", "Error de red. Reintentá.");
+    } finally {
+      setCotizando(null);
+    }
+  }
+
   async function copy(text: string, label: string) {
     try {
       await navigator.clipboard.writeText(text);
@@ -153,6 +172,7 @@ export default function ModeradorDashboard({
               consulta={c}
               busy={cotizando === c.id}
               onCargar={cotizar}
+              onDescartar={descartar}
               onError={(m) => push("error", m)}
             />
           ))}

@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { esStaff, getRol } from "@/lib/auth";
 import { generateCode } from "@/lib/operaciones";
-import { isMock, mockCreateOp } from "@/lib/mock-db";
+import { isMock, mockCreateOp, mockListSolicitudes } from "@/lib/mock-db";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // POST /api/operaciones — crea una operación.
 // Solo staff (admin o moderador): una sesión sin rol del panel no carga
@@ -88,12 +90,48 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Comisión inválida" }, { status: 400 });
   }
 
+  // Comprador elegido de la lista de clientes: la operación queda vinculada a
+  // su cuenta y la ve en Mis pedidos. Se valida acá que sea un cliente
+  // aprobado y vigente — un id cualquiera le mostraría la operación a otro.
+  const clienteIdRaw = body.cliente_id ? String(body.cliente_id) : null;
+  if (clienteIdRaw && !UUID.test(clienteIdRaw)) {
+    return NextResponse.json({ error: "Cliente inválido" }, { status: 400 });
+  }
+  let cliente: { id: string; email: string | null } | null = null;
+
   if (isMock()) {
-    const op = mockCreateOp({ evento, comprador_alias, vendedor_alias, monto, moneda, fee, ticket_id, fecha_evento, notas, cuenta_debitar });
-    return NextResponse.json({ id: op.id, code: op.code }, { status: 201 });
+    if (clienteIdRaw) {
+      const s = mockListSolicitudes().find(
+        (x) => x.user_id === clienteIdRaw && x.estado === "aprobada" && !x.revocada_at
+      );
+      if (!s) return NextResponse.json({ error: "Ese cliente no tiene una cuenta activa" }, { status: 400 });
+      cliente = { id: clienteIdRaw, email: s.email ?? null };
+    }
+    const op = mockCreateOp({
+      evento, comprador_alias, vendedor_alias, monto, moneda, fee, ticket_id, fecha_evento, notas, cuenta_debitar,
+      cliente_id: cliente?.id ?? null,
+      cliente_email: cliente?.email ?? null,
+    });
+    return NextResponse.json(
+      { id: op.id, code: op.code, cliente_id: op.cliente_id, cliente_email: op.cliente_email },
+      { status: 201 }
+    );
   }
 
   const admin = createAdminSupabase();
+
+  if (clienteIdRaw) {
+    const { data: s } = await admin
+      .from("solicitudes_acceso")
+      .select("user_id, email")
+      .eq("user_id", clienteIdRaw)
+      .eq("estado", "aprobada")
+      .is("revocada_at", null)
+      .limit(1)
+      .maybeSingle();
+    if (!s) return NextResponse.json({ error: "Ese cliente no tiene una cuenta activa" }, { status: 400 });
+    cliente = { id: clienteIdRaw, email: (s as { email: string | null }).email ?? null };
+  }
 
   // Reintentos por si el code colisiona (muy improbable).
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -112,12 +150,17 @@ export async function POST(request: Request) {
         fecha_evento,
         notas,
         cuenta_debitar,
+        cliente_id: cliente?.id ?? null,
+        cliente_email: cliente?.email ?? null,
       })
       .select("id, code")
       .single();
 
     if (!error && data) {
-      return NextResponse.json({ id: data.id, code: data.code }, { status: 201 });
+      return NextResponse.json(
+        { id: data.id, code: data.code, cliente_id: cliente?.id ?? null, cliente_email: cliente?.email ?? null },
+        { status: 201 }
+      );
     }
 
     // 23505 = unique_violation (colisión de code). Reintentar.

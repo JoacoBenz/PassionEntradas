@@ -7,9 +7,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AutoRefresh from "@/components/AutoRefresh";
 import { LANGS, LOCALE, TX, type Lang } from "@/lib/tienda-i18n";
-import type { EstadoPublico } from "@/lib/operaciones";
+import { formatMonto, PASOS_PUBLICOS, type EstadoPublico, type Moneda } from "@/lib/operaciones";
+import { waLink } from "@/lib/tickets";
 import { fechaDia, fechaHora } from "@/lib/fechas";
 
 export type PedidoView = {
@@ -21,7 +23,17 @@ export type PedidoView = {
   cantidad: number;
   fecha_evento: string | null;
   created_at: string;
-  estado: EstadoPublico;
+  // `consulta_descartada`: la consulta se cerró sin precio (no conseguimos la
+  // entrada). Es solo de esta vista: en una operación no existe.
+  estado: EstadoPublico | "consulta_descartada";
+  // Total del pedido en su moneda (null en consultas sin precio).
+  monto: number | null;
+  moneda: Moneda | null;
+  // Puede cancelarlo él mismo: pedido en pasos 1–2 o consulta pendiente.
+  puedeCancelar: boolean;
+  canceladaPorCliente: boolean;
+  // Instrucciones de pago de su moneda, solo en "listo para pagar".
+  textoPago: string | null;
   // Factura emitida para este pedido (si el staff ya la generó).
   facturaId: string | null;
   // Una consulta sin precio todavía no es una operación: no hay link público
@@ -30,13 +42,37 @@ export type PedidoView = {
 };
 
 // Color del chip de estado, alineado con el agrupado del panel.
-const ESTADO_CLASS: Record<EstadoPublico, string> = {
+const ESTADO_CLASS: Record<PedidoView["estado"], string> = {
   consulta_recibida: "mp-e-abierta",
+  consulta_descartada: "mp-e-cancelada",
   pedido_recibido: "mp-e-abierta",
+  pedido_confirmado: "mp-e-curso",
+  listo_para_pagar: "mp-e-pagar",
   pago_recibido: "mp-e-curso",
   entregada: "mp-e-cerrada",
   cancelada: "mp-e-cancelada",
 };
+
+// Línea de tiempo compacta del pedido: los cinco pasos, el actual marcado.
+function Pasos({ estado, labels }: { estado: EstadoPublico; labels: Record<string, string> }) {
+  const actual = PASOS_PUBLICOS.indexOf(estado);
+  return (
+    <ol className="mp-pasos" aria-label="Progreso">
+      {PASOS_PUBLICOS.map((p, i) => (
+        <li
+          key={p}
+          className={`mp-paso${i <= actual ? " is-done" : ""}${i === actual ? " is-actual" : ""}`}
+          aria-current={i === actual ? "step" : undefined}
+        >
+          <span className="mp-paso-dot" aria-hidden>
+            {i < actual ? "✓" : i + 1}
+          </span>
+          <span className="mp-paso-label">{labels[p]}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 function useLang(): [Lang, (l: Lang) => void] {
   const [lang, setLang] = useState<Lang>("es");
@@ -73,6 +109,32 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
   const [lang, setLang] = useLang();
   const t = TX[lang];
   const mp = t.misPedidos;
+  const router = useRouter();
+  const [cancelando, setCancelando] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function cancelar(p: PedidoView) {
+    if (!window.confirm(p.tipo === "pedido" ? mp.confirmarCancelarPedido : mp.confirmarCancelarConsulta)) return;
+    setCancelando(p.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/mis-pedidos/${p.id}/cancelar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Una consulta sin precio vive en otra tabla: el server tiene que saber cuál.
+        body: JSON.stringify({ tipo: p.seguible ? "pedido" : "consulta" }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(res.status === 409 ? mp.noSePuedeCancelar : data.error || mp.errorCancelar);
+      }
+      router.refresh();
+    } catch {
+      setError(mp.errorCancelar);
+    } finally {
+      setCancelando(null);
+    }
+  }
 
   return (
     <>
@@ -115,6 +177,12 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
           <p>{mp.sub}</p>
         </div>
 
+        {error && (
+          <p className="mp-error" role="alert">
+            {error}
+          </p>
+        )}
+
         {pedidos.length === 0 ? (
           <div className="mp-empty">
             <h3>{mp.vacioTitle}</h3>
@@ -136,6 +204,33 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
                   </span>
                 </div>
                 <h3 className="mp-evento">{p.evento}</h3>
+                {p.monto != null && p.moneda && (
+                  <p className="mp-monto">{formatMonto(p.monto, p.moneda, { sinDecimales: true })}</p>
+                )}
+                {p.seguible && p.estado !== "cancelada" && p.estado !== "consulta_descartada" && (
+                  <Pasos estado={p.estado as EstadoPublico} labels={mp.pasos} />
+                )}
+                {p.estado === "listo_para_pagar" && (
+                  <div className="mp-pago">
+                    <strong>{mp.comoPagar}</strong>
+                    {p.textoPago ? (
+                      <p className="mp-pago-texto">{p.textoPago}</p>
+                    ) : (
+                      <p className="mp-pago-texto">{mp.pagoSinTexto}</p>
+                    )}
+                    <a
+                      className="mp-link"
+                      href={waLink(`${mp.waPagar} ${p.code}`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {mp.escribinos}
+                    </a>
+                  </div>
+                )}
+                {p.estado === "cancelada" && p.canceladaPorCliente && (
+                  <p className="mp-nota">{p.seguible ? mp.canceladoPorVos : mp.canceladaConsultaPorVos}</p>
+                )}
                 <dl className="mp-meta">
                   {p.sector && (
                     <div>
@@ -172,6 +267,20 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
                       >
                         {mp.verSeguimiento}
                       </a>
+                    )}
+                    {p.puedeCancelar && (
+                      <button
+                        type="button"
+                        className="mp-link mp-link--cancelar"
+                        onClick={() => cancelar(p)}
+                        disabled={cancelando === p.id}
+                      >
+                        {cancelando === p.id
+                          ? mp.cancelando
+                          : p.tipo === "pedido" && p.seguible
+                            ? mp.cancelarPedido
+                            : mp.cancelarConsulta}
+                      </button>
                     )}
                     {/* Factura: solo si el staff ya la emitió. */}
                     {p.facturaId && (

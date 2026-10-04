@@ -21,6 +21,9 @@ type Props = {
     valores: { costo: number; comision: number; moneda: Moneda }
   ) => Promise<string | null>;
   onError: (msg: string) => void;
+  // Cierra la consulta sin precio (no hay entrada). El cliente la ve como
+  // "No disponible". Opcional: sin esto no se muestra el botón.
+  onDescartar?: (c: Consulta) => void;
 };
 
 const inputCls =
@@ -34,8 +37,15 @@ function fechaCorta(fecha: string): string {
   return `${d} ${meses[Number(m) - 1] ?? ""}`;
 }
 
-export default function ConsultaCard({ consulta: c, busy = false, onCargar, onError }: Props) {
+export default function ConsultaCard({
+  consulta: c,
+  busy = false,
+  onCargar,
+  onError,
+  onDescartar,
+}: Props) {
   const [open, setOpen] = useState(false);
+  const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
   const [costo, setCosto] = useState("");
   const [comision, setComision] = useState("");
   // Arranca en la moneda en que se cobraría esa entrada (pesos si es una
@@ -193,13 +203,38 @@ export default function ConsultaCard({ consulta: c, busy = false, onCargar, onEr
                 {total != null ? formatMonto(total, moneda) : "—"}
               </span>
             </p>
-            <button
-              onClick={cargar}
-              disabled={busy || total == null}
-              className="rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-ink/85 disabled:opacity-50"
-            >
-              {busy ? "Cargando…" : "Cargar operación"}
-            </button>
+            <span className="flex flex-wrap items-center gap-2">
+              {onDescartar && (
+                <button
+                  onClick={() => {
+                    // Dos toques, igual que cancelar una operación.
+                    if (!confirmandoDescarte) {
+                      setConfirmandoDescarte(true);
+                      window.setTimeout(() => setConfirmandoDescarte(false), 4000);
+                      return;
+                    }
+                    setConfirmandoDescarte(false);
+                    onDescartar(c);
+                  }}
+                  disabled={busy}
+                  className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                    confirmandoDescarte
+                      ? "border-estado-cancelada bg-estado-cancelada text-white"
+                      : "border-estado-cancelada text-estado-cancelada hover:bg-estado-cancelada/5"
+                  }`}
+                  title="No hay entrada: se le muestra al cliente como no disponible"
+                >
+                  {confirmandoDescarte ? "¿Descartar?" : "No disponible"}
+                </button>
+              )}
+              <button
+                onClick={cargar}
+                disabled={busy || total == null}
+                className="rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-ink/85 disabled:opacity-50"
+              >
+                {busy ? "Cargando…" : "Cargar operación"}
+              </button>
+            </span>
           </div>
         </div>
       )}
