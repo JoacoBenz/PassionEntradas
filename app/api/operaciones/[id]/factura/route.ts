@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol, nombreDe } from "@/lib/auth";
-import { parseCotizacion, type FacturaDatos, type FacturaIdioma } from "@/lib/factura";
+import { metodoValido, parseCotizacion, type FacturaDatos, type FacturaIdioma } from "@/lib/factura";
 import {
   isMock,
   MOCK_USER,
@@ -172,6 +172,12 @@ export async function POST(
     );
   }
   const monedaOp = op.moneda ?? "USD";
+  if (!metodoValido(metodo, monedaOp)) {
+    return NextResponse.json(
+      { error: `El método de pago tiene que ser en la moneda de la operación (${monedaOp})` },
+      { status: 400 }
+    );
+  }
   if (monedaOp === "USD" && arsPorUsd == null) {
     return NextResponse.json(
       { error: "Cargá el dólar del día (pesos por dólar), por ejemplo 1465,50" },

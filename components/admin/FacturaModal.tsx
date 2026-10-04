@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Operacion } from "@/lib/operaciones";
-import { numeroFactura, parseCotizacion, type Factura } from "@/lib/factura";
+import { METODOS_PAGO, metodoValido, numeroFactura, parseCotizacion, type Factura } from "@/lib/factura";
 
 // Emite (o re-emite) la factura de una operación cobrada. Los 4 datos que
 // la operación no tiene (nombre real, contacto, cantidad, método de pago)
@@ -27,9 +27,9 @@ export default function FacturaModal({
   // Cantidad del pedido (topeada por el stock en la tienda). Arranca de la
   // operación; si ya hay factura emitida, gana su snapshot (efecto de más abajo).
   const [cantidad, setCantidad] = useState(String(op.cantidad || 1));
-  const [metodo, setMetodo] = useState(
-    (op.moneda ?? "USD") === "ARS" ? "Transferencia (ARS)" : "Bank transfer (USD)"
-  );
+  // Solo los métodos de la moneda de la operación (ver METODOS_PAGO).
+  const metodos = METODOS_PAGO[op.moneda ?? "USD"];
+  const [metodo, setMetodo] = useState(metodos[0]);
   const [idioma, setIdioma] = useState<"en" | "es">("en");
   // Dólar del día, tipeado por el admin. Al re-emitir se precarga el que ya
   // tenía la factura; si cambió, se corrige acá.
@@ -53,7 +53,10 @@ export default function FacturaModal({
         setNombre(d.comprador.nombre);
         setContacto(d.comprador.contacto ?? "");
         setCantidad(String(d.cantidad));
-        setMetodo(d.metodo_pago);
+        // Una factura vieja puede tener un método de otra moneda (la de Boca
+        // salió con "Bank transfer (USD)"): al re-emitir arranca del primero
+        // de la moneda correcta en vez de arrastrar el error.
+        if (metodoValido(d.metodo_pago, op.moneda ?? "USD")) setMetodo(d.metodo_pago);
         setIdioma(d.idioma);
         if (d.cotizacion) setCotizacion(String(d.cotizacion.ars_por_usd).replace(".", ","));
       })
@@ -257,13 +260,9 @@ export default function FacturaModal({
                   value={metodo}
                   onChange={(e) => setMetodo(e.target.value)}
                 >
-                  {!esUsd && <option>Transferencia (ARS)</option>}
-                  {!esUsd && <option>Efectivo (ARS)</option>}
-                  <option>Bank transfer (USD)</option>
-                  <option>Transferencia (USD)</option>
-                  <option>Cash (USD)</option>
-                  <option>Efectivo (USD)</option>
-                  <option>Crypto (USDT)</option>
+                  {metodos.map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
                 </select>
               </div>
 
