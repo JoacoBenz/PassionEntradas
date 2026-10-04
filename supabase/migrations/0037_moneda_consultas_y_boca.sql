@@ -18,3 +18,20 @@ update public.operaciones
    and moneda = 'USD'
    and monto = 1200000
    and fee = 420000;
+
+-- 3. La factura de ese pedido (#11) es una foto tomada al emitirla: no trae
+--    la moneda (es anterior a guardarla) y salió con "Bank transfer (USD)".
+--    Sin esto, la factura seguiría mostrando US$ 1.200.000 aunque la
+--    operación ya diga pesos. Se le estampa ARS y el método equivalente en
+--    pesos. Guardado: solo esa factura, solo si sigue como se emitió.
+update public.facturas f
+   set datos = f.datos
+             || jsonb_build_object('moneda', 'ARS')
+             || case when f.datos->>'metodo_pago' = 'Bank transfer (USD)'
+                     then jsonb_build_object('metodo_pago', 'Transferencia (ARS)')
+                     else '{}'::jsonb end
+  from public.operaciones o
+ where o.id = f.operacion_id
+   and o.code = 'BX-3RDHY6FK'
+   and not (f.datos ? 'moneda')
+   and (f.datos->>'total')::numeric = 1200000;
