@@ -150,8 +150,9 @@ export default function MargenesPanel() {
     }
   }
 
-  // Pesos por dólar: convierte las entradas propias cargadas en pesos. Sin
-  // cargar, esas entradas se ofrecen "a consultar" (no se inventa un precio).
+  // Pesos por dólar: NO se usa para cobrar (las entradas en pesos se cobran en
+  // pesos). Solo compara precios en pesos con precios en dólares para elegir
+  // el "desde" de un evento y ordenar sus sectores.
   async function guardarArs() {
     if (enviando.current || arsDraft === null) return;
     enviando.current = true;
@@ -269,7 +270,7 @@ export default function MargenesPanel() {
                 <div>
                   <p className="text-sm font-semibold">Cotización dólar-peso</p>
                   <p className="text-xs text-muted">
-                    Para las entradas propias cargadas en pesos. Sin cargar, se ofrecen a consultar
+                    Solo para comparar precios en pesos con precios en dólares (el &quot;desde&quot; de un evento). Las entradas en pesos se cobran en pesos
                   </p>
                 </div>
                 <div className="flex items-center gap-2">

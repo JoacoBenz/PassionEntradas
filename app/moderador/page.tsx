@@ -80,7 +80,7 @@ export default async function ModeradorPage({
       admin
         .from("consultas")
         .select(
-          "id, code, envio_id, cliente_id, cliente_email, comprador_alias, ticket_id, evento, sector, fecha_evento, cantidad, notas, estado, operacion_id, resuelta_por, resuelta_at, created_at, updated_at"
+          "id, code, envio_id, cliente_id, cliente_email, comprador_alias, ticket_id, evento, sector, fecha_evento, cantidad, moneda, notas, estado, operacion_id, resuelta_por, resuelta_at, created_at, updated_at"
         )
         .eq("estado", "pendiente")
         .order("created_at", { ascending: false })

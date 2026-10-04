@@ -153,8 +153,8 @@ function seed(): MockDB {
   const manual: TicketFull[] = MOCK_TICKETS.filter((t) => t.source === "manual").map((t) => ({
     ...t,
     precio_origen: t.precio_final,
-    moneda_origen: "USD",
-    moneda_final: t.precio_final != null ? "USD" : null,
+    moneda_origen: t.moneda_final ?? "USD",
+    moneda_final: t.precio_final != null ? t.moneda_final ?? "USD" : null,
     disponible: (t.stock ?? 0) > 0,
     url_origen: null,
     scraped_at: iso(60),
@@ -660,6 +660,7 @@ export function mockCrearConsulta(input: {
   sector: string | null;
   fecha_evento: string | null;
   cantidad: number;
+  moneda?: Moneda | null;
   notas: string | null;
 }): Consulta {
   const now = new Date().toISOString();

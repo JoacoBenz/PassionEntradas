@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   evaluarLimite,
-  precioUsd,
+  precioVenta,
   reconciliarItem,
   resumenOperacion,
   separarPorTipo,
@@ -51,30 +51,30 @@ function item(over: Partial<ItemPedido> = {}): ItemPedido {
   };
 }
 
-describe("precioUsd", () => {
+describe("precioVenta (portal y propias en USD)", () => {
   it("convierte el precio del portal con la cotización", () => {
-    expect(precioUsd(PORTAL, TASA)).toBeCloseTo(777.6, 5);
+    expect(precioVenta(PORTAL, TASA)).toBeCloseTo(777.6, 5);
   });
 
-  it("deja las entradas propias como están (ya son USD)", () => {
-    expect(precioUsd(PROPIA, TASA)).toBe(150);
+  it("deja las entradas propias en dólares como están", () => {
+    expect(precioVenta(PROPIA, TASA)).toBe(150);
   });
 
   // La regresión que casi se escapa: usar precio_final crudo guardaba el
   // pedido ~8% por debajo del precio que el cliente vio en la tienda.
-  it("el portal en USD vale más que el número crudo de la tabla", () => {
-    expect(precioUsd(PORTAL, TASA)!).toBeGreaterThan(PORTAL.precio_final!);
+  it("el portal pasado a dólares vale más que el número crudo (euros)", () => {
+    expect(precioVenta(PORTAL, TASA)!).toBeGreaterThan(PORTAL.precio_final!);
   });
 
   it("cae a la cotización por defecto si la configurada es inválida", () => {
-    expect(precioUsd(PORTAL, 0)).toBeCloseTo(720 * 1.08, 5);
-    expect(precioUsd(PORTAL, -5)).toBeCloseTo(720 * 1.08, 5);
+    expect(precioVenta(PORTAL, 0)).toBeCloseTo(720 * 1.08, 5);
+    expect(precioVenta(PORTAL, -5)).toBeCloseTo(720 * 1.08, 5);
   });
 
   it("sin precio o con basura devuelve null (nunca NaN)", () => {
-    expect(precioUsd({ ...PORTAL, precio_final: null }, TASA)).toBeNull();
-    expect(precioUsd({ ...PORTAL, precio_final: NaN }, TASA)).toBeNull();
-    expect(precioUsd({ ...PORTAL, precio_final: 0 }, TASA)).toBeNull();
+    expect(precioVenta({ ...PORTAL, precio_final: null }, TASA)).toBeNull();
+    expect(precioVenta({ ...PORTAL, precio_final: NaN }, TASA)).toBeNull();
+    expect(precioVenta({ ...PORTAL, precio_final: 0 }, TASA)).toBeNull();
   });
 });
 

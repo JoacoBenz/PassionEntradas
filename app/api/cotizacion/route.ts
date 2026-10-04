@@ -8,7 +8,8 @@ import { parseCotizacion } from "@/lib/factura";
 
 // Cotizaciones de la tienda (tabla config):
 // - eur_usd: dólares por euro (portal Passion y entradas propias en euros);
-// - ars_por_usd: pesos por dólar (entradas propias en pesos).
+// - ars_por_usd: pesos por dólar. No se cobra con ella: solo compara precios
+//   en pesos con precios en dólares (el "desde" de un evento).
 // GET -> { eurUsd, arsPorUsd } · PUT { eurUsd } o { arsPorUsd } -> guarda esa
 // y revalida la tienda.
 // Solo administrador; escrituras con service role.

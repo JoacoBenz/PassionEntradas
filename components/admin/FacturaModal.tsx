@@ -27,11 +27,15 @@ export default function FacturaModal({
   // Cantidad del pedido (topeada por el stock en la tienda). Arranca de la
   // operación; si ya hay factura emitida, gana su snapshot (efecto de más abajo).
   const [cantidad, setCantidad] = useState(String(op.cantidad || 1));
-  const [metodo, setMetodo] = useState("Bank transfer (USD)");
+  const [metodo, setMetodo] = useState(
+    (op.moneda ?? "USD") === "ARS" ? "Transferencia (ARS)" : "Bank transfer (USD)"
+  );
   const [idioma, setIdioma] = useState<"en" | "es">("en");
   // Dólar del día, tipeado por el admin. Al re-emitir se precarga el que ya
   // tenía la factura; si cambió, se corrige acá.
   const [cotizacion, setCotizacion] = useState("");
+  // El dólar del día solo tiene sentido en una factura en dólares.
+  const esUsd = (op.moneda ?? "USD") === "USD";
   const [existente, setExistente] = useState<Factura | null>(null);
   const [cargando, setCargando] = useState(true);
   const [emitiendo, setEmitiendo] = useState(false);
@@ -71,7 +75,7 @@ export default function FacturaModal({
       onToast("error", "Cantidad inválida");
       return;
     }
-    if (parseCotizacion(cotizacion) == null) {
+    if (esUsd && parseCotizacion(cotizacion) == null) {
       onToast("error", "Cargá el dólar del día (pesos por dólar), por ejemplo 1465,50");
       return;
     }
@@ -253,6 +257,8 @@ export default function FacturaModal({
                   value={metodo}
                   onChange={(e) => setMetodo(e.target.value)}
                 >
+                  {!esUsd && <option>Transferencia (ARS)</option>}
+                  {!esUsd && <option>Efectivo (ARS)</option>}
                   <option>Bank transfer (USD)</option>
                   <option>Transferencia (USD)</option>
                   <option>Cash (USD)</option>
@@ -261,6 +267,7 @@ export default function FacturaModal({
                 </select>
               </div>
 
+              {esUsd && (
               <div>
                 <label htmlFor="f-cotizacion" className={labelCls}>
                   Dólar del día (pesos por dólar) *
@@ -277,6 +284,7 @@ export default function FacturaModal({
                   Queda fijo en la factura con la fecha de hoy. Se muestra el total en pesos al lado del total en dólares.
                 </p>
               </div>
+              )}
 
               <div className="flex gap-2 pt-1">
                 <button

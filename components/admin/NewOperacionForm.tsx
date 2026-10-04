@@ -23,9 +23,11 @@ type TicketMatch = {
   precio_costo: number | null;
   stock: number | null;
   source: "portal" | "manual";
-  // Ya convertidos a USD por la API (la tienda cobra en USD).
-  costo_usd: number | null;
-  precio_usd: number | null;
+  // Ya en su moneda de venta, la misma que vio el cliente en la tienda:
+  // pesos para una propia cargada en pesos, dólares para todo lo demás.
+  moneda_venta: "ARS" | "USD";
+  costo_venta: number | null;
+  precio_venta: number | null;
 };
 
 // Autocompletado del evento contra el catálogo: elegir un resultado vincula
@@ -225,21 +227,21 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
   }, []);
 
   // Elegir una entrada del buscador trae TODO lo que ya sabemos de ella:
-  // fecha, costo y comisión. Para las de Passion también — la API las devuelve
-  // ya pasadas a USD, así que la operación queda con los mismos números que vio
-  // el cliente en la tienda, y la comisión es el markup que se le aplicó.
+  // fecha, moneda, costo y comisión. La API los devuelve en la moneda en que se
+  // cobra esa entrada (pesos para una propia en pesos, dólares para el resto),
+  // así que la operación queda con los mismos números que vio el cliente.
   // Se pisa lo que haya: elegir una entrada es decir "cargá ESTA".
   function elegirTicket(t: TicketMatch) {
     setTicketId(t.id);
     setVinculo({ categoria: t.categoria, source: t.source });
-    const costo = t.costo_usd;
-    const precio = t.precio_usd;
+    const costo = t.costo_venta;
+    const precio = t.precio_venta;
     const comision = costo != null && precio != null ? Math.round((precio - costo) * 100) / 100 : null;
     setForm((f) => ({
       ...f,
       evento: t.evento,
       fecha_evento: t.fecha ? t.fecha.slice(0, 10) : f.fecha_evento,
-      moneda: "USD",
+      moneda: t.moneda_venta,
       costo: costo != null ? String(costo) : f.costo,
       // Solo si da positiva: una entrada sin costo cargado no tiene comisión
       // conocida, y poner 0 sería afirmar que no ganamos nada.

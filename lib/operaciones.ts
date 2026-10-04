@@ -370,8 +370,13 @@ export function quienDe(valor: string | null | undefined): string | null {
 // manejan en dólares.
 // Formatea en la moneda de la operación. ARS sin decimales (los centavos no
 // existen en la práctica); USD y EUR con 2, que es lo contable.
-export function formatMonto(n: number, moneda: Moneda = "USD"): string {
-  const dec = moneda === "ARS" ? 0 : 2;
+export function formatMonto(
+  n: number,
+  moneda: Moneda = "USD",
+  // Totales grandes (el tablero) se leen mejor sin centavos.
+  opts: { sinDecimales?: boolean } = {}
+): string {
+  const dec = moneda === "ARS" || opts.sinDecimales ? 0 : 2;
   return (
     MONEDA_LABEL[moneda] +
     " " +
@@ -435,6 +440,10 @@ export type Consulta = {
   sector: string | null;
   fecha_evento: string | null;
   cantidad: number;
+  // Moneda en que se cobraría la entrada consultada (pesos si es una propia
+  // cargada en pesos, si no dólares). La cotización arranca en esa moneda.
+  // null en consultas viejas o sin entrada vinculada.
+  moneda?: Moneda | null;
   notas: string | null;
   estado: EstadoConsulta;
   operacion_id: string | null;

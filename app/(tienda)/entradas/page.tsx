@@ -1,5 +1,5 @@
 import { fetchConfigTienda, fetchTickets } from "@/lib/supabase/public";
-import { normalizarPreciosUsd } from "@/lib/tickets";
+import { normalizarPrecios } from "@/lib/tickets";
 import { StorefrontHome } from "@/components/tienda/Storefront";
 import { requireAccesoTienda } from "@/lib/tienda-guard";
 
@@ -28,5 +28,5 @@ export default async function EntradasHome() {
   // Interruptor del panel: con Passion apagado quedan solo las propias.
   if (!cfg.portalActivo) rows = rows.filter((t) => t.source !== "portal");
   // Todo a USD antes de renderizar: la tienda no vuelve a convertir.
-  return <StorefrontHome rows={normalizarPreciosUsd(rows, cfg)} />;
+  return <StorefrontHome rows={normalizarPrecios(rows, cfg)} />;
 }

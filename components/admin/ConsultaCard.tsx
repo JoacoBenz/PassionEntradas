@@ -38,7 +38,10 @@ export default function ConsultaCard({ consulta: c, busy = false, onCargar, onEr
   const [open, setOpen] = useState(false);
   const [costo, setCosto] = useState("");
   const [comision, setComision] = useState("");
-  const [moneda, setMoneda] = useState<Moneda>("USD");
+  // Arranca en la moneda en que se cobraría esa entrada (pesos si es una
+  // propia cargada en pesos). Antes arrancaba siempre en USD y había que
+  // acordarse de cambiarla.
+  const [moneda, setMoneda] = useState<Moneda>(c.moneda ?? "USD");
 
   const cliente = c.comprador_alias ?? c.cliente_email ?? null;
   // Vista previa del total mientras escribe: es lo que se le va a cobrar.

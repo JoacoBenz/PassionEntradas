@@ -31,9 +31,14 @@ export type Ticket = {
   // con las zonas pintadas: esto le dice al agente cuál mirar. Lo escribe el
   // worker; puede venir como color (#E4572E, "red") o como nombre de zona.
   zona_color?: string | null;
-  // Moneda del precio. El portal es siempre EUR; una propia, la que eligió el
-  // admin. La tienda la usa para pasar todo a dólares (ver factorAUsd).
+  // Moneda del precio CRUDO. El portal es siempre EUR; una propia, la que
+  // eligió el admin al cargarla.
   moneda_final?: string | null;
+  // Los completa normalizarPrecios() antes de que la fila llegue a la tienda:
+  // en qué moneda se le cobra al cliente (precio_final ya queda en esa moneda)
+  // y su valor aproximado en dólares, solo para comparar y ordenar.
+  moneda_venta?: MonedaVenta;
+  precio_cmp?: number | null;
 };
 
 export type TicketFull = Ticket & {
@@ -83,24 +88,34 @@ export type EventoAgrupado = {
   bookStock: number;
   propias: boolean;
   minPrice: number | null;
+  // Moneda de minPrice: un evento puede tener sectores en pesos y en dólares.
+  minMoneda: MonedaVenta;
   // Mapa de sectores del evento (primera imagen no nula entre los sectores).
   imagen: string | null;
   ubicaciones: Ticket[];
 };
 
 // ---- moneda -----------------------------------------------------------------
-// La tienda trabaja SIEMPRE en dólares. Lo que no está en dólares se convierte
-// con las cotizaciones editables del panel (tabla `config`):
-// - portal Passion: siempre en euros -> clave eur_usd;
-// - entradas propias: en la moneda que eligió el admin al cargarlas (USD, EUR
-//   o ARS) -> eur_usd para euros, ars_por_usd (pesos por dólar) para pesos.
-// Este default solo cubre el caso de no poder leer la cotización del euro.
+// Regla única de moneda (la usan la tienda, el carrito, la búsqueda del panel
+// y el endpoint de pedidos, así que nunca muestran ni cobran cosas distintas):
+//
+// - Una entrada PROPIA cargada en PESOS se muestra y se cobra en PESOS. La
+//   operación queda en ARS y el cliente debe pesos.
+// - Todo lo demás se cobra en DÓLARES: el portal Passion (que viene en euros) y
+//   las propias cargadas en dólares o en euros. Los euros se pasan a dólares
+//   con la cotización del panel (config.eur_usd).
+//
+// La cotización dólar-peso (config.ars_por_usd) NO se usa para cobrar: solo
+// para comparar precios en pesos con precios en dólares (el "desde" de un
+// evento y el orden de sus sectores). Este default solo cubre el caso de no
+// poder leer la cotización del euro.
 export const DEFAULT_EUR_USD = 1.08;
+
+export type MonedaVenta = "ARS" | "USD";
 
 export type Tasas = {
   eurUsd: number;
-  // Pesos por dólar. Sin cargar, una entrada en pesos no tiene precio en
-  // dólares y se muestra "a consultar": mejor eso que un número inventado.
+  // Pesos por dólar. Solo para comparar; null = no cargada.
   arsPorUsd?: number | null;
 };
 
@@ -108,46 +123,74 @@ function tasasDe(t: number | Tasas): Tasas {
   return typeof t === "number" ? { eurUsd: t } : t;
 }
 
-// Por cuánto hay que multiplicar un monto de esa fila para tenerlo en USD.
-// null = no se puede convertir (pesos sin cotización cargada). Antes las
-// entradas propias se trataban siempre como dólares: una cargada en ARS a
-// 150.000 aparecía en la tienda a US$ 150,000.
-export function factorAUsd(
+/** En qué moneda se le cobra al cliente esta entrada. */
+export function monedaDeVenta(
+  source: TicketSource,
+  moneda: string | null | undefined
+): MonedaVenta {
+  return source === "manual" && (moneda ?? "").toUpperCase() === "ARS" ? "ARS" : "USD";
+}
+
+/**
+ * Por cuánto multiplicar un monto crudo de la fila para tenerlo en su moneda
+ * de venta. Pesos quedan como están; dólares también; euros (portal o propias)
+ * se pasan a dólares.
+ */
+export function factorAVenta(
   source: TicketSource,
   moneda: string | null | undefined,
   tasas: number | Tasas
-): number | null {
-  const { eurUsd, arsPorUsd } = tasasDe(tasas);
-  const eur = eurUsd > 0 ? eurUsd : DEFAULT_EUR_USD;
+): number {
+  if (monedaDeVenta(source, moneda) === "ARS") return 1;
+  const eur = tasasDe(tasas).eurUsd > 0 ? tasasDe(tasas).eurUsd : DEFAULT_EUR_USD;
   if (source === "portal") return eur;
-  const m = (moneda ?? "USD").toUpperCase();
-  if (m === "EUR") return eur;
-  if (m === "ARS") return arsPorUsd != null && arsPorUsd > 0 ? 1 / arsPorUsd : null;
-  return 1;
+  return (moneda ?? "USD").toUpperCase() === "EUR" ? eur : 1;
 }
 
-// Formatea un monto que YA está en USD (ver normalizarPreciosUsd).
-// El agrupado de miles sigue el idioma de la tienda (en: 1,234 / es: 1.234).
-export function fmtPrice(usd: number | null, lang: Lang = "en"): string | null {
-  if (usd == null) return null;
-  return (
-    "US$ " +
-    new Intl.NumberFormat(LOCALE[lang], { maximumFractionDigits: 0 }).format(Math.round(usd))
-  );
+/** Valor aproximado en dólares, para comparar. null si es en pesos y no hay cotización. */
+export function valorComparableUsd(
+  precioVenta: number | null,
+  moneda: MonedaVenta,
+  tasas: number | Tasas
+): number | null {
+  if (precioVenta == null || !Number.isFinite(precioVenta)) return null;
+  if (moneda === "USD") return precioVenta;
+  const ars = tasasDe(tasas).arsPorUsd;
+  return ars != null && ars > 0 ? precioVenta / ars : null;
 }
 
-// Normaliza el catálogo a USD (ver factorAUsd). Así la tienda muestra, ordena
-// y calcula "desde" en una sola moneda. Una fila que no se puede convertir
-// queda sin precio y la tienda la ofrece "a consultar".
-export function normalizarPreciosUsd<
+/**
+ * Deja el catálogo listo para la tienda: precio_final en su moneda de venta,
+ * con la moneda y el valor comparable al lado. La tienda no vuelve a convertir.
+ */
+export function normalizarPrecios<
   T extends { precio_final: number | null; source: TicketSource; moneda_final?: string | null }
->(rows: T[], tasas: number | Tasas): T[] {
+>(rows: T[], tasas: number | Tasas): (T & { moneda_venta: MonedaVenta; precio_cmp: number | null })[] {
   return rows.map((t) => {
-    if (t.precio_final == null) return t;
-    const f = factorAUsd(t.source, t.moneda_final, tasas);
-    if (f === 1) return t;
-    return { ...t, precio_final: f == null ? null : t.precio_final * f };
+    const moneda_venta = monedaDeVenta(t.source, t.moneda_final);
+    const precio =
+      t.precio_final == null ? null : t.precio_final * factorAVenta(t.source, t.moneda_final, tasas);
+    return {
+      ...t,
+      precio_final: precio,
+      moneda_venta,
+      precio_cmp: valorComparableUsd(precio, moneda_venta, tasas),
+    };
   });
+}
+
+// Formatea un monto que YA está en su moneda de venta (ver normalizarPrecios).
+// El agrupado de miles sigue el idioma de la tienda (en: 1,234 / es: 1.234).
+export function fmtPrice(
+  monto: number | null,
+  lang: Lang = "en",
+  moneda: MonedaVenta = "USD"
+): string | null {
+  if (monto == null) return null;
+  return (
+    (moneda === "ARS" ? "$ " : "US$ ") +
+    new Intl.NumberFormat(LOCALE[lang], { maximumFractionDigits: 0 }).format(Math.round(monto))
+  );
 }
 
 // Día calendario de HOY en Argentina (en-CA da formato YYYY-MM-DD).
@@ -249,6 +292,21 @@ export function imagenSegura(url: string | null | undefined): string | null {
 }
 
 // ---- agrupado por evento --------------------------------------------------------
+// Para ordenar sectores con monedas distintas: el valor en dólares si se
+// puede calcular. Un precio en pesos sin cotización va después de los que se
+// pueden comparar (entre ellos, por su monto), y sin precio al final.
+function valorDeOrden(u: Ticket): number {
+  if (u.precio_cmp != null) return u.precio_cmp;
+  if ((u.moneda_venta ?? "USD") === "USD" && u.precio_final != null) return Number(u.precio_final);
+  if (u.precio_final != null) return 1e12 + Number(u.precio_final);
+  return Infinity;
+}
+
+function masBarato(arr: Ticket[]): Ticket | null {
+  if (arr.length === 0) return null;
+  return [...arr].sort((a, b) => valorDeOrden(a) - valorDeOrden(b))[0];
+}
+
 export function buildEvents(rows: Ticket[]): EventoAgrupado[] {
   const map = new Map<string, EventoAgrupado>();
   for (const r of rows) {
@@ -266,6 +324,7 @@ export function buildEvents(rows: Ticket[]): EventoAgrupado[] {
         bookStock: 0,
         propias: false,
         minPrice: null,
+        minMoneda: "USD",
         imagen: null,
         ubicaciones: [],
       });
@@ -298,18 +357,16 @@ export function buildEvents(rows: Ticket[]): EventoAgrupado[] {
     // evento sin mapa aunque otro sector tenga uno bueno.
     ev.imagen =
       ev.ubicaciones.map((u) => imagenSegura(u.imagen_url)).find((src) => src != null) ?? null;
-    // "desde": menor precio real (>0). Prioriza lo reservable.
-    const precioPos = (arr: Ticket[]) =>
-      arr.map((u) => Number(u.precio_final)).filter((n) => Number.isFinite(n) && n > 0);
-    const reservables = precioPos(
+    // "desde": el sector más barato, comparando pesos con dólares por su valor
+    // en dólares. Prioriza lo reservable. Se muestra en SU moneda.
+    const candidatos = (arr: Ticket[]) =>
+      arr.filter((u) => Number.isFinite(Number(u.precio_final)) && Number(u.precio_final) > 0);
+    const reservables = candidatos(
       ev.ubicaciones.filter((u) => (u.stock ?? 0) > 0 && u.estado === "book")
     );
-    const todos = precioPos(ev.ubicaciones);
-    ev.minPrice = reservables.length
-      ? Math.min(...reservables)
-      : todos.length
-        ? Math.min(...todos)
-        : null;
+    const elegido = masBarato(reservables.length ? reservables : candidatos(ev.ubicaciones));
+    ev.minPrice = elegido ? Number(elegido.precio_final) : null;
+    ev.minMoneda = elegido?.moneda_venta ?? "USD";
     // Primero lo que se puede comprar, después lo que hay que consultar: el
     // que entra a la tarjeta quiere ver qué hay disponible, no arrancar por
     // los sectores sin cupo. Dentro de cada grupo, del más barato al más caro.
@@ -317,9 +374,7 @@ export function buildEvents(rows: Ticket[]): EventoAgrupado[] {
       const ca = comprable(a) ? 0 : 1;
       const cb = comprable(b) ? 0 : 1;
       if (ca !== cb) return ca - cb;
-      const pa = a.precio_final == null ? Infinity : Number(a.precio_final);
-      const pb = b.precio_final == null ? Infinity : Number(b.precio_final);
-      return pa - pb;
+      return valorDeOrden(a) - valorDeOrden(b);
     });
   }
   return evs;

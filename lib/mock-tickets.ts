@@ -32,4 +32,7 @@ export const MOCK_TICKETS: Ticket[] = [
   { id: "4001::REQ", evento: "Final - FIFA World Cup 2026", competicion: "FIFA World Cup 2026", fecha: d(45), ciudad: "MetLife Stadium, New York (USA)", categoria: null, precio_final: null, stock: 0, estado: "on_request", source: "portal" },
   // Manual (propia)
   { id: "manual::demo-1", evento: "River vs Boca - Superclásico", competicion: "Primera División", fecha: d(15), ciudad: "Estadio Monumental, Buenos Aires (ARG)", categoria: "Platea Alta", precio_costo: 110, precio_final: 150, stock: 2, estado: "book", source: "manual" },
+  // Propia cargada en PESOS: el demo tiene que mostrar el caso del pedido de
+  // Boca (se cobra en pesos, no se convierte).
+  { id: "manual::demo-ars", evento: "Boca vs Vasco da Gama", competicion: "Copa Libertadores", fecha: d(18), ciudad: "La Bombonera, Buenos Aires (ARG)", categoria: "Platea Baja", precio_costo: 390000, precio_final: 600000, moneda_final: "ARS", stock: 7, estado: "book", source: "manual" },
 ];

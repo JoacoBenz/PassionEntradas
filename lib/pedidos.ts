@@ -5,7 +5,7 @@
 // avisos se disparan), y así se pueden testear sin levantar Next ni Supabase.
 // El route se queda con lo que no es puro: leer la base y responder HTTP.
 
-import { factorAUsd, type Tasas, type TicketSource } from "@/lib/tickets";
+import { factorAVenta, monedaDeVenta, type MonedaVenta, type Tasas, type TicketSource } from "@/lib/tickets";
 import type { TipoOperacion } from "@/lib/operaciones";
 
 // La fila real de `tickets` contra la que se reconcilia un item del carrito.
@@ -41,31 +41,33 @@ export type ItemPedido = {
   // contra la fila real y termina en el `fee` de la operación, que es de donde
   // sale "comisión ganada" en el tablero.
   comision?: number;
+  // Moneda en que se cobra esta línea (ver monedaDeVenta). La pone la
+  // reconciliación con la fila real; una línea sin entrada vinculada es USD.
+  moneda?: MonedaVenta;
 };
 
 // --- precio ------------------------------------------------------------------
-// Pasa a USD el precio crudo de `tickets`, con el mismo criterio que la tienda
-// (ver factorAUsd): si no, el monto guardado no sería el precio que vio el
-// cliente.
-export function precioUsd(t: TicketRef, tasa: number | Tasas): number | null {
-  return aUsd(t.precio_final, t, tasa);
+// El precio crudo de `tickets` llevado a su moneda de venta, con el mismo
+// criterio que la tienda (ver monedaDeVenta / factorAVenta): pesos quedan en
+// pesos, euros pasan a dólares. Si no, el monto guardado no sería el precio
+// que vio el cliente.
+export function precioVenta(t: TicketRef, tasa: number | Tasas): number | null {
+  return aVenta(t.precio_final, t, tasa);
 }
 
-// Lo que NOS cuesta la entrada, en USD. El costo de una entrada propia está en
-// la misma moneda que su precio. null cuando no hay dato de costo cargado.
-export function costoUsd(t: TicketRef, tasa: number | Tasas): number | null {
+// Lo que NOS cuesta la entrada, en la misma moneda que su precio de venta.
+// null cuando no hay dato de costo cargado.
+export function costoVenta(t: TicketRef, tasa: number | Tasas): number | null {
   const crudo = t.source === "portal" ? t.precio_origen : t.precio_costo;
-  return aUsd(crudo ?? null, t, tasa);
+  return aVenta(crudo ?? null, t, tasa);
 }
 
-function aUsd(valor: number | null, t: TicketRef, tasa: number | Tasas): number | null {
+function aVenta(valor: number | null, t: TicketRef, tasa: number | Tasas): number | null {
   if (valor == null) return null;
   const bruto = Number(valor);
   if (!Number.isFinite(bruto)) return null;
-  const factor = factorAUsd(t.source, t.moneda_final, tasa);
-  if (factor == null) return null;
-  const usd = bruto * factor;
-  return Number.isFinite(usd) && usd > 0 ? usd : null;
+  const v = bruto * factorAVenta(t.source, t.moneda_final, tasa);
+  return Number.isFinite(v) && v > 0 ? v : null;
 }
 
 // --- reconciliación ----------------------------------------------------------
@@ -91,13 +93,13 @@ export function reconciliarItem(p: ItemPedido, t: TicketRef | undefined, tasa: n
   // Mismo redondeo que muestra la tienda (fmtPrice usa Math.round), para que el
   // monto guardado coincida con el precio que vio el cliente. La consulta queda
   // en 0: es "a confirmar", no una compra.
-  const usd = precioUsd(t, tasa);
-  // Un pedido de una entrada que no tiene precio en dólares (por ejemplo, en
-  // pesos sin cotización cargada) no se puede cobrar: pasa a consulta. La
-  // tienda ya la mostraba "a consultar"; esto cubre un carrito viejo o
-  // manipulado, que si no terminaba en una operación de US$ 0.
-  if (out.tipo === "pedido" && usd == null) out.tipo = "consulta";
-  const unit = out.tipo === "pedido" && usd != null ? Math.round(usd) : 0;
+  out.moneda = monedaDeVenta(t.source, t.moneda_final);
+  const precio = precioVenta(t, tasa);
+  // Un pedido de una entrada que hoy no tiene precio no se puede cobrar: pasa
+  // a consulta. La tienda ya la mostraba "a consultar"; esto cubre un carrito
+  // viejo o manipulado, que si no terminaba en una operación de 0.
+  if (out.tipo === "pedido" && precio == null) out.tipo = "consulta";
+  const unit = out.tipo === "pedido" && precio != null ? Math.round(precio) : 0;
   out.monto = unit * out.cantidad;
 
   // Comisión de la línea = lo que se cobra − lo que cuesta, con el costo
@@ -107,7 +109,7 @@ export function reconciliarItem(p: ItemPedido, t: TicketRef | undefined, tasa: n
   // Sin costo conocido la comisión es 0, NO el precio entero: un costo
   // desconocido no es un costo de cero, y tomarlo como tal le inventaría al
   // tablero una ganancia igual a toda la venta.
-  const costo = out.tipo === "pedido" ? costoUsd(t, tasa) : null;
+  const costo = out.tipo === "pedido" ? costoVenta(t, tasa) : null;
   out.comision = costo == null ? 0 : Math.max(0, (unit - Math.round(costo)) * out.cantidad);
   return out;
 }
@@ -179,6 +181,16 @@ export function resumenOperacion(lineas: ItemPedido[]): ResumenOperacion {
   const monto = lineas.reduce((a, l) => a + l.monto, 0);
 
   return { evento, sector, ticket_id, cantidad, fecha_evento, monto };
+}
+
+// Un carrito puede traer entradas en pesos y en dólares. Una operación se
+// debe en UNA moneda (sus líneas no tienen moneda propia), así que el pedido
+// se parte: una operación por moneda. Orden estable: dólares primero.
+export function agruparPorMoneda(lineas: ItemPedido[]): { moneda: MonedaVenta; lineas: ItemPedido[] }[] {
+  const orden: MonedaVenta[] = ["USD", "ARS"];
+  return orden
+    .map((moneda) => ({ moneda, lineas: lineas.filter((l) => (l.moneda ?? "USD") === moneda) }))
+    .filter((g) => g.lineas.length > 0);
 }
 
 // Separa lo que se reserva de lo que se consulta: la operación se arma solo

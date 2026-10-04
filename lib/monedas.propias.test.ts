@@ -1,86 +1,176 @@
 import { describe, expect, it } from "vitest";
-import { factorAUsd, normalizarPreciosUsd } from "./tickets";
-import { costoUsd, precioUsd, reconciliarItem, type ItemPedido, type TicketRef } from "./pedidos";
+import {
+  buildEvents,
+  factorAVenta,
+  fmtPrice,
+  monedaDeVenta,
+  normalizarPrecios,
+  valorComparableUsd,
+  type Ticket,
+} from "./tickets";
+import {
+  agruparPorMoneda,
+  costoVenta,
+  precioVenta,
+  reconciliarItem,
+  type ItemPedido,
+  type TicketRef,
+} from "./pedidos";
 
 const tasas = { eurUsd: 1.15, arsPorUsd: 1500 };
 
-describe("factorAUsd", () => {
-  it("portal: siempre euros", () => {
-    expect(factorAUsd("portal", "USD", tasas)).toBe(1.15);
+describe("monedaDeVenta: la regla única", () => {
+  it("una propia en pesos se cobra en pesos", () => {
+    expect(monedaDeVenta("manual", "ARS")).toBe("ARS");
+    expect(monedaDeVenta("manual", "ars")).toBe("ARS");
   });
-  it("propias: según la moneda con que se cargaron", () => {
-    expect(factorAUsd("manual", "USD", tasas)).toBe(1);
-    expect(factorAUsd("manual", null, tasas)).toBe(1);
-    expect(factorAUsd("manual", "EUR", tasas)).toBe(1.15);
-    expect(factorAUsd("manual", "ARS", tasas)).toBeCloseTo(1 / 1500);
-  });
-  it("pesos sin cotización cargada: no se puede convertir", () => {
-    expect(factorAUsd("manual", "ARS", { eurUsd: 1.15 })).toBeNull();
-    expect(factorAUsd("manual", "ARS", { eurUsd: 1.15, arsPorUsd: 0 })).toBeNull();
-  });
-  it("acepta el número suelto de antes (solo EUR)", () => {
-    expect(factorAUsd("portal", null, 1.2)).toBe(1.2);
+  it("todo lo demás se cobra en dólares", () => {
+    expect(monedaDeVenta("manual", "USD")).toBe("USD");
+    expect(monedaDeVenta("manual", "EUR")).toBe("USD");
+    expect(monedaDeVenta("manual", null)).toBe("USD");
+    expect(monedaDeVenta("portal", "EUR")).toBe("USD");
+    // Un portal nunca se cobra en pesos, aunque una fila venga rara.
+    expect(monedaDeVenta("portal", "ARS")).toBe("USD");
   });
 });
 
-describe("normalizarPreciosUsd con entradas propias", () => {
-  const fila = (moneda: string, precio: number) => ({
+describe("factorAVenta", () => {
+  it("pesos quedan como están (no se convierten)", () => {
+    expect(factorAVenta("manual", "ARS", tasas)).toBe(1);
+    // Ni siquiera hace falta la cotización del peso para cobrar.
+    expect(factorAVenta("manual", "ARS", { eurUsd: 1.15 })).toBe(1);
+  });
+  it("euros pasan a dólares (portal y propias)", () => {
+    expect(factorAVenta("portal", "EUR", tasas)).toBe(1.15);
+    expect(factorAVenta("manual", "EUR", tasas)).toBe(1.15);
+  });
+  it("dólares quedan como están", () => {
+    expect(factorAVenta("manual", "USD", tasas)).toBe(1);
+  });
+});
+
+describe("normalizarPrecios: lo que ve el cliente", () => {
+  const fila = (moneda: string, precio: number, source: "manual" | "portal" = "manual") => ({
     precio_final: precio,
-    source: "manual" as const,
+    source,
     moneda_final: moneda,
   });
 
-  it("el bug: una propia en pesos ya no aparece como dólares", () => {
-    const [r] = normalizarPreciosUsd([fila("ARS", 150_000)], tasas);
-    expect(r.precio_final).toBe(100); // 150.000 / 1500
+  it("el caso Boca: $ 600.000 se muestra en pesos, no como US$ 600,000", () => {
+    const [r] = normalizarPrecios([fila("ARS", 600_000)], tasas);
+    expect(r.precio_final).toBe(600_000);
+    expect(r.moneda_venta).toBe("ARS");
+    expect(fmtPrice(r.precio_final, "es", r.moneda_venta)).toBe("$ 600.000");
   });
-  it("euros propios se convierten igual que el portal", () => {
-    const [r] = normalizarPreciosUsd([fila("EUR", 100)], tasas);
+  it("una propia en euros se muestra en dólares", () => {
+    const [r] = normalizarPrecios([fila("EUR", 100)], tasas);
+    expect(r.moneda_venta).toBe("USD");
     expect(r.precio_final).toBeCloseTo(115);
   });
-  it("dólares quedan igual", () => {
-    const [r] = normalizarPreciosUsd([fila("USD", 250)], tasas);
-    expect(r.precio_final).toBe(250);
+  it("pesos sin cotización igual tienen precio (solo no se pueden comparar)", () => {
+    const [r] = normalizarPrecios([fila("ARS", 600_000)], { eurUsd: 1.15 });
+    expect(r.precio_final).toBe(600_000);
+    expect(r.precio_cmp).toBeNull();
   });
-  it("pesos sin cotización: sin precio (la tienda la ofrece a consultar)", () => {
-    const [r] = normalizarPreciosUsd([fila("ARS", 150_000)], { eurUsd: 1.15 });
-    expect(r.precio_final).toBeNull();
+});
+
+describe("valorComparableUsd", () => {
+  it("compara pesos con dólares usando la cotización", () => {
+    expect(valorComparableUsd(600_000, "ARS", tasas)).toBe(400);
+    expect(valorComparableUsd(500, "USD", tasas)).toBe(500);
+  });
+});
+
+describe("evento con sectores en pesos y en dólares", () => {
+  const base = {
+    evento: "Boca vs Vasco",
+    competicion: "Libertadores",
+    fecha: "2026-11-01",
+    ciudad: "La Bombonera",
+    estado: "book",
+    stock: 3,
+  };
+  const rows = (t: typeof tasas | { eurUsd: number }) =>
+    normalizarPrecios(
+      [
+        { ...base, id: "a", categoria: "Platea", precio_final: 600_000, moneda_final: "ARS", source: "manual" as const },
+        { ...base, id: "b", categoria: "VIP", precio_final: 500, moneda_final: "USD", source: "manual" as const },
+      ],
+      t
+    ) as unknown as Ticket[];
+
+  it("el 'desde' es el más barato de verdad, en su moneda", () => {
+    // $ 600.000 / 1500 = US$ 400 < US$ 500
+    const [ev] = buildEvents(rows(tasas));
+    expect(ev.minPrice).toBe(600_000);
+    expect(ev.minMoneda).toBe("ARS");
+    expect(ev.ubicaciones.map((u) => u.categoria)).toEqual(["Platea", "VIP"]);
+  });
+  it("sin cotización no compara 600.000 contra 500: el 'desde' queda en dólares", () => {
+    const [ev] = buildEvents(rows({ eurUsd: 1.15 }));
+    expect(ev.minMoneda).toBe("USD");
+    expect(ev.minPrice).toBe(500);
   });
 });
 
 describe("pedido de una entrada propia en pesos", () => {
   const ref: TicketRef = {
-    evento: "Boca vs River",
-    categoria: "Platea",
-    precio_final: 150_000,
-    precio_costo: 120_000,
-    stock: 5,
-    fecha: "2026-10-10",
+    evento: "Boca vs Vasco",
+    categoria: "Platea Baja",
+    precio_final: 600_000,
+    precio_costo: 390_000,
+    stock: 7,
+    fecha: "2026-11-01",
     source: "manual",
     moneda_final: "ARS",
   };
   const item: ItemPedido = {
     tipo: "pedido",
-    evento: "Boca vs River",
-    sector: "Platea",
-    ticket_id: "manual::x",
-    monto: 150_000,
+    evento: "x",
+    sector: "x",
+    ticket_id: "manual::boca",
+    monto: 1,
     cantidad: 2,
     fecha_evento: null,
   };
 
-  it("se cobra en dólares al precio que vio el cliente, con su comisión", () => {
-    expect(precioUsd(ref, tasas)).toBe(100);
-    expect(costoUsd(ref, tasas)).toBe(80);
+  it("se cobra en pesos: el caso real (2 × $ 600.000, comisión 2 × $ 210.000)", () => {
+    expect(precioVenta(ref, tasas)).toBe(600_000);
+    expect(costoVenta(ref, tasas)).toBe(390_000);
     const r = reconciliarItem(item, ref, tasas);
+    expect(r.moneda).toBe("ARS");
     expect(r.tipo).toBe("pedido");
-    expect(r.monto).toBe(200); // 2 × US$ 100
-    expect(r.comision).toBe(40); // 2 × (100 − 80)
+    expect(r.monto).toBe(1_200_000);
+    expect(r.comision).toBe(420_000);
   });
 
-  it("sin cotización de pesos pasa a consulta, nunca a un pedido de US$ 0", () => {
+  it("no depende de la cotización del peso", () => {
     const r = reconciliarItem(item, ref, { eurUsd: 1.15 });
-    expect(r.tipo).toBe("consulta");
-    expect(r.monto).toBe(0);
+    expect(r.tipo).toBe("pedido");
+    expect(r.monto).toBe(1_200_000);
+  });
+});
+
+describe("agruparPorMoneda: un carrito, una operación por moneda", () => {
+  const l = (moneda: "ARS" | "USD" | undefined, monto: number): ItemPedido => ({
+    tipo: "pedido",
+    evento: "e",
+    sector: null,
+    ticket_id: null,
+    monto,
+    cantidad: 1,
+    fecha_evento: null,
+    moneda,
+  });
+  it("separa pesos de dólares y nunca los suma", () => {
+    const g = agruparPorMoneda([l("ARS", 600_000), l("USD", 500), l("ARS", 300_000)]);
+    expect(g.map((x) => x.moneda)).toEqual(["USD", "ARS"]);
+    expect(g[1].lineas.reduce((a, x) => a + x.monto, 0)).toBe(900_000);
+  });
+  it("una línea sin moneda (sin entrada vinculada) es USD", () => {
+    expect(agruparPorMoneda([l(undefined, 10)])[0].moneda).toBe("USD");
+  });
+  it("todo en una moneda: un solo grupo", () => {
+    expect(agruparPorMoneda([l("USD", 1), l("USD", 2)])).toHaveLength(1);
   });
 });

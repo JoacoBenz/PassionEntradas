@@ -89,9 +89,9 @@ export async function POST(
   const cantidad = Math.trunc(Number(body.cantidad));
   const metodo = String(body.metodo_pago ?? "").trim().slice(0, 80);
   const idioma: FacturaIdioma = body.idioma === "es" ? "es" : "en";
-  // Dólar del día: lo carga el admin a mano en cada emisión. Obligatorio,
-  // porque la factura existe justamente para dejar asentado el valor de ese
-  // día. La fecha es la de emisión, en hora argentina.
+  // Dólar del día: lo carga el admin a mano en cada emisión de una factura en
+  // DÓLARES (deja asentado su valor en pesos ese día). Una factura en pesos no
+  // lo necesita. La fecha es la de emisión, en hora argentina.
   const arsPorUsd = parseCotizacion(body.cotizacion);
 
   if (!nombre) {
@@ -106,12 +106,6 @@ export async function POST(
   if (!metodo) {
     return NextResponse.json(
       { error: "El método de pago es obligatorio" },
-      { status: 400 }
-    );
-  }
-  if (arsPorUsd == null) {
-    return NextResponse.json(
-      { error: "Cargá el dólar del día (pesos por dólar), por ejemplo 1465,50" },
       { status: 400 }
     );
   }
@@ -130,6 +124,7 @@ export async function POST(
     pago_confirmado_at: string | null;
     fecha_evento: string | null;
     ticket_id: string | null;
+    moneda?: "ARS" | "USD" | "EUR" | null;
     // Quién la pidió desde la tienda (null en las cargadas a mano).
     cliente_id?: string | null;
     cliente_email?: string | null;
@@ -150,7 +145,7 @@ export async function POST(
     const admin = createAdminSupabase();
     const { data, error } = await admin
       .from("operaciones")
-      .select("id, code, evento, monto, fee, status, pago_confirmado_at, fecha_evento, ticket_id, cliente_id, cliente_email")
+      .select("id, code, evento, monto, fee, moneda, status, pago_confirmado_at, fecha_evento, ticket_id, cliente_id, cliente_email")
       .eq("id", params.id)
       .maybeSingle();
     if (error) {
@@ -174,6 +169,13 @@ export async function POST(
     return NextResponse.json(
       { error: "La operación está cancelada: no se factura" },
       { status: 409 }
+    );
+  }
+  const monedaOp = op.moneda ?? "USD";
+  if (monedaOp === "USD" && arsPorUsd == null) {
+    return NextResponse.json(
+      { error: "Cargá el dólar del día (pesos por dólar), por ejemplo 1465,50" },
+      { status: 400 }
     );
   }
   // El invoice es un recibo: recién existe cuando el pago está confirmado.
@@ -275,7 +277,8 @@ export async function POST(
     total: op.monto,
     metodo_pago: metodo,
     pago_confirmado_at: op.pago_confirmado_at,
-    cotizacion: { ars_por_usd: arsPorUsd, fecha: hoyAr },
+    cotizacion: monedaOp === "USD" && arsPorUsd != null ? { ars_por_usd: arsPorUsd, fecha: hoyAr } : null,
+    moneda: monedaOp,
   };
 
   if (isMock()) {

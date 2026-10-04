@@ -18,6 +18,9 @@ export type Metrics = {
   enJuegoMonto: number; // monto comprometido en operaciones abiertas sin pago
   enJuegoOps: number; // cuántas operaciones abiertas sin pago
   ticketPromedio: number; // plataMovida / entradasVendidas: precio medio por entrada
+  // Las otras monedas con movimiento (mismos campos, cada una en la suya).
+  // El tablero las muestra en pestañas: pesos y dólares nunca se suman.
+  otrasMonedas?: Metrics[];
 };
 
 type OpMetrica = Pick<
@@ -94,23 +97,22 @@ export function computeMetrics(
 }
 
 
-// El RPC devuelve una fila por moneda. Se queda con la de mayor movimiento:
-// mezclarlas daría un número que no significa nada, y mostrar N tableros
-// complica una pantalla que hoy es de un vistazo.
-export function metricasDominantes(
-  filas: {
-    moneda?: string | null;
-    plata_movida?: number | null;
-    comision_ganada?: number | null;
-    entradas_vendidas?: number | null;
-    en_juego_monto?: number | null;
-    en_juego_ops?: number | null;
-  }[]
-): Metrics {
-  const orden = [...(filas ?? [])].sort(
-    (a, b) => Number(b.plata_movida ?? 0) - Number(a.plata_movida ?? 0)
-  );
-  const m = orden[0] ?? {};
+// El RPC devuelve una fila por moneda. La principal es USD si tuvo
+// movimiento (es la moneda de casi todo el negocio); si no, la de más
+// operaciones. Las demás van en `otrasMonedas` para verlas por separado.
+// Antes se elegía "la de mayor plata movida" comparando montos crudos: un
+// pedido de $ 1.200.000 le ganaba a US$ 50.000 y el tablero pasaba a pesos
+// mostrando los montos con "US$" adelante.
+type FilaMoneda = {
+  moneda?: string | null;
+  plata_movida?: number | null;
+  comision_ganada?: number | null;
+  entradas_vendidas?: number | null;
+  en_juego_monto?: number | null;
+  en_juego_ops?: number | null;
+};
+
+function aMetrics(m: FilaMoneda): Metrics {
   const plataMovida = Number(m.plata_movida ?? 0);
   const entradasVendidas = Number(m.entradas_vendidas ?? 0);
   return {
@@ -122,4 +124,15 @@ export function metricasDominantes(
     enJuegoOps: Number(m.en_juego_ops ?? 0),
     ticketPromedio: entradasVendidas > 0 ? Math.round(plataMovida / entradasVendidas) : 0,
   };
+}
+
+export function metricasDominantes(filas: FilaMoneda[]): Metrics {
+  const todas = (filas ?? []).map(aMetrics);
+  const actividad = (m: Metrics) => m.entradasVendidas + m.enJuegoOps;
+  const principal =
+    todas.find((m) => m.moneda === "USD" && actividad(m) > 0) ??
+    [...todas].sort((a, b) => actividad(b) - actividad(a))[0] ??
+    aMetrics({});
+  const otras = todas.filter((m) => m !== principal && actividad(m) > 0);
+  return { ...principal, otrasMonedas: otras };
 }

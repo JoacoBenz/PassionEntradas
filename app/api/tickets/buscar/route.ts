@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { esStaff, getRol } from "@/lib/auth";
-import { DEFAULT_EUR_USD, factorAUsd, hoyArgentina, type Tasas } from "@/lib/tickets";
+import { DEFAULT_EUR_USD, factorAVenta, hoyArgentina, monedaDeVenta, type MonedaVenta, type Tasas } from "@/lib/tickets";
 import { fetchConfigTienda } from "@/lib/supabase/public";
 import { isMock, mockListManual } from "@/lib/mock-db";
 import { MOCK_TICKETS } from "@/lib/mock-tickets";
@@ -23,18 +23,18 @@ export type TicketMatch = {
   precio_costo: number | null;
   stock: number | null;
   source: "portal" | "manual";
-  // Costo y precio YA en USD, con la misma conversión que usa la tienda. Se
+  // Costo y precio YA en su moneda de venta (la misma regla que la tienda:
+  // una propia en pesos queda en pesos, el resto en dólares) y esa moneda. Se
   // resuelven acá porque el formulario no tiene la cotización (es de admin) y
-  // porque así la operación se carga con los mismos números que vio el
-  // cliente. Para las del portal, el costo es lo que cobra Passion y la
-  // diferencia con el precio es nuestro markup.
-  costo_usd: number | null;
-  precio_usd: number | null;
+  // porque así la operación se carga con los mismos números y la misma moneda
+  // que vio el cliente. Para las del portal, el costo es lo que cobra Passion.
+  moneda_venta: MonedaVenta;
+  costo_venta: number | null;
+  precio_venta: number | null;
 };
 
-// Misma conversión que la tienda (ver factorAUsd): el portal guarda EUR; las
-// propias, la moneda con que se cargaron.
-function enUsd(
+// Misma regla que la tienda (ver monedaDeVenta / factorAVenta).
+function enVenta(
   valor: unknown,
   source: "portal" | "manual",
   moneda: string | null | undefined,
@@ -43,9 +43,7 @@ function enUsd(
   if (valor == null) return null;
   const n = Number(valor);
   if (!Number.isFinite(n) || n <= 0) return null;
-  const f = factorAUsd(source, moneda, tasas);
-  if (f == null) return null;
-  return Math.round(n * f * 100) / 100;
+  return Math.round(n * factorAVenta(source, moneda, tasas) * 100) / 100;
 }
 
 const LIMITE = 12;
@@ -93,8 +91,9 @@ export async function GET(request: Request) {
           precio_costo: r.precio_costo ?? null,
           stock,
           source,
-          costo_usd: enUsd(costo, source, r.moneda_final, tasa),
-          precio_usd: enUsd(precio_final, source, r.moneda_final, tasa),
+          moneda_venta: monedaDeVenta(source, r.moneda_final),
+          costo_venta: enVenta(costo, source, r.moneda_final, tasa),
+          precio_venta: enVenta(precio_final, source, r.moneda_final, tasa),
         };
       });
     return NextResponse.json(out);
@@ -151,8 +150,9 @@ export async function GET(request: Request) {
       precio_costo: t.precio_costo ?? null,
       stock: t.stock ?? null,
       source,
-      costo_usd: enUsd(costo, source, t.moneda_final, tasa),
-      precio_usd: enUsd(t.precio_final, source, t.moneda_final, tasa),
+      moneda_venta: monedaDeVenta(source, t.moneda_final),
+      costo_venta: enVenta(costo, source, t.moneda_final, tasa),
+      precio_venta: enVenta(t.precio_final, source, t.moneda_final, tasa),
     };
   });
   return NextResponse.json(out);

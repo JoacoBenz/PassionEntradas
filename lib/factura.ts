@@ -51,7 +51,28 @@ export type FacturaDatos = {
   // su emisión, no el de hoy). Opcional porque las facturas emitidas antes no
   // lo tienen.
   cotizacion?: { ars_por_usd: number; fecha: string } | null;
+  // Moneda de la operación facturada. Opcional: todas las facturas emitidas
+  // antes de este campo eran en dólares, y se leen así (ver monedaFactura).
+  moneda?: "ARS" | "USD" | "EUR";
 };
+
+export function monedaFactura(d: Pick<FacturaDatos, "moneda">): "ARS" | "USD" | "EUR" {
+  return d.moneda ?? "USD";
+}
+
+// Monto en la moneda de la factura. ARS sin decimales (los centavos no se usan);
+// USD y EUR con dos, que es lo contable.
+export function fmtMontoMoneda(n: number, moneda: "ARS" | "USD" | "EUR", idioma: FacturaIdioma): string {
+  if (moneda === "USD") return fmtMontoFactura(n, idioma);
+  const dec = moneda === "ARS" ? 0 : 2;
+  return (
+    (moneda === "ARS" ? "AR$ " : "€ ") +
+    new Intl.NumberFormat(idioma === "en" ? "en-US" : "es-AR", {
+      minimumFractionDigits: dec,
+      maximumFractionDigits: dec,
+    }).format(n)
+  );
+}
 
 export type Factura = {
   id: string;
@@ -143,6 +164,8 @@ export const FACTURA_TX = {
     fee: "Service & escrow fee",
     total: "Total",
     usdNote: "All amounts in US dollars (USD).",
+    arsOnlyNote: "All amounts in Argentine pesos (ARS).",
+    eurOnlyNote: "All amounts in euros (EUR).",
     exchangeRate: (fecha: string) => `Exchange rate (${fecha})`,
     totalArs: "Total in Argentine pesos",
     arsNote: "Peso amount for reference, at the exchange rate of the issue date.",
@@ -177,6 +200,8 @@ export const FACTURA_TX = {
     fee: "Servicio y custodia",
     total: "Total",
     usdNote: "Todos los montos en dólares estadounidenses (USD).",
+    arsOnlyNote: "Todos los montos en pesos argentinos (ARS).",
+    eurOnlyNote: "Todos los montos en euros (EUR).",
     exchangeRate: (fecha: string) => `Dólar del día (${fecha})`,
     totalArs: "Total en pesos",
     arsNote: "Monto en pesos de referencia, al dólar del día de emisión.",
