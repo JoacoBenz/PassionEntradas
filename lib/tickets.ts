@@ -274,15 +274,31 @@ export const mesLabel = (iso: string | null) =>
     : "A confirmar";
 
 // ---- WhatsApp -----------------------------------------------------------------
-export function waLink(text: string): string {
-  const wa = (process.env.NEXT_PUBLIC_WHATSAPP || "").replace(/\D/g, "");
-  const base = wa ? `https://wa.me/${wa}` : "https://wa.me/";
-  return `${base}?text=${encodeURIComponent(text)}`;
+// Número de WhatsApp de la tienda. Sale de NEXT_PUBLIC_WHATSAPP si está
+// definida; si no, el de siempre. Antes este link no tenía default y en
+// producción (donde la variable no está cargada) abría WhatsApp SIN
+// destinatario: el botón "Buscá un evento puntual", el flotante y el de
+// "Consultar" quedaban vacíos.
+export const WHATSAPP_TIENDA =
+  (process.env.NEXT_PUBLIC_WHATSAPP || "").replace(/\D/g, "") || "5491136148053";
+
+export function waLink(text: string, telefono: string = WHATSAPP_TIENDA): string {
+  return `https://wa.me/${telefono}?text=${encodeURIComponent(text)}`;
 }
 
 // El mapa de sectores termina en un <img src>. Solo se aceptan esquemas
 // seguros: http(s) y data:image (el catálogo demo usa un SVG inline). Cualquier
 // otro (javascript:, etc.) se descarta en vez de renderizarse.
+// Mapa de una entrada PROPIA: solo se acepta uno subido por el panel a
+// nuestro bucket `mapas` (o una data URL en el modo demo). Una URL externa
+// cualquiera dejaría que el panel publique imágenes de terceros en la tienda.
+export function mapaPropioValido(url: string | null | undefined, demo = false): string | null {
+  const s = imagenSegura(url);
+  if (!s) return null;
+  if (demo && s.startsWith("data:image/")) return s;
+  return /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/mapas\//i.test(s) ? s : null;
+}
+
 export function imagenSegura(url: string | null | undefined): string | null {
   if (!url) return null;
   const s = String(url).trim();

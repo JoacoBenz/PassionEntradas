@@ -207,6 +207,9 @@ export default function AdminDashboard({
         )
       );
       push("success", okMsg);
+      // Sobreventa o falla al mover el stock: la acción salió, pero hay que
+      // revisar la disponibilidad.
+      if (data.aviso) push("error", data.aviso);
     } catch {
       push("error", "Error de red al actualizar");
     } finally {

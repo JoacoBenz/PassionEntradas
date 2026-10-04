@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { compararAZ } from "@/lib/orden";
 import Link from "next/link";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import { ToastViewport, useToast } from "./Toast";
@@ -25,7 +26,8 @@ function CompeticionCombo({
   const [abierto, setAbierto] = useState(false);
   const sugerencias = useMemo(() => {
     const q = value.trim().toLowerCase();
-    const base = q ? opciones.filter((c) => c.toLowerCase().includes(q)) : opciones;
+    const todas = [...opciones].sort(compararAZ);
+    const base = q ? todas.filter((c) => c.toLowerCase().includes(q)) : todas;
     // Si ya escribió una igual, no la sugerimos de nuevo.
     return base.filter((c) => c.toLowerCase() !== q).slice(0, 8);
   }, [value, opciones]);
@@ -181,6 +183,9 @@ export default function TicketsPanel({
   // así aparece en la próxima carga sin recargar la página.
   const [comps, setComps] = useState<string[]>(competiciones);
   const [form, setForm] = useState(empty);
+  // Mapa del estadio (opcional). `undefined` al editar = no se tocó.
+  const [mapa, setMapa] = useState<string | null | undefined>(undefined);
+  const [subiendoMapa, setSubiendoMapa] = useState(false);
   const [sectores, setSectores] = useState<SectorForm[]>([sectorVacio()]);
   // Edición de una entrada existente: el mismo form pasa a modo "Guardar
   // cambios" (una entrada = un sector; el id y el link no cambian).
@@ -220,6 +225,7 @@ export default function TicketsPanel({
       ciudad: t.ciudad ?? "",
       proveedor: t.proveedor ?? "",
     });
+    setMapa(t.imagen_url ?? null);
     // En la base vive el precio de VENTA (precio_final) y el costo. La
     // comisión es la diferencia: se deriva para editar, no se guarda aparte.
     const costo = t.precio_costo != null ? Number(t.precio_costo) : 0;
@@ -240,7 +246,33 @@ export default function TicketsPanel({
   function cancelarEdicion() {
     setEditando(null);
     setForm(empty);
+    setMapa(undefined);
     setSectores([sectorVacio()]);
+  }
+
+  // Sube el mapa apenas se elige: así el formulario manda solo la URL.
+  async function subirMapa(file: File | undefined) {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      push("error", "La imagen pesa más de 5 MB");
+      return;
+    }
+    setSubiendoMapa(true);
+    try {
+      const fd = new FormData();
+      fd.append("archivo", file);
+      const res = await fetch("/api/tickets/mapa", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        push("error", data.error ?? "No se pudo subir el mapa");
+        return;
+      }
+      setMapa(data.url);
+    } catch {
+      push("error", "Error de red al subir el mapa");
+    } finally {
+      setSubiendoMapa(false);
+    }
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -309,6 +341,8 @@ export default function TicketsPanel({
               comision: s.comision,
               moneda: s.moneda,
               stock: s.stock,
+              // undefined no viaja en el JSON: el mapa no se toca.
+              ...(mapa !== undefined ? { imagen_url: mapa } : {}),
             },
           }),
         });
@@ -328,7 +362,7 @@ export default function TicketsPanel({
       const res = await fetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticket: { ...form, sectores } }),
+        body: JSON.stringify({ ticket: { ...form, sectores, imagen_url: mapa ?? null } }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -341,6 +375,7 @@ export default function TicketsPanel({
         setComps((prev) => [...prev, nuevaComp].sort());
       }
       setForm(empty);
+      setMapa(undefined);
       setSectores([sectorVacio()]);
       push(
         "success",
@@ -555,6 +590,42 @@ export default function TicketsPanel({
                   onChange={(e) => set("proveedor", e.target.value)}
                   placeholder="A quién le compramos (opcional)"
                 />
+              </div>
+              <div>
+                <label className={labelCls}>Mapa del estadio</label>
+                {mapa ? (
+                  <div className="flex items-center gap-3 rounded-lg border border-line bg-white p-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={mapa} alt="Mapa del estadio" className="h-14 w-20 rounded object-cover" />
+                    <span className="min-w-0 flex-1 truncate text-xs text-muted">
+                      Se muestra en la tienda con zoom
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setMapa(null)}
+                      className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-[#4A4E5E] hover:bg-canvas"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-dashed border-line bg-white px-3 py-2.5 text-sm text-muted hover:border-brand">
+                    <span>{subiendoMapa ? "Subiendo…" : "Subir imagen (PNG, JPG o WEBP, hasta 5 MB)"}</span>
+                    <span className="shrink-0 rounded-lg bg-canvas px-2.5 py-1 text-xs font-semibold text-[#4A4E5E]">
+                      Elegir
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="sr-only"
+                      disabled={subiendoMapa}
+                      onChange={(e) => {
+                        void subirMapa(e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
               </div>
               <div>
                 <label className={labelCls}>Fecha *</label>

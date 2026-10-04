@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { avisoDeSobreventa, movimientoDeStock, type LineaDescontada } from "@/lib/stock";
 import { revalidatePath } from "next/cache";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import {
@@ -76,11 +77,9 @@ export async function PATCH(
     if (!res.ok) {
       return NextResponse.json({ error: res.error }, { status: res.status });
     }
-    // Cerrar/reabrir puede haber tocado el stock de una entrada propia.
-    if (action.action === "cerrar") {
-      revalidatePath("/(tienda)", "layout");
-    }
-    return NextResponse.json(pickResult(res.op));
+    // Pago, cancelar o reabrir pueden haber movido el stock de una propia.
+    if (movimientoDeStock(action, res.op)) revalidatePath("/(tienda)", "layout");
+    return NextResponse.json({ ...pickResult(res.op), ...(res.aviso ? { aviso: res.aviso } : {}) });
   }
 
   const admin = createAdminSupabase();
@@ -207,31 +206,28 @@ export async function PATCH(
     );
   }
 
-  // Entrada PROPIA vinculada: cerrar la operación descuenta 1 del stock de
-  // la tienda (evita la sobreventa por olvidarse de editarlo a mano);
-  // reabrir el cierre lo repone. Solo manual:: — las del portal las maneja
-  // el worker con el stock real de Passion. Fail-soft: si falla, la
-  // operación ya quedó cerrada igual (el stock se corrige desde Entradas).
-  if (action.action === "cerrar" && current.ticket_id?.startsWith("manual::")) {
-    const { data: t } = await admin
-      .from("tickets")
-      .select("stock")
-      .eq("id", current.ticket_id)
-      .eq("source", "manual")
-      .maybeSingle();
-    if (t) {
-      const stock = Math.max(0, (t.stock ?? 0) + (action.done ? -1 : 1));
-      await admin
-        .from("tickets")
-        .update({ stock, disponible: stock > 0 })
-        .eq("id", current.ticket_id)
-        .eq("source", "manual");
+  // Stock de entradas propias: se toma al confirmar el pago y se devuelve al
+  // desmarcarlo o cancelar (ver lib/stock.ts y la función stock_operacion).
+  // Fail-soft: si falla, la operación ya quedó actualizada igual y el stock se
+  // corrige desde Entradas; se avisa en la respuesta.
+  let aviso: string | null = null;
+  const mov = movimientoDeStock(action, data as Operacion);
+  if (mov) {
+    const { data: lineas, error: errStock } = await admin.rpc("stock_operacion", {
+      p_op: params.id,
+      p_tomar: mov === "tomar",
+    });
+    if (errStock) {
+      console.error(`[stock] no se pudo ${mov} stock de ${params.id}: ${errStock.message}`);
+      aviso = "No se pudo actualizar el stock de la tienda; revisalo en Entradas.";
+    } else {
+      if (mov === "tomar") aviso = avisoDeSobreventa(lineas as LineaDescontada[]);
       // La tienda muestra el stock: reflejarlo al instante.
       revalidatePath("/(tienda)", "layout");
     }
   }
 
-  return NextResponse.json(pickResult(data as Operacion));
+  return NextResponse.json({ ...pickResult(data as Operacion), ...(aviso ? { aviso } : {}) });
 }
 
 function pickResult(
