@@ -65,7 +65,7 @@ export default async function ModeradorPage({
       admin
         .from("operaciones")
         .select(
-          "id, code, evento, comprador_alias, vendedor_alias, monto, cantidad, fee, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, ticket_id, tipo, cliente_email, sector, created_at, updated_at"
+          "id, code, evento, comprador_alias, vendedor_alias, monto, moneda, cantidad, fee, status, entrada_recibida_at, pago_confirmado_at, pago_proveedor_at, cerrada_at, fecha_evento, ticket_id, tipo, cliente_email, sector, created_at, updated_at"
         )
         .order("created_at", { ascending: false })
         .limit(10),
