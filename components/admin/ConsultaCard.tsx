@@ -149,7 +149,6 @@ export default function ConsultaCard({ consulta: c, busy = false, onCargar, onEr
               >
                 <option value="USD">USD</option>
                 <option value="ARS">ARS</option>
-                <option value="EUR">EUR</option>
               </select>
             </div>
             <div>

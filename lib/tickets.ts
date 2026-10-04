@@ -102,7 +102,8 @@ export type EventoAgrupado = {
 // - Una entrada PROPIA cargada en PESOS se muestra y se cobra en PESOS. La
 //   operación queda en ARS y el cliente debe pesos.
 // - Todo lo demás se cobra en DÓLARES: el portal Passion (que viene en euros) y
-//   las propias cargadas en dólares o en euros. Los euros se pasan a dólares
+//   las propias cargadas en dólares (o en euros, de antes de que se sacara la
+//   opción: ya no se pueden cargar). Los euros se pasan a dólares
 //   con la cotización del panel (config.eur_usd).
 //
 // La cotización dólar-peso (config.ars_por_usd) NO se usa para cobrar: solo

@@ -143,11 +143,10 @@ function fmtFechaCorta(iso: string | null): string {
   return `${d}/${m}/${y}`;
 }
 
-// La moneda guardada es texto libre en la base; se acota a las tres que maneja
-// la app para poder formatear.
+// La moneda guardada es texto libre en la base; se acota a las dos que maneja
+// la app (una propia vieja en euros se vende en dólares: se edita como USD).
 function monedaDe(v: string | null | undefined): Moneda {
-  const u = String(v ?? "USD").toUpperCase();
-  return u === "ARS" || u === "EUR" ? u : "USD";
+  return String(v ?? "USD").toUpperCase() === "ARS" ? "ARS" : "USD";
 }
 
 const sectorVacio = (): SectorForm => ({
@@ -612,7 +611,6 @@ export default function TicketsPanel({
                       >
                         <option value="USD">USD</option>
                         <option value="ARS">ARS</option>
-                        <option value="EUR">EUR</option>
                       </select>
                     </div>
                     <div>

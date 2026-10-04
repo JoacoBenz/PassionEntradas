@@ -516,7 +516,6 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
               >
                 <option value="USD">USD</option>
                 <option value="ARS">ARS</option>
-                <option value="EUR">EUR</option>
               </select>
             </div>
             <div>
