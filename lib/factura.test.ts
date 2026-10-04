@@ -35,11 +35,7 @@ describe("metodoValido — el método de pago va en la moneda de la factura", ()
     expect(metodoValido("Crypto (USDT)", "USD")).toBe(true);
     expect(metodoValido("Efectivo (ARS)", "USD")).toBe(false);
   });
-  it("una en euros tiene los suyos", () => {
-    expect(metodoValido("Bank transfer (EUR)", "EUR")).toBe(true);
-    expect(metodoValido("Transferencia (ARS)", "EUR")).toBe(false);
-  });
   it("cada moneda tiene al menos un método", () => {
-    for (const m of ["ARS", "USD", "EUR"] as const) expect(METODOS_PAGO[m].length).toBeGreaterThan(0);
+    for (const m of ["ARS", "USD"] as const) expect(METODOS_PAGO[m].length).toBeGreaterThan(0);
   });
 });

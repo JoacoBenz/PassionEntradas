@@ -53,37 +53,32 @@ export type FacturaDatos = {
   cotizacion?: { ars_por_usd: number; fecha: string } | null;
   // Moneda de la operación facturada. Opcional: todas las facturas emitidas
   // antes de este campo eran en dólares, y se leen así (ver monedaFactura).
-  moneda?: "ARS" | "USD" | "EUR";
+  moneda?: "ARS" | "USD";
 };
 
-export function monedaFactura(d: Pick<FacturaDatos, "moneda">): "ARS" | "USD" | "EUR" {
-  return d.moneda ?? "USD";
+export function monedaFactura(d: Pick<FacturaDatos, "moneda">): "ARS" | "USD" {
+  return d.moneda === "ARS" ? "ARS" : "USD";
 }
 
 // Métodos de pago por moneda: una factura en pesos se paga en pesos, una en
 // dólares en dólares. Antes la lista era una sola y un pedido en pesos podía
 // salir con "Bank transfer (USD)" (le pasó a la factura de Boca).
-export const METODOS_PAGO: Record<"ARS" | "USD" | "EUR", string[]> = {
+export const METODOS_PAGO: Record<"ARS" | "USD", string[]> = {
   ARS: ["Transferencia (ARS)", "Efectivo (ARS)", "Mercado Pago (ARS)"],
   USD: ["Bank transfer (USD)", "Transferencia (USD)", "Cash (USD)", "Efectivo (USD)", "Crypto (USDT)"],
-  EUR: ["Bank transfer (EUR)", "Transferencia (EUR)", "Cash (EUR)", "Efectivo (EUR)"],
 };
 
-export function metodoValido(metodo: string, moneda: "ARS" | "USD" | "EUR"): boolean {
+export function metodoValido(metodo: string, moneda: "ARS" | "USD"): boolean {
   return METODOS_PAGO[moneda].includes(metodo);
 }
 
 // Monto en la moneda de la factura. ARS sin decimales (los centavos no se usan);
-// USD y EUR con dos, que es lo contable.
-export function fmtMontoMoneda(n: number, moneda: "ARS" | "USD" | "EUR", idioma: FacturaIdioma): string {
+// USD con dos, que es lo contable.
+export function fmtMontoMoneda(n: number, moneda: "ARS" | "USD", idioma: FacturaIdioma): string {
   if (moneda === "USD") return fmtMontoFactura(n, idioma);
-  const dec = moneda === "ARS" ? 0 : 2;
   return (
-    (moneda === "ARS" ? "AR$ " : "€ ") +
-    new Intl.NumberFormat(idioma === "en" ? "en-US" : "es-AR", {
-      minimumFractionDigits: dec,
-      maximumFractionDigits: dec,
-    }).format(n)
+    "AR$ " +
+    new Intl.NumberFormat(idioma === "en" ? "en-US" : "es-AR", { maximumFractionDigits: 0 }).format(n)
   );
 }
 
@@ -178,7 +173,6 @@ export const FACTURA_TX = {
     total: "Total",
     usdNote: "All amounts in US dollars (USD).",
     arsOnlyNote: "All amounts in Argentine pesos (ARS).",
-    eurOnlyNote: "All amounts in euros (EUR).",
     exchangeRate: (fecha: string) => `Exchange rate (${fecha})`,
     totalArs: "Total in Argentine pesos",
     arsNote: "Peso amount for reference, at the exchange rate of the issue date.",
@@ -214,7 +208,6 @@ export const FACTURA_TX = {
     total: "Total",
     usdNote: "Todos los montos en dólares estadounidenses (USD).",
     arsOnlyNote: "Todos los montos en pesos argentinos (ARS).",
-    eurOnlyNote: "Todos los montos en euros (EUR).",
     exchangeRate: (fecha: string) => `Dólar del día (${fecha})`,
     totalArs: "Total en pesos",
     arsNote: "Monto en pesos de referencia, al dólar del día de emisión.",

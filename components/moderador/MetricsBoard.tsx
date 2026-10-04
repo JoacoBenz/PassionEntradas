@@ -194,7 +194,7 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
                   : "border border-line bg-white text-[#4A4E5E] hover:bg-canvas"
               }`}
             >
-              {m.moneda === "ARS" ? "Pesos (ARS)" : m.moneda === "EUR" ? "Euros (EUR)" : "Dólares (USD)"}
+              {m.moneda === "ARS" ? "Pesos (ARS)" : "Dólares (USD)"}
             </button>
           ))}
         </div>

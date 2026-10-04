@@ -124,7 +124,7 @@ export async function POST(
     pago_confirmado_at: string | null;
     fecha_evento: string | null;
     ticket_id: string | null;
-    moneda?: "ARS" | "USD" | "EUR" | null;
+    moneda?: "ARS" | "USD" | null;
     // Quién la pidió desde la tienda (null en las cargadas a mano).
     cliente_id?: string | null;
     cliente_email?: string | null;
