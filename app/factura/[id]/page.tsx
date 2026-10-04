@@ -67,7 +67,7 @@ export default async function FacturaPage({ params }: { params: { id: string } }
   const moneda = monedaFactura(d);
   const usd = (n: number) => fmtMontoMoneda(n, moneda, d.idioma);
   const notaMoneda =
-    moneda === "ARS" ? t.arsOnlyNote : moneda === "EUR" ? t.eurOnlyNote : t.usdNote;
+    moneda === "ARS" ? t.arsOnlyNote : t.usdNote;
   // Facturas emitidas antes del modelo multi-línea no traen `items`: se arma
   // una línea con el resumen para que se sigan viendo igual.
   const lineas =

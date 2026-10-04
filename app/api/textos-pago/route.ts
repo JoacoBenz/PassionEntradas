@@ -8,7 +8,7 @@ import { isMock, mockGetTextosPago, mockSetTextoPago } from "@/lib/mock-db";
 // GET/PUT /api/textos-pago — instrucciones de pago por moneda que ve el
 // cliente cuando su pedido está "listo para pagar". Solo administrador.
 //
-// PUT body: { moneda: "ARS"|"USD"|"EUR", texto: string } ("" borra).
+// PUT body: { moneda: "ARS"|"USD", texto: string } ("" borra).
 export const dynamic = "force-dynamic";
 
 async function soloAdmin(): Promise<NextResponse | null> {

@@ -4,7 +4,7 @@
 
 import type { Moneda } from "@/lib/operaciones";
 
-export const MONEDAS_PAGO: Moneda[] = ["ARS", "USD", "EUR"];
+export const MONEDAS_PAGO: Moneda[] = ["ARS", "USD"];
 
 export const claveTextoPago = (m: Moneda) => `pago_${m}`;
 

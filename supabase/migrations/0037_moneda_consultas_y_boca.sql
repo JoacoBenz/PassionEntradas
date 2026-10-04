@@ -5,7 +5,7 @@
 --    panel arranca en esa moneda. Aditiva y nullable: las consultas viejas
 --    quedan en null y se cotizan en USD por defecto, como hasta ahora.
 alter table public.consultas add column if not exists moneda text
-  check (moneda is null or moneda in ('ARS', 'USD', 'EUR'));
+  check (moneda is null or moneda in ('ARS', 'USD'));
 
 -- 2. Pedido de Boca (BX-3RDHY6FK): se creó desde la tienda sin moneda y la
 --    base le puso el default 'USD', pero los montos son PESOS (2 × $ 600.000
@@ -35,3 +35,16 @@ update public.facturas f
    and o.code = 'BX-3RDHY6FK'
    and not (f.datos ? 'moneda')
    and (f.datos->>'total')::numeric = 1200000;
+
+-- 4. Dos monedas: pesos y dólares. El euro es solo la moneda de origen de los
+--    precios de Passion (tickets del portal), que se pasan a dólares al
+--    publicarlos: nunca se cobra ni se factura en euros. Las operaciones y las
+--    entradas propias quedan acotadas a ARS/USD (en producción no hay ninguna
+--    en EUR; los tickets del portal no se tocan).
+alter table public.operaciones drop constraint if exists operaciones_moneda_check;
+alter table public.operaciones add constraint operaciones_moneda_check
+  check (moneda in ('ARS', 'USD'));
+
+alter table public.tickets drop constraint if exists tickets_moneda_propia_check;
+alter table public.tickets add constraint tickets_moneda_propia_check
+  check (source <> 'manual' or moneda_final is null or moneda_final in ('ARS', 'USD'));

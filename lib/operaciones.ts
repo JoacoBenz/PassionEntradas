@@ -14,14 +14,37 @@ export type Status =
 
 // Origen de la operación: carga interna del staff, o pedido/consulta hecho por
 // un cliente desde la tienda sobre una entrada del catálogo.
-export type Moneda = "ARS" | "USD" | "EUR";
+//
+// La app maneja DOS monedas: pesos y dólares. El euro existe solo como moneda
+// de ORIGEN de los precios de Passion, que se pasan a dólares al publicarlos
+// (ver factorAVenta en lib/tickets.ts): nunca se cobra, se factura ni se
+// muestra en euros.
+export type Moneda = "ARS" | "USD";
+export const MONEDAS: Moneda[] = ["ARS", "USD"];
 
 // Símbolo/prefijo por moneda para mostrar montos sin ambigüedad.
 export const MONEDA_LABEL: Record<Moneda, string> = {
   ARS: "$",
   USD: "US$",
-  EUR: "€",
 };
+
+export const MONEDA_NOMBRE: Record<Moneda, string> = {
+  ARS: "Pesos (ARS)",
+  USD: "Dólares (USD)",
+};
+
+/**
+ * Moneda que llega en un body. Sin valor: USD (el default histórico). Con un
+ * valor que no es pesos ni dólares (ej. "EUR"): null, y la API responde 400 en
+ * vez de guardarlo en otra moneda sin avisar.
+ */
+export function parseMoneda(raw: unknown): Moneda | null {
+  if (raw == null || raw === "") return "USD";
+  const u = String(raw).trim().toUpperCase();
+  return u === "ARS" || u === "USD" ? u : null;
+}
+
+export const ERROR_MONEDA = "Moneda inválida: solo pesos (ARS) o dólares (USD)";
 
 export type TipoOperacion = "operacion" | "pedido" | "consulta";
 
@@ -435,7 +458,7 @@ export function quienDe(valor: string | null | undefined): string | null {
 // Formato de moneda USD sin decimales ("US$ 1.234"): las operaciones se
 // manejan en dólares.
 // Formatea en la moneda de la operación. ARS sin decimales (los centavos no
-// existen en la práctica); USD y EUR con 2, que es lo contable.
+// existen en la práctica); USD con 2, que es lo contable.
 export function formatMonto(
   n: number,
   moneda: Moneda = "USD",

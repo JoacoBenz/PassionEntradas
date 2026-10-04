@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { esStaff, getRol } from "@/lib/auth";
-import { generateCode } from "@/lib/operaciones";
+import { ERROR_MONEDA, generateCode, parseMoneda } from "@/lib/operaciones";
 import { isMock, mockCreateOp, mockListSolicitudes } from "@/lib/mock-db";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -42,12 +42,9 @@ export async function POST(request: Request) {
     ? String(body.vendedor_alias).trim()
     : null;
   const monto = Math.trunc(Number(body.monto));
-  // Moneda de la operación: se guarda, no se convierte. Cualquier valor que
-  // no sea una de las tres cae a USD, que es el default histórico.
-  const monedaRaw = String(body.moneda ?? "USD").toUpperCase();
-  const moneda = (["ARS", "USD", "EUR"] as const).includes(monedaRaw as any)
-    ? (monedaRaw as "ARS" | "USD" | "EUR")
-    : "USD";
+  // Moneda de la operación: pesos o dólares; se guarda, no se convierte.
+  const moneda = parseMoneda(body.moneda);
+  if (!moneda) return NextResponse.json({ error: ERROR_MONEDA }, { status: 400 });
   const fee = Math.trunc(Number(body.fee));
   const ticket_id = body.ticket_id ? String(body.ticket_id) : null;
   const fecha_evento = body.fecha_evento ? String(body.fecha_evento) : null;

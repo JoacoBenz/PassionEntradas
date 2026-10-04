@@ -16,7 +16,7 @@ export type TicketRef = {
   stock: number | null;
   fecha: string | null;
   // Define la moneda: el portal guarda EUR; las propias, la que eligió el
-  // admin (moneda_final: USD, EUR o ARS).
+  // admin (moneda_final: USD o ARS; una vieja en EUR se vende en USD).
   source: TicketSource;
   moneda_final?: string | null;
   // Lo que nos cuesta la entrada, para saber cuánto ganamos con ella:

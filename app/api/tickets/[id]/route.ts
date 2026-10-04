@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { mapaPropioValido } from "@/lib/tickets";
 import { revalidatePath } from "next/cache";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
+import { ERROR_MONEDA, parseMoneda } from "@/lib/operaciones";
 import { getRol } from "@/lib/auth";
 import { isMock, mockDeleteManual, mockListManual, mockUpdateManual } from "@/lib/mock-db";
 import { parsePrecio } from "@/lib/precios";
@@ -45,9 +46,9 @@ export async function PATCH(
   const categoria = String(t.categoria ?? "").trim();
   const fecha = String(t.fecha ?? "").trim();
   const stock = Math.trunc(Number(t.stock));
-  // Moneda de la entrada: se guarda, no se convierte.
-  const monedaRaw = String(t.moneda ?? "USD").toUpperCase();
-  const moneda = ["ARS", "USD", "EUR"].includes(monedaRaw) ? monedaRaw : "USD";
+  // Moneda de la entrada: pesos o dólares (el euro es solo de Passion).
+  const moneda = parseMoneda(t.moneda);
+  if (!moneda) return NextResponse.json({ error: ERROR_MONEDA }, { status: 400 });
 
   if (!evento) {
     return NextResponse.json({ error: "El evento es obligatorio" }, { status: 400 });

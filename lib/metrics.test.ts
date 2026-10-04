@@ -63,7 +63,7 @@ describe("computeMetrics", () => {
 // del demo mostraba un número que no era de ninguna moneda. Ahora agrupa y
 // devuelve la dominante, igual que el RPC de producción.
 describe("computeMetrics — varias monedas", () => {
-  const pagada = (monto: number, fee: number, moneda: "ARS" | "USD" | "EUR") => ({
+  const pagada = (monto: number, fee: number, moneda: "ARS" | "USD") => ({
     ...base,
     monto,
     fee,
@@ -89,8 +89,8 @@ describe("computeMetrics — varias monedas", () => {
   });
 
   it("sin movimiento en dólares, la principal es la que tiene operaciones", () => {
-    const m = computeMetrics([pagada(9_000, 900, "EUR")]);
-    expect(m.moneda).toBe("EUR");
+    const m = computeMetrics([pagada(9_000, 900, "ARS")]);
+    expect(m.moneda).toBe("ARS");
     expect(m.plataMovida).toBe(9_000);
     expect(m.comisionGanada).toBe(900);
     expect(m.otrasMonedas).toEqual([]);

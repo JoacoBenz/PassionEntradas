@@ -14,7 +14,6 @@ describe("textos de pago", () => {
     const t = { pago_ARS: "pesos", pago_USD: " " };
     expect(textoPagoDe(t, "ARS")).toBe("pesos");
     expect(textoPagoDe(t, "USD")).toBeNull();
-    expect(textoPagoDe(t, "EUR")).toBeNull();
     expect(textoPagoDe(t, null)).toBeNull();
   });
 });
