@@ -12,6 +12,7 @@ import AutoRefresh from "@/components/AutoRefresh";
 import { LANGS, LOCALE, TX, type Lang } from "@/lib/tienda-i18n";
 import { formatMonto, PASOS_PUBLICOS, type EstadoPublico, type Moneda } from "@/lib/operaciones";
 import { waLink } from "@/lib/tickets";
+import { tiempoRestante } from "@/lib/cotizaciones";
 import { fechaDia, fechaHora } from "@/lib/fechas";
 
 export type PedidoView = {
@@ -25,7 +26,12 @@ export type PedidoView = {
   created_at: string;
   // `consulta_descartada`: la consulta se cerró sin precio (no conseguimos la
   // entrada). Es solo de esta vista: en una operación no existe.
-  estado: EstadoPublico | "consulta_descartada";
+  estado:
+    | EstadoPublico
+    | "consulta_descartada"
+    | "consulta_cotizada"
+    | "consulta_vencida"
+    | "consulta_rechazada";
   // Total del pedido en su moneda (null en consultas sin precio).
   monto: number | null;
   moneda: Moneda | null;
@@ -34,6 +40,9 @@ export type PedidoView = {
   canceladaPorCliente: boolean;
   // Instrucciones de pago de su moneda, solo en "listo para pagar".
   textoPago: string | null;
+  // Cotización esperando su respuesta: la versión que está viendo (si el
+  // staff la cambia, aceptar la vieja falla) y hasta cuándo vale.
+  cotizacion: { version: number; venceAt: string | null } | null;
   // Factura emitida para este pedido (si el staff ya la generó).
   facturaId: string | null;
   // Una consulta sin precio todavía no es una operación: no hay link público
@@ -45,6 +54,9 @@ export type PedidoView = {
 const ESTADO_CLASS: Record<PedidoView["estado"], string> = {
   consulta_recibida: "mp-e-abierta",
   consulta_descartada: "mp-e-cancelada",
+  consulta_cotizada: "mp-e-pagar",
+  consulta_vencida: "mp-e-cancelada",
+  consulta_rechazada: "mp-e-cancelada",
   pedido_recibido: "mp-e-abierta",
   pedido_confirmado: "mp-e-curso",
   listo_para_pagar: "mp-e-pagar",
@@ -112,6 +124,31 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
   const router = useRouter();
   const [cancelando, setCancelando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Aceptar o rechazar la cotización. Aceptar crea el pedido: pide
+  // confirmación, igual que cancelar.
+  async function responder(p: PedidoView, accion: "aceptar" | "rechazar") {
+    const msg = accion === "aceptar" ? mp.confirmarAceptar : mp.confirmarRechazar;
+    if (!window.confirm(msg)) return;
+    setCancelando(p.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/consultas/${p.id}/${accion}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version: p.cotizacion?.version }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(res.status === 409 ? data.error || mp.cotizacionNoDisponible : data.error || mp.errorCancelar);
+      }
+      router.refresh();
+    } catch {
+      setError(mp.errorCancelar);
+    } finally {
+      setCancelando(null);
+    }
+  }
 
   async function cancelar(p: PedidoView) {
     if (!window.confirm(p.tipo === "pedido" ? mp.confirmarCancelarPedido : mp.confirmarCancelarConsulta)) return;
@@ -228,6 +265,46 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
                     </a>
                   </div>
                 )}
+                {p.estado === "consulta_cotizada" && p.cotizacion && (
+                  <div className="mp-cotizacion">
+                    <strong>{mp.cotizacionTitulo}</strong>
+                    <p className="mp-pago-texto">
+                      {mp.cotizacionTexto} · {tiempoRestante(p.cotizacion.venceAt, new Date(), lang)}
+                    </p>
+                    <span className="mp-cot-acciones">
+                      <button
+                        type="button"
+                        className="mp-link mp-link--aceptar"
+                        onClick={() => responder(p, "aceptar")}
+                        disabled={cancelando === p.id}
+                      >
+                        {cancelando === p.id ? mp.enviando : mp.aceptar}
+                      </button>
+                      <button
+                        type="button"
+                        className="mp-link mp-link--cancelar"
+                        onClick={() => responder(p, "rechazar")}
+                        disabled={cancelando === p.id}
+                      >
+                        {mp.rechazar}
+                      </button>
+                    </span>
+                  </div>
+                )}
+                {p.estado === "consulta_vencida" && (
+                  <div className="mp-cotizacion mp-cotizacion--vencida">
+                    <p className="mp-pago-texto">{mp.cotizacionVencida}</p>
+                    <a
+                      className="mp-link"
+                      href={waLink(`${mp.waNuevaCotizacion} ${p.code}`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {mp.escribinos}
+                    </a>
+                  </div>
+                )}
+                {p.estado === "consulta_rechazada" && <p className="mp-nota">{mp.rechazadaPorVos}</p>}
                 {p.estado === "cancelada" && p.canceladaPorCliente && (
                   <p className="mp-nota">{p.seguible ? mp.canceladoPorVos : mp.canceladaConsultaPorVos}</p>
                 )}

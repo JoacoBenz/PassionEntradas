@@ -9,17 +9,21 @@
 // la misma lista.
 
 import { useState } from "react";
-import { formatMonto, type Consulta, type Moneda } from "@/lib/operaciones";
+import { formatMonto, quienDe, type Consulta, type Moneda } from "@/lib/operaciones";
 import { parsePrecio } from "@/lib/precios";
+import { estadoCotizacion, tiempoRestante } from "@/lib/cotizaciones";
 
 type Props = {
   consulta: Consulta;
   busy?: boolean;
-  // Devuelve el mensaje de error si falló, o null si salió bien.
-  onCargar: (
+  // Manda (o cambia) la cotización al cliente. NO crea el pedido: eso pasa
+  // cuando el cliente la acepta. Devuelve el error si falló, o null.
+  onCotizar: (
     c: Consulta,
     valores: { costo: number; comision: number; moneda: Moneda }
   ) => Promise<string | null>;
+  // El cliente dijo que sí por WhatsApp: el staff lo registra y nace el pedido.
+  onAceptarWhatsapp?: (c: Consulta) => void;
   onError: (msg: string) => void;
   // Cierra la consulta sin precio (no hay entrada). El cliente la ve como
   // "No disponible". Opcional: sin esto no se muestra el botón.
@@ -40,14 +44,22 @@ function fechaCorta(fecha: string): string {
 export default function ConsultaCard({
   consulta: c,
   busy = false,
-  onCargar,
+  onCotizar,
+  onAceptarWhatsapp,
   onError,
   onDescartar,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
-  const [costo, setCosto] = useState("");
-  const [comision, setComision] = useState("");
+  const [confirmandoWa, setConfirmandoWa] = useState(false);
+  // Cotizada: se muestra la cotización; "Cambiar" abre el form precargado.
+  const est = estadoCotizacion(c);
+  const cotizada = est === "esperando" || est === "vencida";
+  const [editando, setEditando] = useState(false);
+  const montoCot = Number(c.cotizacion_monto ?? 0);
+  const feeCot = Number(c.cotizacion_fee ?? 0);
+  const [costo, setCosto] = useState(cotizada ? String(montoCot - feeCot) : "");
+  const [comision, setComision] = useState(cotizada ? String(feeCot) : "");
   // Arranca en la moneda en que se cobraría esa entrada (pesos si es una
   // propia cargada en pesos). Antes arrancaba siempre en USD y había que
   // acordarse de cambiarla.
@@ -58,22 +70,29 @@ export default function ConsultaCard({
   const previo = parsePrecio(costo, comision);
   const total = previo.ok ? previo.total : null;
 
-  async function cargar() {
+  async function cotizar() {
     const r = parsePrecio(costo, comision);
     if (!r.ok) {
       onError(r.error);
       return;
     }
-    const err = await onCargar(c, { costo: r.costo, comision: r.comision, moneda });
-    if (!err) {
-      setCosto("");
-      setComision("");
-      setOpen(false);
-    }
+    const err = await onCotizar(c, { costo: r.costo, comision: r.comision, moneda });
+    if (!err) setEditando(false);
   }
 
+  const chip =
+    est === "a_cotizar"
+      ? { txt: "A cotizar", color: "#B07A14" }
+      : est === "esperando"
+        ? { txt: "Esperando cliente", color: "#1F33E0" }
+        : { txt: "Vencida", color: "#D14D68" };
+  const mostrarForm = !cotizada || editando;
+
   return (
-    <article className="card-shadow overflow-hidden rounded-2xl bg-white ring-1 ring-[#B07A14]/25">
+    <article
+      className="card-shadow overflow-hidden rounded-2xl bg-white ring-1"
+      style={{ ["--tw-ring-color" as string]: `${chip.color}40` }}
+    >
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}
@@ -83,9 +102,9 @@ export default function ConsultaCard({
             tiene hitos que semaforear, tiene una pregunta sin responder. */}
         <span
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-          style={{ background: "#B07A14" }}
-          title="Consulta: chequear stock y cerrar precio"
-          aria-label="Consulta: chequear stock y cerrar precio"
+          style={{ background: chip.color }}
+          title={cotizada ? "Cotización enviada al cliente" : "Consulta: chequear stock y cerrar precio"}
+          aria-label={cotizada ? "Cotización enviada al cliente" : "Consulta: chequear stock y cerrar precio"}
         >
           ?
         </span>
@@ -99,12 +118,18 @@ export default function ConsultaCard({
             </span>
           )}
           <span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-wider text-muted">
-            {c.code} · Consulta — chequear stock
+            {c.code} ·{" "}
+            {cotizada
+              ? `${formatMonto(montoCot, (c.moneda ?? "USD") as Moneda)} · ${tiempoRestante(c.vence_at)}`
+              : "Consulta — chequear stock"}
             {c.fecha_evento ? ` · ${fechaCorta(c.fecha_evento)}` : ""}
           </span>
         </span>
-        <span className="shrink-0 rounded-full bg-[#B07A14]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#B07A14]">
-          A cotizar
+        <span
+          className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+          style={{ color: chip.color, backgroundColor: `${chip.color}1A` }}
+        >
+          {chip.txt}
         </span>
         <svg
           className={`h-4 w-4 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
@@ -142,6 +167,62 @@ export default function ConsultaCard({
             </p>
           )}
 
+          {cotizada && !editando && (
+            <div
+              className={`mt-4 rounded-xl border px-3.5 py-3 ${
+                est === "vencida" ? "border-[#D14D68]/30 bg-[#D14D68]/5" : "border-[#1F33E0]/25 bg-[#1F33E0]/5"
+              }`}
+            >
+              <p className="text-sm font-semibold text-ink">
+                Cotización enviada:{" "}
+                <span className="font-display tabular-nums">
+                  {formatMonto(montoCot, (c.moneda ?? "USD") as Moneda)}
+                </span>
+                <span className="ml-1 text-xs font-normal text-muted">
+                  (comisión {formatMonto(feeCot, (c.moneda ?? "USD") as Moneda)})
+                </span>
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted">
+                {est === "vencida"
+                  ? "Venció sin respuesta. Cambiala para mandarle una nueva."
+                  : `El cliente la acepta desde Mis pedidos · ${tiempoRestante(c.vence_at)}`}
+                {c.cotizada_por ? ` · por ${quienDe(c.cotizada_por)}` : ""}
+                {(c.cotizacion_version ?? 1) > 1 ? ` · versión ${c.cotizacion_version}` : ""}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {onAceptarWhatsapp && est === "esperando" && (
+                  <button
+                    onClick={() => {
+                      // Dos toques: crea el pedido a nombre del cliente.
+                      if (!confirmandoWa) {
+                        setConfirmandoWa(true);
+                        window.setTimeout(() => setConfirmandoWa(false), 4000);
+                        return;
+                      }
+                      setConfirmandoWa(false);
+                      onAceptarWhatsapp(c);
+                    }}
+                    disabled={busy}
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                      confirmandoWa ? "bg-[#0D9377] text-white" : "border border-[#0D9377] text-[#0D9377] hover:bg-[#0D9377]/5"
+                    }`}
+                    title="Registra que el cliente aceptó por WhatsApp y crea el pedido"
+                  >
+                    {confirmandoWa ? "¿Confirmás? Crea el pedido" : "El cliente aceptó por WhatsApp"}
+                  </button>
+                )}
+                <button
+                  onClick={() => setEditando(true)}
+                  disabled={busy}
+                  className="rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-[#4A4E5E] transition-colors hover:bg-canvas disabled:opacity-50"
+                >
+                  Cambiar cotización
+                </button>
+              </div>
+            </div>
+          )}
+
+          {mostrarForm && (<>
           {/* Precio = costo + comisión. Se cobra el total; el desglose es
               interno (la factura muestra solo el total). */}
           {/* Cada campo en su celda: la moneda pegada al importe dejaba el
@@ -226,15 +307,51 @@ export default function ConsultaCard({
                   {confirmandoDescarte ? "¿Descartar?" : "No disponible"}
                 </button>
               )}
+              {editando && (
+                <button
+                  onClick={() => setEditando(false)}
+                  disabled={busy}
+                  className="rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-[#4A4E5E] hover:bg-canvas disabled:opacity-50"
+                >
+                  Volver
+                </button>
+              )}
               <button
-                onClick={cargar}
+                onClick={cotizar}
                 disabled={busy || total == null}
                 className="rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-ink/85 disabled:opacity-50"
+                title="El cliente la ve en Mis pedidos y la acepta o la rechaza"
               >
-                {busy ? "Cargando…" : "Cargar operación"}
+                {busy ? "Enviando…" : editando ? "Enviar nueva cotización" : "Enviar cotización"}
               </button>
             </span>
           </div>
+          </>)}
+
+          {/* Cotizada: "No disponible" sigue a mano aunque no se edite. */}
+          {cotizada && !editando && onDescartar && (
+            <div className="mt-3 flex justify-end">
+              <button
+                onClick={() => {
+                  if (!confirmandoDescarte) {
+                    setConfirmandoDescarte(true);
+                    window.setTimeout(() => setConfirmandoDescarte(false), 4000);
+                    return;
+                  }
+                  setConfirmandoDescarte(false);
+                  onDescartar(c);
+                }}
+                disabled={busy}
+                className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                  confirmandoDescarte
+                    ? "border-estado-cancelada bg-estado-cancelada text-white"
+                    : "border-estado-cancelada text-estado-cancelada hover:bg-estado-cancelada/5"
+                }`}
+              >
+                {confirmandoDescarte ? "¿Descartar?" : "No disponible"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </article>

@@ -41,7 +41,7 @@ export default async function AdminPage() {
     email = MOCK_USER.email;
     ops = mockListOps();
     items = ops.flatMap((o) => mockListItems(o.id));
-    consultas = mockListConsultas().filter((c) => c.estado === "pendiente");
+    consultas = mockListConsultas().filter((c) => c.estado === "pendiente" || c.estado === "cotizada");
   } else {
     const supabase = createServerSupabase();
     const {
@@ -88,9 +88,9 @@ export default async function AdminPage() {
     const { data: cons } = await createAdminSupabase()
       .from("consultas")
       .select(
-        "id, code, envio_id, cliente_id, cliente_email, comprador_alias, ticket_id, evento, sector, fecha_evento, cantidad, moneda, notas, estado, operacion_id, resuelta_por, resuelta_at, created_at, updated_at"
+        "id, code, envio_id, cliente_id, cliente_email, comprador_alias, ticket_id, evento, sector, fecha_evento, cantidad, moneda, notas, estado, operacion_id, resuelta_por, resuelta_at, created_at, updated_at, cotizacion_monto, cotizacion_fee, cotizacion_version, cotizada_at, cotizada_por, cotizada_por_admin, vence_at"
       )
-      .eq("estado", "pendiente")
+      .in("estado", ["pendiente", "cotizada"])
       .order("created_at", { ascending: false })
       .limit(500);
     consultas = (cons ?? []) as Consulta[];

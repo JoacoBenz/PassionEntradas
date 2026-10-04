@@ -152,14 +152,15 @@ export default function OperacionCard({
             </span>
           )}
           <span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-wider text-muted">
+            {/* En celular el chip "Nuevo" le comía el nombre del evento: va acá. */}
+            {nuevo && <span className="font-bold text-[#D14D68] sm:hidden">● Nuevo · </span>}
             {op.code} · {SEMAFORO_LABEL[semaforo]}
             {op.fecha_evento ? ` · ${fechaCorta(op.fecha_evento)}` : ""}
           </span>
         </span>
         {nuevo && (
-          // Visible también en celular: es lo primero que el admin tiene que
-          // atender, a diferencia del chip de origen.
-          <span className="shrink-0 rounded-full bg-[#D14D68] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+          // En desktop como chip; en celular va en la línea del código.
+          <span className="hidden shrink-0 rounded-full bg-[#D14D68] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white sm:inline-block">
             Nuevo
           </span>
         )}
