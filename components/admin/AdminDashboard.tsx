@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { fusionarRefresco, parcheOptimista, previoDe } from "@/lib/estado-local";
 import { useRouter } from "next/navigation";
 import { estadoCotizacion } from "@/lib/cotizaciones";
 import {
@@ -106,12 +107,40 @@ export default function AdminDashboard({
     setPage(1);
   }, [filter, query, sort]);
 
+  // Clicks de estado (ver lib/estado-local.ts): fila por operación, cuántos
+  // hay en vuelo, y el updated_at de la última respuesta de cada una.
+  const colas = useRef(new Map<string, Promise<void>>());
+  const enVuelo = useRef(new Map<string, number>());
+  const ultimaRespuesta = useRef(new Map<string, string>());
+  const [guardando, setGuardando] = useState<Set<string>>(new Set());
+
   // Lista viva: cuando AutoRefresh refresca el server component, `initial`
   // llega con datos nuevos (operaciones cargadas por el moderador, cambios
-  // de otro admin) y sincronizamos el estado local.
+  // de otro admin). Se MEZCLA con lo local: un refresco que salió antes de un
+  // click no puede destildar lo que se acaba de marcar.
   useEffect(() => {
-    setOps(initial);
+    setOps((prev) =>
+      fusionarRefresco(
+        prev,
+        initial,
+        (id) => enVuelo.current.get(id) ?? 0,
+        (id) => ultimaRespuesta.current.get(id)
+      )
+    );
   }, [initial]);
+
+  // Operaciones tocadas en este filtro: se quedan a la vista aunque el click
+  // las saque del filtro (marcar el 3er hito en "En curso" la mandaba a "Para
+  // entregar" y la tarjeta desaparecía bajo el dedo, sin poder corregir un
+  // toque equivocado). `fijasArriba`: las que eran "Nuevo" al tocarlas siguen
+  // arriba en vez de saltar de lugar al confirmarlas. Se limpian al cambiar de
+  // filtro.
+  const [fijas, setFijas] = useState<Set<string>>(new Set());
+  const [fijasArriba, setFijasArriba] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setFijas(new Set());
+    setFijasArriba(new Set());
+  }, [filter]);
 
   useEffect(() => {
     setConsultas(consultasIniciales);
@@ -139,7 +168,7 @@ export default function AdminDashboard({
     let filas: Fila[] = ops
       .filter(
         (o) =>
-          matches(o, filter) &&
+          (matches(o, filter) || fijas.has(o.id)) &&
           coincide(o.evento, o.code, o.comprador_alias, o.vendedor_alias, o.cliente_email)
       )
       .map((op) => ({ kind: "op" as const, id: op.id, created_at: op.created_at, op }));
@@ -171,11 +200,12 @@ export default function AdminDashboard({
 
     // Los pedidos nuevos (sin confirmar) también esperan al admin: van arriba,
     // justo después de las consultas.
-    const nuevos = filas.filter((f) => f.kind === "op" && necesitaConfirmar(f.op));
-    const resto = filas.filter((f) => !(f.kind === "op" && necesitaConfirmar(f.op)));
+    const arriba = (f: Fila) => f.kind === "op" && (necesitaConfirmar(f.op) || fijasArriba.has(f.id));
+    const nuevos = filas.filter(arriba);
+    const resto = filas.filter((f) => !arriba(f));
 
     return [...pendientes, ...nuevos, ...resto];
-  }, [ops, consultas, filter, query, sort]);
+  }, [ops, consultas, filter, query, sort, fijas, fijasArriba]);
 
   // Paginado en el cliente: con historial grande, renderizar cientos de
   // cards de una sola vez es lo que pesa (el fetch ya viene topado en 1000).
@@ -189,53 +219,92 @@ export default function AdminDashboard({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function applyAction(op: Operacion, action: StatusAction, okMsg: string) {
-    setBusyId(op.id);
-    try {
-      const res = await fetch(`/api/operaciones/${op.id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(action),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        push("error", data.error ?? "No se pudo actualizar el estado");
-        return;
+  // Un click de estado. El cambio se ve al instante y la petición entra en
+  // la fila de esa operación (una por vez). Si el server la rechaza, se
+  // revierte solo ese cambio. Cancelar y reabrir no son optimistas: esperan.
+  function applyAction(op: Operacion, action: StatusAction, okMsg: string) {
+    const id = op.id;
+    const parche = parcheOptimista(op, action, new Date().toISOString());
+    const previo = parche ? previoDe(op, parche) : null;
+
+    setFijas((s) => (s.has(id) ? s : new Set(s).add(id)));
+    if (necesitaConfirmar(op)) setFijasArriba((s) => (s.has(id) ? s : new Set(s).add(id)));
+    if (parche) setOps((prev) => prev.map((o) => (o.id === id ? { ...o, ...parche } : o)));
+    else setBusyId(id);
+
+    enVuelo.current.set(id, (enVuelo.current.get(id) ?? 0) + 1);
+    setGuardando((s) => new Set(s).add(id));
+
+    const correr = async () => {
+      try {
+        const res = await fetch(`/api/operaciones/${id}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(action),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (previo) setOps((prev) => prev.map((o) => (o.id === id ? { ...o, ...previo } : o)));
+          push("error", data.error ?? "No se pudo actualizar el estado");
+          return;
+        }
+        if (data.updated_at) ultimaRespuesta.current.set(id, data.updated_at);
+        // La respuesta es la verdad del server, pero si quedan clicks en la
+        // fila de esta operación, sus cambios todavía no están en ella: se
+        // aplica recién con la última, para no destildar lo que viene atrás.
+        if ((enVuelo.current.get(id) ?? 1) <= 1) {
+          setOps((prev) =>
+            prev.map((o) =>
+              o.id === id
+                ? {
+                    ...o,
+                    status: data.status,
+                    entrada_recibida_at: data.entrada_recibida_at,
+                    pago_confirmado_at: data.pago_confirmado_at,
+                    pago_proveedor_at: data.pago_proveedor_at ?? null,
+                    pago_proveedor_por: data.pago_proveedor_por ?? null,
+                    cerrada_at: data.cerrada_at,
+                    entrada_recibida_por: data.entrada_recibida_por ?? null,
+                    pago_confirmado_por: data.pago_confirmado_por ?? null,
+                    cerrada_por: data.cerrada_por ?? null,
+                    confirmada_at: data.confirmada_at ?? null,
+                    confirmada_por: data.confirmada_por ?? null,
+                    cancelada_at: data.cancelada_at ?? null,
+                    cancelada_por: data.cancelada_por ?? null,
+                    updated_at: data.updated_at ?? o.updated_at,
+                  }
+                : o
+            )
+          );
+        }
+        push("success", okMsg);
+        // Sobreventa o falla al mover el stock: la acción salió, pero hay que
+        // revisar la disponibilidad.
+        if (data.aviso) push("error", data.aviso);
+      } catch {
+        if (previo) setOps((prev) => prev.map((o) => (o.id === id ? { ...o, ...previo } : o)));
+        push("error", "Error de red al actualizar");
+      } finally {
+        const n = (enVuelo.current.get(id) ?? 1) - 1;
+        if (n <= 0) {
+          enVuelo.current.delete(id);
+          setGuardando((s) => {
+            const t = new Set(s);
+            t.delete(id);
+            return t;
+          });
+        } else {
+          enVuelo.current.set(id, n);
+        }
+        if (!parche) setBusyId((b) => (b === id ? null : b));
       }
-      setOps((prev) =>
-        prev.map((o) =>
-          o.id === op.id
-            ? {
-                ...o,
-                status: data.status,
-                entrada_recibida_at: data.entrada_recibida_at,
-                pago_confirmado_at: data.pago_confirmado_at,
-                // Faltaba el hito del proveedor: se guardaba en el servidor
-                // pero la tarjeta lo seguía mostrando sin tildar hasta que uno
-                // refrescaba la página.
-                pago_proveedor_at: data.pago_proveedor_at ?? null,
-                pago_proveedor_por: data.pago_proveedor_por ?? null,
-                cerrada_at: data.cerrada_at,
-                entrada_recibida_por: data.entrada_recibida_por ?? null,
-                pago_confirmado_por: data.pago_confirmado_por ?? null,
-                cerrada_por: data.cerrada_por ?? null,
-                confirmada_at: data.confirmada_at ?? null,
-                confirmada_por: data.confirmada_por ?? null,
-                cancelada_at: data.cancelada_at ?? null,
-                cancelada_por: data.cancelada_por ?? null,
-              }
-            : o
-        )
-      );
-      push("success", okMsg);
-      // Sobreventa o falla al mover el stock: la acción salió, pero hay que
-      // revisar la disponibilidad.
-      if (data.aviso) push("error", data.aviso);
-    } catch {
-      push("error", "Error de red al actualizar");
-    } finally {
-      setBusyId(null);
-    }
+    };
+
+    const cola = (colas.current.get(id) ?? Promise.resolve()).then(correr);
+    colas.current.set(id, cola);
+    void cola.finally(() => {
+      if (colas.current.get(id) === cola) colas.current.delete(id);
+    });
   }
 
   // Edición de datos internos (notas / fecha) vía PATCH /api/operaciones/[id].
@@ -491,6 +560,7 @@ export default function AdminDashboard({
                 items={itemsPorOp.get(fila.id) ?? []}
                 baseUrl={baseUrl}
                 busy={busyId === fila.id}
+                guardando={guardando.has(fila.id)}
                 onAction={applyAction}
                 onUpdate={updateOp}
                 onCopied={(m) => push("success", m)}
