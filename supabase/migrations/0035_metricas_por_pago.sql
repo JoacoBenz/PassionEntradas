@@ -20,9 +20,9 @@
 -- Los parámetros pasan a tener default null: el módulo del moderador la
 -- llama sin argumentos.
 
-drop function if exists public.metricas_operaciones(date, date);
-
-create function public.metricas_operaciones(p_desde date default null, p_hasta date default null)
+-- create or replace (sin drop): misma firma y mismo retorno; agregarle
+-- defaults a los parámetros se puede sin recrearla.
+create or replace function public.metricas_operaciones(p_desde date default null, p_hasta date default null)
 returns table (
   moneda text, plata_movida numeric, comision_ganada numeric,
   entradas_vendidas bigint, en_juego_monto numeric, en_juego_ops bigint
