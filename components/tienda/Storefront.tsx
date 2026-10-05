@@ -6,7 +6,7 @@
 // Bilingüe EN/ES (default español): los textos viven en lib/tienda-i18n.ts y
 // el toggle del header se recuerda en localStorage.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { compararAZ } from "@/lib/orden";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -443,7 +443,7 @@ function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang 
 }
 
 // ---- card de evento (talón) ----------------------------------------------------
-function TicketCard({
+function TicketCardBase({
   ev,
   i,
   lang,
@@ -597,6 +597,9 @@ function TicketCard({
     </article>
   );
 }
+
+// Memo: al filtrar, las cards que siguen en la lista no se vuelven a dibujar.
+const TicketCard = memo(TicketCardBase);
 
 // =============================== HOME ==========================================
 export function StorefrontHome({ resumen }: { resumen: ResumenHome }) {
@@ -846,15 +849,22 @@ function Select({
   options: { value: string; label: string }[];
   onChange: (v: string) => void;
 }) {
+  // Mismos elementos mientras no cambien las opciones: React no vuelve a
+  // recorrer los cientos de <option> en cada tecla del buscador.
+  const opciones = useMemo(
+    () =>
+      options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      )),
+    [options]
+  );
   return (
     <label className="sel">
       <span>{label}</span>
       <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
+        {opciones}
       </select>
     </label>
   );
@@ -879,18 +889,22 @@ export function StorefrontCatalog({ catalogo }: { catalogo: CatalogoCompacto }) 
     comp: params.get("c") || "",
   });
 
+  // Los filtros responden al toque (selects e input usan `state`) y la lista
+  // se recalcula con la versión diferida: React la arma en segundo plano y
+  // la descarta si llega otra tecla, así escribir no se traba en el celular.
+  const filtro = useDeferredValue(state);
   const filtered = useMemo(() => {
     const out = events.filter((ev) => {
       // Link compartido: solo ese evento (y su competición, si vino en el
       // link: dos torneos pueden repetir nombre de partido).
-      if (state.evento) {
-        return ev.evento === state.evento && (!state.comp || ev.comp === state.comp);
+      if (filtro.evento) {
+        return ev.evento === filtro.evento && (!filtro.comp || ev.comp === filtro.comp);
       }
-      if (state.cat !== "*" && ev.comp !== state.cat) return false;
-      if (state.lugar !== "*" && ev.lugar !== state.lugar) return false;
-      if (state.mes !== "*" && ev.mes !== state.mes) return false;
-      if (state.q) {
-        const q = state.q.toLowerCase();
+      if (filtro.cat !== "*" && ev.comp !== filtro.cat) return false;
+      if (filtro.lugar !== "*" && ev.lugar !== filtro.lugar) return false;
+      if (filtro.mes !== "*" && ev.mes !== filtro.mes) return false;
+      if (filtro.q) {
+        const q = filtro.q.toLowerCase();
         const hit =
           ev.evento.toLowerCase().includes(q) ||
           (ev.ciudad || "").toLowerCase().includes(q) ||
@@ -906,7 +920,7 @@ export function StorefrontCatalog({ catalogo }: { catalogo: CatalogoCompacto }) 
       return da - db;
     });
     return out;
-  }, [events, state]);
+  }, [events, filtro]);
 
   // Se muestran los primeros 30 y "Ver más" agrega otros 30: la cartelera
   // tiene cientos de eventos y dibujarlos todos traba el celular. Filtrar no
@@ -933,19 +947,26 @@ export function StorefrontCatalog({ catalogo }: { catalogo: CatalogoCompacto }) 
   const visible = filtered.slice(0, mostrar);
   const quedan = filtered.length - visible.length;
 
-  const catOpts = [
-    { value: "*", label: t.todasCategorias },
-    ...uniqueOptions(events, (e) => ({ key: e.comp, label: e.comp }), true),
-  ];
-  const lugarOpts = [
-    { value: "*", label: t.todosLugares },
-    ...uniqueOptions(events, (e) => ({ key: e.lugar, label: e.lugar }), true),
-  ];
-  // El label del mes se arma acá (no en buildEvents) para que siga el idioma.
-  const mesOpts = [
-    { value: "*", label: t.todasFechas },
-    ...uniqueOptions(events, (e) => ({ key: e.mes, label: mesLabelLang(e.mes, lang) }), false),
-  ];
+  // Memo: armar y ordenar las opciones (orden alfabético con acentos) sobre
+  // cientos de eventos en CADA tecla era buena parte de lo que trababa el buscador.
+  const { catOpts, lugarOpts, mesOpts } = useMemo(
+    () => ({
+      catOpts: [
+        { value: "*", label: t.todasCategorias },
+        ...uniqueOptions(events, (e) => ({ key: e.comp, label: e.comp }), true),
+      ],
+      lugarOpts: [
+        { value: "*", label: t.todosLugares },
+        ...uniqueOptions(events, (e) => ({ key: e.lugar, label: e.lugar }), true),
+      ],
+      // El label del mes se arma acá (no en buildEvents) para que siga el idioma.
+      mesOpts: [
+        { value: "*", label: t.todasFechas },
+        ...uniqueOptions(events, (e) => ({ key: e.mes, label: mesLabelLang(e.mes, lang) }), false),
+      ],
+    }),
+    [events, lang, t]
+  );
   const filtrando =
     state.cat !== "*" || state.lugar !== "*" || state.mes !== "*" || !!state.q || !!state.evento;
 
@@ -1024,7 +1045,7 @@ export function StorefrontCatalog({ catalogo }: { catalogo: CatalogoCompacto }) 
             <TicketCard
               key={ev.comp + ev.evento}
               ev={ev}
-              i={i}
+              i={Math.min(i, 12)}
               lang={lang}
               defaultOpen={
                 !!state.evento &&
