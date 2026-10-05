@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { unstable_noStore as noStore } from "next/cache";
 import { createPublicSupabase } from "@/lib/supabase/public";
 import {
   FACTURA_TX,
@@ -17,6 +18,12 @@ import "./factura.css";
 // mismo modelo que el link de seguimiento /op/[id]. Renderiza el snapshot
 // emitido — nunca datos vivos de la operación.
 export const dynamic = "force-dynamic";
+// La lectura va por el cliente público (sin cookies), y Next guarda esos fetch
+// en su caché de datos — que en Vercel SOBREVIVE a los deploys. Con solo
+// force-dynamic, una factura re-emitida (o corregida en la base) se seguía
+// mostrando con la foto vieja: la de Boca salía en US$ con los datos ya en ARS.
+// Una factura tiene que leerse siempre fresca.
+export const fetchCache = "force-no-store";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -45,6 +52,7 @@ function fechaCorta(iso: string, idioma: "en" | "es"): string {
 export default async function FacturaPage({ params }: { params: { id: string } }) {
   if (!UUID_RE.test(params.id)) notFound();
 
+  noStore();
   let factura: Factura | null = null;
   if (isMock()) {
     factura = mockFacturaPorId(params.id);
