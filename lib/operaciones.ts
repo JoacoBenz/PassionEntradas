@@ -544,7 +544,17 @@ export function totalItem(i: Pick<OperacionItem, "cantidad" | "precio_unitario">
 // Una consulta NO es una operación: es una entrada pedida sin precio cerrado.
 // Cuando se arregla el precio, se convierte en operación y queda apuntando a
 // ella por `operacion_id`.
-export type EstadoConsulta = "pendiente" | "convertida" | "descartada" | "cancelada";
+// pendiente -> (staff cotiza) cotizada -> (cliente acepta) convertida
+//                                       -> (cliente rechaza) rechazada
+// "Vencida" no se guarda: es una cotizada con vence_at pasado (ver
+// lib/cotizaciones.ts).
+export type EstadoConsulta =
+  | "pendiente"
+  | "cotizada"
+  | "convertida"
+  | "descartada"
+  | "cancelada"
+  | "rechazada";
 
 export type Consulta = {
   id: string;
@@ -565,6 +575,19 @@ export type Consulta = {
   moneda?: Moneda | null;
   notas: string | null;
   estado: EstadoConsulta;
+  // Cotización que se le mandó al cliente (estado cotizada). Re-cotizar sube
+  // la versión: el cliente acepta la que vio.
+  cotizacion_monto?: number | null;
+  cotizacion_fee?: number | null;
+  cotizacion_version?: number;
+  cotizada_at?: string | null;
+  cotizada_por?: string | null;
+  cotizada_por_admin?: boolean;
+  vence_at?: string | null;
+  // Cómo se aceptó: 'web' (el cliente) o 'whatsapp' (lo registró el staff).
+  aceptada_at?: string | null;
+  aceptada_por?: string | null;
+  aceptada_via?: "web" | "whatsapp" | null;
   operacion_id: string | null;
   resuelta_por: string | null;
   resuelta_at: string | null;
@@ -576,7 +599,9 @@ export const ESTADO_CONSULTA_LABEL: Record<EstadoConsulta, string> = {
   pendiente: "Pendiente",
   convertida: "Convertida en operación",
   descartada: "Descartada",
+  cotizada: "Cotizada, esperando al cliente",
   cancelada: "Cancelada por el cliente",
+  rechazada: "Rechazada por el cliente",
 };
 
 // Línea tal como la ve el comprador en el link público: sin ticket_id ni ids

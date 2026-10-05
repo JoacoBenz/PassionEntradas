@@ -29,7 +29,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
     .from("consultas")
     .update({ estado: "descartada", resuelta_por: quien, resuelta_at: new Date().toISOString() })
     .eq("id", params.id)
-    .eq("estado", "pendiente")
+    .in("estado", ["pendiente", "cotizada"])
     .select("id")
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

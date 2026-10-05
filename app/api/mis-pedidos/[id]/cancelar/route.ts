@@ -65,7 +65,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       .update({ estado: "cancelada", resuelta_por: "cliente", resuelta_at: ahora })
       .eq("id", params.id)
       .eq("cliente_id", user.id)
-      .eq("estado", "pendiente")
+      .in("estado", ["pendiente", "cotizada"])
       .select("code, evento, sector")
       .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

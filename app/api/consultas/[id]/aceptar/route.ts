@@ -1,0 +1,95 @@
+import { NextResponse } from "next/server";
+import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
+import { esStaff, getRol, nombreDe, puedeVerTienda } from "@/lib/auth";
+import { notificarVendedoresEmail } from "@/lib/email";
+import { isMock, MOCK_USER, mockAceptarCotizacion } from "@/lib/mock-db";
+
+// POST /api/consultas/[id]/aceptar — la cotización pasa a ser un pedido.
+//
+// Dos caminos, los dos por la misma función atómica de la base
+// (aceptar_cotizacion: bloquea la fila, valida estado/versión/vencimiento/
+// dueño, crea la operación y marca la consulta en una sola transacción):
+//
+//   - el CLIENTE, logueado, desde Mis pedidos: { version }. Solo la suya.
+//   - el STAFF, cuando el cliente dijo que sí por WhatsApp:
+//     { version, via: "whatsapp" }. Queda registrado quién lo marcó.
+//
+// No hay links de un click por email: aceptar exige sesión y un botón.
+const CLIENTE_DEMO = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
+export async function POST(request: Request, { params }: { params: { id: string } }) {
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+  const version = Number(body?.version);
+  if (!Number.isInteger(version) || version < 1) {
+    return NextResponse.json({ error: "Versión inválida" }, { status: 400 });
+  }
+  const porWhatsapp = body?.via === "whatsapp";
+
+  let clienteId: string | null;
+  let quien: string;
+
+  if (isMock()) {
+    clienteId = porWhatsapp ? null : CLIENTE_DEMO;
+    quien = MOCK_USER.email;
+    const r = mockAceptarCotizacion(params.id, {
+      version,
+      clienteId,
+      via: porWhatsapp ? "whatsapp" : "web",
+      quien,
+    });
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+    return NextResponse.json({ ok: true, operacion: { id: r.op.id, code: r.op.code } });
+  }
+
+  const supabase = createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const rol = getRol(user);
+  if (porWhatsapp) {
+    // Registrar una aceptación por WhatsApp es cosa del staff.
+    if (!esStaff(rol)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    clienteId = null;
+    quien = nombreDe(user) ?? user.email ?? "staff";
+  } else {
+    if (!puedeVerTienda(rol)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    clienteId = user.id;
+    quien = user.email ?? user.id;
+  }
+
+  const admin = createAdminSupabase();
+  const { data, error } = await admin
+    .rpc("aceptar_cotizacion", {
+      p_consulta: params.id,
+      p_version: version,
+      p_cliente: clienteId,
+      p_via: porWhatsapp ? "whatsapp" : "web",
+      p_quien: quien,
+    })
+    .maybeSingle();
+  if (error) {
+    // P0002 = no es suya o no existe; P0001 = estado/versión/vencimiento.
+    const code = (error as { code?: string }).code;
+    const status = code === "P0002" ? 404 : code === "P0001" ? 409 : 500;
+    return NextResponse.json({ error: error.message }, { status });
+  }
+  const op = data as { op_id: string; op_code: string } | null;
+  if (!op) return NextResponse.json({ error: "No se pudo crear el pedido" }, { status: 500 });
+
+  // Aviso a los vendedores. Best-effort: el pedido ya quedó creado.
+  try {
+    await notificarVendedoresEmail(
+      `✅ Cotización aceptada — pedido ${op.op_code}`,
+      `${porWhatsapp ? `${quien} registró que el cliente aceptó por WhatsApp` : `El cliente ${quien} aceptó la cotización en la web`}. Se creó el pedido ${op.op_code}.`
+    );
+  } catch (e) {
+    console.error("[aceptar] no se pudo avisar a los vendedores:", e);
+  }
+  return NextResponse.json({ ok: true, operacion: { id: op.op_id, code: op.op_code } });
+}

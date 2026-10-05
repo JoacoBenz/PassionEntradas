@@ -1173,6 +1173,16 @@
 }
 .mp-pago strong { font-size: 14px; }
 .mp-pago-texto { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+.mp-cotizacion {
+  margin-top: 14px; padding: 12px 14px; background: #eef0fd; border: 1.5px solid var(--cobalt);
+  display: grid; gap: 8px; justify-items: start;
+}
+.mp-cotizacion strong { font-size: 14px; }
+.mp-cotizacion--vencida { background: #f4f3ef; border-color: var(--mute); }
+.mp-cot-acciones { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.mp-link--aceptar { background: var(--cobalt); border-color: var(--cobalt); color: #fff; cursor: pointer; }
+.mp-link--aceptar:hover { background: var(--cobalt-d); border-color: var(--cobalt-d); color: #fff; }
+.mp-link--aceptar:disabled { opacity: .6; cursor: wait; }
 .mp-nota { margin: 10px 0 0; font-size: 13px; color: var(--mute); }
 .mp-error {
   margin: 0 0 14px; padding: 10px 14px; border: 1.5px solid #d14d68; background: #fbe9ed;

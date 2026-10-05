@@ -53,6 +53,8 @@ type MockDB = {
   consultas: Consulta[];
   // Textos de pago por moneda (espejo de textos_config).
   textos: Record<string, string>;
+  // Plazo para aceptar una cotización (config.cotizacion_vence_horas).
+  venceHoras: number;
 };
 
 function iso(minsAgo: number) {
@@ -261,11 +263,64 @@ function seed(): MockDB {
     facturaNumero: 0,
     solicitudes,
     items: [],
-    consultas: [],
+    // Consultas del cliente demo: una para cotizar y una ya cotizada que
+    // espera su respuesta (se ve en el panel y en Mis pedidos).
+    consultas: [
+      {
+        id: "55555555-5555-4555-8555-555555555555",
+        code: "BX-DEMOCONS",
+        envio_id: null,
+        cliente_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        cliente_email: "demo@passion.local",
+        comprador_alias: "demo",
+        ticket_id: null,
+        evento: "Final Copa Libertadores 2026",
+        sector: "Platea",
+        fecha_evento: null,
+        cantidad: 2,
+        moneda: "USD",
+        notas: null,
+        estado: "pendiente",
+        operacion_id: null,
+        resuelta_por: null,
+        resuelta_at: null,
+        created_at: iso(60),
+        updated_at: iso(60),
+      },
+      {
+        id: "66666666-6666-4666-8666-666666666666",
+        code: "BX-DEMOCOTI",
+        envio_id: null,
+        cliente_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        cliente_email: "demo@passion.local",
+        comprador_alias: "demo",
+        ticket_id: null,
+        evento: "Argentina vs Brasil - Eliminatorias",
+        sector: "Popular",
+        fecha_evento: null,
+        cantidad: 1,
+        moneda: "USD",
+        notas: null,
+        estado: "cotizada",
+        cotizacion_monto: 450,
+        cotizacion_fee: 70,
+        cotizacion_version: 1,
+        cotizada_at: iso(60),
+        cotizada_por: MOCK_USER.email,
+        cotizada_por_admin: true,
+        vence_at: new Date(Date.now() + 47 * 3600_000).toISOString(),
+        operacion_id: null,
+        resuelta_por: null,
+        resuelta_at: null,
+        created_at: iso(120),
+        updated_at: iso(60),
+      },
+    ],
     textos: {
       pago_ARS: "Transferencia a alias PASSION.ENTRADAS (Banco Demo). Mandanos el comprobante por WhatsApp.",
       pago_USD: "Pago en dólares: transferencia o efectivo. Escribinos por WhatsApp y te pasamos los datos.",
     },
+    venceHoras: 48,
   };
 }
 
@@ -726,8 +781,9 @@ export function mockListConsultas(): Consulta[] {
   return db().consultas;
 }
 
-// Consultas del cliente que no son (todavía) una operación: las pendientes y
-// las canceladas/descartadas de los últimos 30 días. Las convertidas ya se ven
+// Consultas del cliente que no son (todavía) una operación: las pendientes, las
+// cotizadas (esperando su respuesta) y las canceladas/descartadas/rechazadas de
+// los últimos 30 días. Las convertidas ya se ven
 // como la operación que originaron; mostrarlas otra vez duplicaría el pedido.
 export function mockListConsultasCliente(
   clienteId: string | null,
@@ -738,7 +794,9 @@ export function mockListConsultasCliente(
     .consultas.filter(
       (c) =>
         (c.estado === "pendiente" ||
-          ((c.estado === "cancelada" || c.estado === "descartada") && c.updated_at >= desde)) &&
+          c.estado === "cotizada" ||
+          ((c.estado === "cancelada" || c.estado === "descartada" || c.estado === "rechazada") &&
+            c.updated_at >= desde)) &&
         ((clienteId && c.cliente_id === clienteId) ||
           (email && c.cliente_email?.toLowerCase() === email.toLowerCase()))
     )
@@ -774,40 +832,86 @@ export function mockCrearConsulta(input: {
   return c;
 }
 
-// Convierte una consulta en operación (espejo de /api/consultas/[id]/convertir).
-export function mockConvertirConsulta(
+// --- cotizaciones (espejo de 0041 y /api/consultas/[id]/{cotizar,aceptar,rechazar}) --
+type MockRes<T = {}> = ({ ok: true } & T) | { ok: false; status: number; error: string };
+
+export function mockGetVenceHoras(): number {
+  return db().venceHoras;
+}
+export function mockSetVenceHoras(h: number): void {
+  db().venceHoras = h;
+}
+
+export function mockCotizar(
   id: string,
-  opts: { monto: number; fee: number; moneda?: Moneda; quien: string }
-): { ok: true; op: Operacion } | { ok: false; status: number; error: string } {
-  const d = db();
-  const c = d.consultas.find((x) => x.id === id);
-  // Distinguir "no existe" de "ya resuelta": el mock tiene que dar el mismo
-  // código que la API real o el demo miente sobre el comportamiento.
+  opts: { monto: number; fee: number; moneda: Moneda; quien: string; esAdmin: boolean }
+): MockRes<{ consulta: Consulta }> {
+  const c = db().consultas.find((x) => x.id === id);
   if (!c) return { ok: false, status: 404, error: "Consulta no encontrada" };
-  if (c.estado !== "pendiente") {
+  if (c.estado !== "pendiente" && c.estado !== "cotizada") {
     return { ok: false, status: 409, error: "Esta consulta ya fue resuelta" };
   }
+  const ahora = new Date();
+  c.estado = "cotizada";
+  c.cotizacion_monto = opts.monto;
+  c.cotizacion_fee = opts.fee;
+  c.moneda = opts.moneda;
+  c.cotizacion_version = (c.cotizacion_version ?? 0) + 1;
+  c.cotizada_at = ahora.toISOString();
+  c.cotizada_por = opts.quien;
+  c.cotizada_por_admin = opts.esAdmin;
+  c.vence_at = new Date(ahora.getTime() + db().venceHoras * 3600_000).toISOString();
+  c.updated_at = c.cotizada_at;
+  return { ok: true, consulta: c };
+}
+
+// Espejo de la función aceptar_cotizacion: mismas validaciones, mismo orden.
+export function mockAceptarCotizacion(
+  id: string,
+  opts: { version: number; clienteId: string | null; via: "web" | "whatsapp"; quien: string }
+): MockRes<{ op: Operacion }> {
+  const c = db().consultas.find((x) => x.id === id);
+  if (!c || (opts.clienteId && c.cliente_id !== opts.clienteId)) {
+    return { ok: false, status: 404, error: "Cotización no encontrada" };
+  }
+  if (c.estado !== "cotizada") return { ok: false, status: 409, error: "Esta cotización ya no está disponible" };
+  if ((c.cotizacion_version ?? 0) !== opts.version) {
+    return { ok: false, status: 409, error: "La cotización cambió: revisá el precio nuevo" };
+  }
+  if (c.vence_at && new Date(c.vence_at).getTime() < Date.now()) {
+    return { ok: false, status: 409, error: "La cotización venció" };
+  }
   const cantidad = Math.max(1, c.cantidad || 1);
+  const monto = Number(c.cotizacion_monto);
+  const ahora = new Date().toISOString();
   const op = mockCreateOp({
     evento: c.evento,
     comprador_alias: c.comprador_alias,
     vendedor_alias: null,
-    monto: opts.monto,
-    fee: opts.fee,
-    moneda: opts.moneda ?? "USD",
+    monto,
+    fee: Number(c.cotizacion_fee ?? 0),
+    moneda: (c.moneda ?? "USD") as Moneda,
     cantidad,
     ticket_id: c.ticket_id,
     fecha_evento: c.fecha_evento,
-    notas: `${c.notas ?? ""}\nCargada desde consulta por ${opts.quien}.`.trim(),
+    notas: [
+      c.notas?.trim() || null,
+      `Cotizada por ${c.cotizada_por ?? "staff"}. ` +
+        (opts.via === "web"
+          ? "Aceptada por el cliente en la web."
+          : `Aceptada por WhatsApp (registró ${opts.quien}).`),
+    ]
+      .filter(Boolean)
+      .join("\n"),
     cuenta_debitar: null,
     tipo: "pedido",
     cliente_id: c.cliente_id,
     cliente_email: c.cliente_email,
     sector: c.sector,
     envio_id: c.envio_id,
-    // En demo cotiza el admin: el pedido nace confirmado (espejo de la API).
-    confirmada_at: new Date().toISOString(),
-    confirmada_por: opts.quien,
+    // Solo un admin confirma: si cotizó un moderador, entra como "Nuevo".
+    confirmada_at: c.cotizada_por_admin ? ahora : null,
+    confirmada_por: c.cotizada_por_admin ? c.cotizada_por ?? null : null,
     items: [
       {
         ticket_id: c.ticket_id,
@@ -815,16 +919,30 @@ export function mockConvertirConsulta(
         sector: c.sector,
         fecha_evento: c.fecha_evento,
         cantidad,
-        precio_unitario: opts.monto / cantidad,
+        precio_unitario: Math.round((monto / cantidad) * 100) / 100,
       },
     ],
   });
   c.estado = "convertida";
   c.operacion_id = op.id;
+  c.aceptada_at = ahora;
+  c.aceptada_por = opts.quien;
+  c.aceptada_via = opts.via;
+  c.resuelta_at = ahora;
   c.resuelta_por = opts.quien;
+  c.updated_at = ahora;
+  return { ok: true, op };
+}
+
+export function mockRechazarCotizacion(id: string, clienteId: string): MockRes {
+  const c = db().consultas.find((x) => x.id === id && x.cliente_id === clienteId);
+  if (!c) return { ok: false, status: 404, error: "Cotización no encontrada" };
+  if (c.estado !== "cotizada") return { ok: false, status: 409, error: "Esta cotización ya no está disponible" };
+  c.estado = "rechazada";
+  c.resuelta_por = "cliente";
   c.resuelta_at = new Date().toISOString();
   c.updated_at = c.resuelta_at;
-  return { ok: true, op };
+  return { ok: true };
 }
 
 // --- pasos del pedido y cancelación (espejo de 0040) ----------------------
@@ -862,7 +980,9 @@ export function mockClienteCancelarConsulta(
 ): { ok: true } | { ok: false; status: number; error: string } {
   const c = db().consultas.find((x) => x.id === id && x.cliente_id === clienteId);
   if (!c) return { ok: false, status: 404, error: "Consulta no encontrada" };
-  if (c.estado !== "pendiente") return { ok: false, status: 409, error: "Esta consulta ya fue resuelta" };
+  if (c.estado !== "pendiente" && c.estado !== "cotizada") {
+    return { ok: false, status: 409, error: "Esta consulta ya fue resuelta" };
+  }
   c.estado = "cancelada";
   c.resuelta_por = "cliente";
   c.resuelta_at = new Date().toISOString();
@@ -876,7 +996,9 @@ export function mockDescartarConsulta(
 ): { ok: true } | { ok: false; status: number; error: string } {
   const c = db().consultas.find((x) => x.id === id);
   if (!c) return { ok: false, status: 404, error: "Consulta no encontrada" };
-  if (c.estado !== "pendiente") return { ok: false, status: 409, error: "Esta consulta ya fue resuelta" };
+  if (c.estado !== "pendiente" && c.estado !== "cotizada") {
+    return { ok: false, status: 409, error: "Esta consulta ya fue resuelta" };
+  }
   c.estado = "descartada";
   c.resuelta_por = quien;
   c.resuelta_at = new Date().toISOString();

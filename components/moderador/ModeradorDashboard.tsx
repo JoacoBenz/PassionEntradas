@@ -45,29 +45,52 @@ export default function ModeradorDashboard({
     setConsultas(consultasIniciales);
   }, [consultasIniciales]);
 
+  // Cotizar le manda el precio al cliente; el pedido nace cuando lo acepta.
   async function cotizar(
     c: Consulta,
     valores: { costo: number; comision: number; moneda: Moneda }
   ): Promise<string | null> {
     setCotizando(c.id);
     try {
-      const res = await fetch(`/api/consultas/${c.id}/convertir`, {
+      const res = await fetch(`/api/consultas/${c.id}/cotizar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(valores),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const msg = data.error ?? "No se pudo cargar la operación";
+        const msg = data.error ?? "No se pudo enviar la cotización";
         push("error", msg);
         return msg;
       }
-      setConsultas((prev) => prev.filter((x) => x.id !== c.id));
-      push("success", `Consulta cotizada: operación ${data.operacion?.code ?? ""} creada`);
+      setConsultas((prev) => prev.map((x) => (x.id === c.id ? { ...x, ...data.consulta } : x)));
+      push("success", "Cotización enviada al cliente");
       return null;
     } catch {
       push("error", "Error de red al cotizar");
       return "Error de red al cotizar";
+    } finally {
+      setCotizando(null);
+    }
+  }
+
+  async function aceptarPorWhatsapp(c: Consulta) {
+    setCotizando(c.id);
+    try {
+      const res = await fetch(`/api/consultas/${c.id}/aceptar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version: c.cotizacion_version, via: "whatsapp" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        push("error", data.error ?? "No se pudo registrar la aceptación");
+        return;
+      }
+      setConsultas((prev) => prev.filter((x) => x.id !== c.id));
+      push("success", `Pedido ${data.operacion?.code ?? ""} creado`);
+    } catch {
+      push("error", "Error de red. Reintentá.");
     } finally {
       setCotizando(null);
     }
@@ -164,14 +187,15 @@ export default function ModeradorDashboard({
       {consultas.length > 0 && (
         <section className="mt-8 space-y-3">
           <h2 className="text-xs font-medium uppercase tracking-widest text-muted">
-            Consultas a cotizar ({consultas.length})
+            Consultas ({consultas.length})
           </h2>
           {consultas.map((c) => (
             <ConsultaCard
               key={c.id}
               consulta={c}
               busy={cotizando === c.id}
-              onCargar={cotizar}
+              onCotizar={cotizar}
+              onAceptarWhatsapp={aceptarPorWhatsapp}
               onDescartar={descartar}
               onError={(m) => push("error", m)}
             />

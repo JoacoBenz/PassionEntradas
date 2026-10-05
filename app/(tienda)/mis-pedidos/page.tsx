@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol, puedeVerTienda } from "@/lib/auth";
-import { clientePuedeCancelar, estadoPublicoDe, type Moneda } from "@/lib/operaciones";
+import { clientePuedeCancelar, estadoPublicoDe, type EstadoConsulta, type Moneda } from "@/lib/operaciones";
+import { estadoCotizacion } from "@/lib/cotizaciones";
 import { textoPagoDe } from "@/lib/textos";
 import { MisPedidos, type PedidoView } from "@/components/tienda/MisPedidos";
 import {
@@ -52,6 +53,10 @@ type ConsultaRow = {
   fecha_evento: string | null;
   created_at: string;
   estado: string;
+  moneda: Moneda | null;
+  cotizacion_monto: number | null;
+  cotizacion_version: number | null;
+  vence_at: string | null;
 };
 
 function toView(
@@ -77,13 +82,17 @@ function toView(
     canceladaPorCliente: o.cancelada_por === "cliente",
     // Las instrucciones de pago aparecen recién cuando le pedimos que pague.
     textoPago: estado === "listo_para_pagar" ? textoPagoDe(textos, o.moneda) : null,
+    cotizacion: null,
     facturaId,
     seguible: true,
   };
 }
 
-// Consulta pendiente: sin operación detrás no hay seguimiento ni factura.
+// Consulta todavía sin operación: pendiente, cotizada (esperando que la
+// acepte), o cerrada sin pedido (cancelada / descartada / rechazada).
 function consultaToView(c: ConsultaRow): PedidoView {
+  const est = estadoCotizacion({ estado: c.estado as EstadoConsulta, vence_at: c.vence_at });
+  const cotizada = c.estado === "cotizada";
   return {
     id: c.id,
     code: c.code,
@@ -98,9 +107,17 @@ function consultaToView(c: ConsultaRow): PedidoView {
         ? "cancelada"
         : c.estado === "descartada"
           ? "consulta_descartada"
-          : "consulta_recibida",
-    monto: null,
-    moneda: null,
+          : c.estado === "rechazada"
+            ? "consulta_rechazada"
+            : est === "vencida"
+              ? "consulta_vencida"
+              : cotizada
+                ? "consulta_cotizada"
+                : "consulta_recibida",
+    // La cotización que le mandamos: lo que va a pagar si la acepta.
+    monto: cotizada ? Number(c.cotizacion_monto) || null : null,
+    moneda: cotizada ? c.moneda ?? "USD" : null,
+    cotizacion: cotizada ? { version: c.cotizacion_version ?? 1, venceAt: c.vence_at } : null,
     puedeCancelar: c.estado === "pendiente",
     canceladaPorCliente: c.estado === "cancelada",
     textoPago: null,
@@ -151,15 +168,15 @@ export default async function MisPedidosPage() {
       .limit(200);
     const ops = (data ?? []) as OpRow[];
 
-    // Las pendientes, y las canceladas/descartadas del último mes (para que
+    // Las pendientes y cotizadas, y las cerradas sin pedido del último mes (para que
     // vea qué pasó con ellas). Una consulta ya convertida se ve como la
     // operación que originó; mostrar las dos duplicaría el mismo pedido.
     const haceUnMes = new Date(Date.now() - 30 * 86400_000).toISOString();
     const { data: dataC } = await admin
       .from("consultas")
-      .select("id, code, evento, sector, cantidad, fecha_evento, created_at, estado")
+      .select("id, code, evento, sector, cantidad, fecha_evento, created_at, estado, moneda, cotizacion_monto, cotizacion_version, vence_at")
       .eq("cliente_id", user.id)
-      .or(`estado.eq.pendiente,and(estado.in.(cancelada,descartada),updated_at.gte.${haceUnMes})`)
+      .or(`estado.in.(pendiente,cotizada),and(estado.in.(cancelada,descartada,rechazada),updated_at.gte.${haceUnMes})`)
       .order("created_at", { ascending: false })
       .limit(200);
     const consultas = (dataC ?? []) as ConsultaRow[];

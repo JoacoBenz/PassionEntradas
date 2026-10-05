@@ -19,6 +19,9 @@ export default function TextosPagoPanel() {
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState<Moneda | null>(null);
   const [aviso, setAviso] = useState<{ tipo: "ok" | "error"; msg: string } | null>(null);
+  // Plazo para aceptar una cotización (horas).
+  const [horas, setHoras] = useState<number | null>(null);
+  const [horasDraft, setHorasDraft] = useState("");
 
   useEffect(() => {
     fetch("/api/textos-pago")
@@ -30,7 +33,37 @@ export default function TextosPagoPanel() {
       })
       .catch(() => setAviso({ tipo: "error", msg: "No se pudieron cargar los textos de pago" }))
       .finally(() => setCargando(false));
+    fetch("/api/ajustes-cotizacion")
+      .then((r) => r.json())
+      .then((d) => {
+        if (typeof d?.horas === "number") {
+          setHoras(d.horas);
+          setHorasDraft(String(d.horas));
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  async function guardarHoras() {
+    setAviso(null);
+    try {
+      const res = await fetch("/api/ajustes-cotizacion", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ horas: horasDraft }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAviso({ tipo: "error", msg: data.error ?? "No se pudo guardar" });
+        return;
+      }
+      setHoras(data.horas);
+      setHorasDraft(String(data.horas));
+      setAviso({ tipo: "ok", msg: `Las cotizaciones nuevas vencen a las ${data.horas} h` });
+    } catch {
+      setAviso({ tipo: "error", msg: "Error de red al guardar" });
+    }
+  }
 
   async function guardar(m: Moneda) {
     const key = claveTextoPago(m);
@@ -63,7 +96,7 @@ export default function TextosPagoPanel() {
         <p className="text-[10px] font-medium uppercase tracking-[0.25em] text-white/50">
           Pedidos de la tienda
         </p>
-        <h2 className="mt-0.5 font-display text-lg font-bold tracking-tight">Cómo pagar</h2>
+        <h2 className="mt-0.5 font-display text-lg font-bold tracking-tight">Cotizaciones y pagos</h2>
       </div>
       <div className="punch-t bg-white">
         <div className="perf-line-light mx-5" />
@@ -84,6 +117,34 @@ export default function TextosPagoPanel() {
               {aviso.msg}
             </p>
           )}
+
+          <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl bg-canvas px-3.5 py-3">
+            <div className="min-w-0">
+              <label htmlFor="vence-horas" className="block text-sm font-semibold">
+                Vencimiento de las cotizaciones
+              </label>
+              <p className="text-xs text-muted">
+                Horas que tiene el cliente para aceptar. Aplica a las que mandes desde ahora.
+              </p>
+            </div>
+            <span className="flex items-center gap-2">
+              <input
+                id="vence-horas"
+                inputMode="numeric"
+                value={horasDraft}
+                onChange={(e) => setHorasDraft(e.target.value)}
+                className="h-10 w-20 rounded-lg border border-line bg-white px-2.5 text-right font-mono text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+              />
+              <span className="text-sm text-muted">h</span>
+              <button
+                onClick={guardarHoras}
+                disabled={horas == null || horasDraft.trim() === String(horas)}
+                className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-deep disabled:opacity-50"
+              >
+                Guardar
+              </button>
+            </span>
+          </div>
 
           {cargando ? (
             <p className="text-sm text-muted">Cargando…</p>

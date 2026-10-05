@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { esStaff, getRol } from "@/lib/auth";
-import { isMock, mockListOps } from "@/lib/mock-db";
+import { isMock, mockListConsultas, mockListOps } from "@/lib/mock-db";
 
 // GET /api/operaciones/version — versión mínima de la lista de operaciones.
 // Devuelve { v } donde v cambia si se creó/actualizó cualquier operación
@@ -12,9 +12,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   if (isMock()) {
+    // Espejo de version_operaciones (0041): operaciones + consultas.
     const ops = mockListOps();
     const max = ops.reduce((m, o) => (o.updated_at > m ? o.updated_at : m), "");
-    return NextResponse.json({ v: `${ops.length}:${max}` });
+    const cs = mockListConsultas();
+    const maxC = cs.reduce((m, c) => (c.updated_at > m ? c.updated_at : m), "");
+    return NextResponse.json({ v: `${ops.length}:${max}|${cs.length}:${maxC}` });
   }
 
   const supabase = createServerSupabase();

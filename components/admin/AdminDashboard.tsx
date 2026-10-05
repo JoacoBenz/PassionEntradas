@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { estadoCotizacion } from "@/lib/cotizaciones";
 import {
   diasHastaEvento,
   estadoDe,
@@ -97,6 +99,7 @@ export default function AdminDashboard({
   const [sort, setSort] = useState<"recientes" | "urgentes">("recientes");
   const [page, setPage] = useState(1);
   const { toasts, push } = useToast();
+  const router = useRouter();
 
   // Cambiar filtro, búsqueda u orden vuelve a la primera página.
   useEffect(() => {
@@ -122,7 +125,10 @@ export default function AdminDashboard({
     const paraCerrar = estados.filter((e) => e === "lista_para_cerrar").length;
     const cerradas = estados.filter((e) => e === "cerrada").length;
     const nuevos = ops.filter(necesitaConfirmar).length;
-    return { enCurso, paraCerrar, cerradas, aCotizar: consultas.length, nuevos };
+    const aCotizar = consultas.filter((c) => estadoCotizacion(c) === "a_cotizar").length;
+    // Cotizadas sin respuesta (incluye las vencidas: hay que re-cotizarlas).
+    const esperando = consultas.length - aCotizar;
+    return { enCurso, paraCerrar, cerradas, aCotizar, esperando, nuevos };
   }, [ops, consultas]);
 
   const visible = useMemo<Fila[]>(() => {
@@ -265,72 +271,59 @@ export default function AdminDashboard({
     }
   }
 
-  // Cotizar una consulta la convierte en operación: desaparece de las
-  // consultas y aparece en la lista como una operación más.
-  async function cargarConsulta(
+  // Cotizar NO crea la operación: le manda el precio al cliente, que la
+  // acepta (o no) desde Mis pedidos. La consulta queda en la lista como
+  // "Esperando cliente" hasta que responda.
+  async function cotizarConsulta(
     c: Consulta,
     valores: { costo: number; comision: number; moneda: Moneda }
   ): Promise<string | null> {
     setBusyId(c.id);
     try {
-      const res = await fetch(`/api/consultas/${c.id}/convertir`, {
+      const res = await fetch(`/api/consultas/${c.id}/cotizar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(valores),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const msg = data.error ?? "No se pudo cargar la operación";
+        const msg = data.error ?? "No se pudo enviar la cotización";
         push("error", msg);
         return msg;
       }
-      setConsultas((prev) => prev.filter((x) => x.id !== c.id));
-      if (data.operacion) {
-        // Optimista: la operación real llega con el próximo AutoRefresh, pero
-        // la fila tiene que aparecer ya para que se vea que se cargó.
-        setOps((prev) => [
-          {
-            id: data.operacion.id,
-            code: data.operacion.code,
-            evento: c.evento,
-            comprador_alias: c.comprador_alias,
-            vendedor_alias: null,
-            monto: valores.costo + valores.comision,
-            fee: valores.comision,
-            moneda: valores.moneda,
-            cantidad: c.cantidad,
-            status: "esperando_entrada",
-            ticket_id: c.ticket_id,
-            sector: c.sector,
-            fecha_evento: c.fecha_evento,
-            notas: c.notas,
-            cuenta_debitar: null,
-            tipo: "pedido",
-            cliente_id: c.cliente_id,
-            cliente_email: c.cliente_email,
-            envio_id: c.envio_id,
-            entrada_recibida_at: null,
-            pago_confirmado_at: null,
-            pago_proveedor_at: null,
-            cerrada_at: null,
-            entrada_recibida_por: null,
-            pago_confirmado_por: null,
-            pago_proveedor_por: null,
-            cerrada_por: null,
-            // Cotiza el admin: el pedido nace confirmado (ver convertir).
-            confirmada_at: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          } as Operacion,
-          ...prev,
-        ]);
-      }
-      push("success", `Operación ${data.operacion?.code ?? ""} creada`);
+      setConsultas((prev) => prev.map((x) => (x.id === c.id ? { ...x, ...data.consulta } : x)));
+      push("success", `Cotización enviada a ${c.comprador_alias ?? c.cliente_email ?? "el cliente"}`);
       return null;
     } catch {
       const msg = "Error de red. Reintentá.";
       push("error", msg);
       return msg;
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // El cliente aceptó por WhatsApp: se registra (con quién lo marcó) y nace
+  // el pedido, por la misma función atómica que usa el cliente en la web.
+  async function aceptarPorWhatsapp(c: Consulta) {
+    setBusyId(c.id);
+    try {
+      const res = await fetch(`/api/consultas/${c.id}/aceptar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version: c.cotizacion_version, via: "whatsapp" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        push("error", data.error ?? "No se pudo registrar la aceptación");
+        return;
+      }
+      setConsultas((prev) => prev.filter((x) => x.id !== c.id));
+      push("success", `Pedido ${data.operacion?.code ?? ""} creado`);
+      // La operación nueva la trae el server (con su estado real).
+      router.refresh();
+    } catch {
+      push("error", "Error de red. Reintentá.");
     } finally {
       setBusyId(null);
     }
@@ -361,13 +354,18 @@ export default function AdminDashboard({
       <section className="card-shadow mb-5 overflow-hidden rounded-2xl bg-white">
         {/* 2×2 en celular: cuatro columnas en 390px dejaban las etiquetas
             partidas en dos renglones y el número sin aire. */}
-        <div className="grid grid-cols-2 divide-x divide-dashed divide-line sm:grid-cols-4">
+        <div className="grid grid-cols-2 divide-x divide-dashed divide-line sm:grid-cols-5">
           {/* "A cotizar" son las consultas: entradas que el cliente pidió y
               todavía hay que chequear si están y a cuánto. */}
           <Stat label="A cotizar" value={stats.aCotizar} accent="#B07A14" />
+          {/* Cotizaciones mandadas que el cliente todavía no respondió. */}
+          <Stat label="Esperando cliente" value={stats.esperando} accent="#D14D68" />
           <Stat label="En curso" value={stats.enCurso} accent="#1F33E0" />
           <Stat label="Para entregar" value={stats.paraCerrar} accent="#0D9377" />
-          <Stat label="Entregadas" value={stats.cerradas} accent="#6C5BF2" />
+          {/* Quinta celda: en celular ocupa la fila entera (2 columnas). */}
+          <div className="col-span-2 border-t border-dashed border-line sm:col-span-1 sm:border-t-0">
+            <Stat label="Entregadas" value={stats.cerradas} accent="#6C5BF2" />
+          </div>
         </div>
       </section>
 
@@ -403,13 +401,14 @@ export default function AdminDashboard({
         </a>
       </div>
 
-      {/* Filtros por estado: la barra ocupa el ancho completo y los 6 tabs
+      {/* Filtros por estado. En celular, 2 filas de 3: seis tabs en una fila
+          de 375px quedaban cortados ("Nuev…", "En cu…"). En desktop, la barra ocupa el ancho completo y los 6 tabs
           lo reparten en partes iguales — nada de barra corta ni scroll
           horizontal con tabs cortados. */}
       <div
         role="tablist"
         aria-label="Filtrar operaciones"
-        className="mb-5 flex w-full gap-1 rounded-xl border border-line bg-white p-1 shadow-sm"
+        className="mb-5 grid w-full grid-cols-3 gap-1 rounded-xl border border-line bg-white p-1 shadow-sm sm:flex"
       >
         {FILTERS.map((f) => {
           const active = filter === f.key;
@@ -480,7 +479,8 @@ export default function AdminDashboard({
                 key={fila.id}
                 consulta={fila.consulta}
                 busy={busyId === fila.id}
-                onCargar={cargarConsulta}
+                onCotizar={cotizarConsulta}
+                onAceptarWhatsapp={aceptarPorWhatsapp}
                 onDescartar={descartarConsulta}
                 onError={(m) => push("error", m)}
               />
