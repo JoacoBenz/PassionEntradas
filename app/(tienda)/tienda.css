@@ -1150,7 +1150,7 @@
 /* Línea de tiempo del pedido: cinco pasos parejos, sin scroll en móvil. */
 .mp-pasos {
   list-style: none; margin: 14px 0 0; padding: 0;
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
 }
 .mp-paso { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; min-width: 0; }
 .mp-paso-dot {
@@ -1165,7 +1165,8 @@
 }
 .mp-paso.is-done .mp-paso-dot { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
 .mp-paso.is-done .mp-paso-label { color: var(--ink); }
-.mp-paso.is-actual .mp-paso-dot { box-shadow: 0 0 0 3px #e6e9fb; }
+.mp-paso.is-actual .mp-paso-dot { border-color: var(--cobalt); color: var(--cobalt); box-shadow: 0 0 0 3px #e6e9fb; }
+.mp-paso.is-actual .mp-paso-label { color: var(--cobalt); }
 .mp-pago {
   margin-top: 14px; padding: 12px 14px; background: #fff7e0; border: 1.5px solid #b07a14;
   display: grid; gap: 8px; justify-items: start;
