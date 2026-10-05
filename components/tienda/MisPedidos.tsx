@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AutoRefresh from "@/components/AutoRefresh";
 import { LANGS, LOCALE, TX, type Lang } from "@/lib/tienda-i18n";
-import { formatMonto, PASOS_PUBLICOS, type EstadoPublico, type Moneda } from "@/lib/operaciones";
+import { formatMonto, pasosCliente, type EstadoPublico, type Moneda } from "@/lib/operaciones";
 import { waLink } from "@/lib/tickets";
 import { fechaDia, fechaHora } from "@/lib/fechas";
 
@@ -53,21 +53,22 @@ const ESTADO_CLASS: Record<PedidoView["estado"], string> = {
   cancelada: "mp-e-cancelada",
 };
 
-// Línea de tiempo compacta del pedido: los cinco pasos, el actual marcado.
-function Pasos({ estado, labels }: { estado: EstadoPublico; labels: Record<string, string> }) {
-  const actual = PASOS_PUBLICOS.indexOf(estado);
+// Línea de tiempo del pedido: los 3 pasos del cliente (ver pasosCliente).
+function Pasos({ estado, lang }: { estado: EstadoPublico; lang: Lang }) {
+  const pasos = pasosCliente(estado, lang);
+  if (!pasos) return null;
   return (
     <ol className="mp-pasos" aria-label="Progreso">
-      {PASOS_PUBLICOS.map((p, i) => (
+      {pasos.map((p, i) => (
         <li
-          key={p}
-          className={`mp-paso${i <= actual ? " is-done" : ""}${i === actual ? " is-actual" : ""}`}
-          aria-current={i === actual ? "step" : undefined}
+          key={p.key}
+          className={`mp-paso${p.estado === "hecho" ? " is-done" : ""}${p.estado === "actual" ? " is-actual" : ""}`}
+          aria-current={p.estado === "actual" ? "step" : undefined}
         >
           <span className="mp-paso-dot" aria-hidden>
-            {i < actual ? "✓" : i + 1}
+            {p.estado === "hecho" ? "✓" : i + 1}
           </span>
-          <span className="mp-paso-label">{labels[p]}</span>
+          <span className="mp-paso-label">{p.label}</span>
         </li>
       ))}
     </ol>
@@ -208,7 +209,7 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
                   <p className="mp-monto">{formatMonto(p.monto, p.moneda, { sinDecimales: true })}</p>
                 )}
                 {p.seguible && p.estado !== "cancelada" && p.estado !== "consulta_descartada" && (
-                  <Pasos estado={p.estado as EstadoPublico} labels={mp.pasos} />
+                  <Pasos estado={p.estado as EstadoPublico} lang={lang} />
                 )}
                 {p.estado === "listo_para_pagar" && (
                   <div className="mp-pago">

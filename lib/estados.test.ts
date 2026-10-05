@@ -4,6 +4,7 @@ import {
   estadoPublicoDe,
   clientePuedeCancelar,
   necesitaConfirmar,
+  pasosCliente,
   semaforoDe,
   operacionCompleta,
   sePuedeFacturar,
@@ -261,5 +262,33 @@ describe("semaforoDe", () => {
   it("respeta un plazo de aviso distinto", () => {
     expect(semaforoDe({ ...hitos(), fecha_evento: enDias(10) }, 14)).toBe("rojo");
     expect(semaforoDe({ ...hitos(), fecha_evento: enDias(10) }, 5)).toBe("gris");
+  });
+});
+
+describe("pasosCliente — 3 pasos que cambian de nombre al completarse", () => {
+  const vista = (e: Parameters<typeof pasosCliente>[0]) =>
+    pasosCliente(e)!.map((p) => `${p.label}:${p.estado}`).join(" | ");
+
+  it("recién enviado: Recibido (actual)", () => {
+    expect(vista("pedido_recibido")).toBe("Recibido:actual | Para pagar:pendiente | Entregada:pendiente");
+  });
+  it("confirmado por el admin: Confirmado (hecho)", () => {
+    expect(vista("pedido_confirmado")).toBe("Confirmado:hecho | Para pagar:pendiente | Entregada:pendiente");
+  });
+  it("con la entrada en mano: Para pagar (actual)", () => {
+    expect(vista("listo_para_pagar")).toBe("Confirmado:hecho | Para pagar:actual | Entregada:pendiente");
+  });
+  it("pagado: Para pagar pasa a Pagado (hecho)", () => {
+    expect(vista("pago_recibido")).toBe("Confirmado:hecho | Pagado:hecho | Entregada:actual");
+  });
+  it("entregada: los tres hechos", () => {
+    expect(vista("entregada")).toBe("Confirmado:hecho | Pagado:hecho | Entregada:hecho");
+  });
+  it("en inglés", () => {
+    expect(pasosCliente("pago_recibido", "en")!.map((p) => p.label)).toEqual(["Confirmed", "Paid", "Delivered"]);
+  });
+  it("cancelada o consulta sin precio: sin pasos", () => {
+    expect(pasosCliente("cancelada")).toBeNull();
+    expect(pasosCliente("consulta_recibida")).toBeNull();
   });
 });

@@ -261,21 +261,51 @@ export function clientePuedeCancelar(op: HitosPublicos): boolean {
   return e === "pedido_recibido" || e === "pedido_confirmado";
 }
 
-// Línea de tiempo del cliente (sin consulta_recibida ni cancelada).
-export const PASOS_PUBLICOS: EstadoPublico[] = [
-  "pedido_recibido",
-  "pedido_confirmado",
-  "listo_para_pagar",
-  "pago_recibido",
-  "entregada",
-];
+// Lo que ve el CLIENTE (link de seguimiento y Mis pedidos): 3 pasos, y cada
+// uno cambia de nombre al completarse:
+//   1. Recibido  -> Confirmado   (el admin confirma el pedido)
+//   2. Para pagar -> Pagado      (con los datos de pago / WhatsApp)
+//   3. Entregada                 (y con eso queda cerrada para el cliente)
+// Los hitos internos (entrada del proveedor, pago al proveedor) no aparecen.
+export type PasoCliente = {
+  key: "pedido" | "pago" | "entrega";
+  label: string;
+  estado: "hecho" | "actual" | "pendiente";
+};
+
+const PASO_TXT = {
+  es: { recibido: "Recibido", confirmado: "Confirmado", paraPagar: "Para pagar", pagado: "Pagado", entregada: "Entregada" },
+  en: { recibido: "Received", confirmado: "Confirmed", paraPagar: "To pay", pagado: "Paid", entregada: "Delivered" },
+} as const;
+
+/** Los 3 pasos del cliente; null si no aplica (cancelada o consulta sin precio). */
+export function pasosCliente(e: EstadoPublico, lang: "es" | "en" = "es"): PasoCliente[] | null {
+  if (e === "cancelada" || e === "consulta_recibida") return null;
+  const t = PASO_TXT[lang];
+  const confirmado = e !== "pedido_recibido";
+  const pagado = e === "pago_recibido" || e === "entregada";
+  const entregada = e === "entregada";
+  return [
+    { key: "pedido", label: confirmado ? t.confirmado : t.recibido, estado: confirmado ? "hecho" : "actual" },
+    {
+      key: "pago",
+      label: pagado ? t.pagado : t.paraPagar,
+      estado: pagado ? "hecho" : e === "listo_para_pagar" ? "actual" : "pendiente",
+    },
+    {
+      key: "entrega",
+      label: t.entregada,
+      estado: entregada ? "hecho" : e === "pago_recibido" ? "actual" : "pendiente",
+    },
+  ];
+}
 
 export const ESTADO_PUBLICO_LABEL: Record<EstadoPublico, string> = {
   consulta_recibida: "Consulta recibida",
-  pedido_recibido: "Pedido recibido",
-  pedido_confirmado: "Pedido confirmado",
-  listo_para_pagar: "Listo para pagar",
-  pago_recibido: "Pago recibido",
+  pedido_recibido: "Recibido",
+  pedido_confirmado: "Confirmado",
+  listo_para_pagar: "Para pagar",
+  pago_recibido: "Pagado",
   entregada: "Entregada",
   cancelada: "Cancelada",
 };

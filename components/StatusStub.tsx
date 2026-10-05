@@ -8,6 +8,7 @@ import {
   type OperacionPublica,
 } from "@/lib/operaciones";
 import ProgressSteps from "./ProgressSteps";
+import { waLink } from "@/lib/tickets";
 
 // Código de barras decorativo, derivado determinísticamente del code de la
 // operación (cada char define anchos de barra). Refuerza el motivo "entrada".
@@ -48,9 +49,12 @@ function Microtext({ dark = false }: { dark?: boolean }) {
 export default function StatusStub({
   op,
   items = [],
+  textoPago = null,
 }: {
   op: OperacionPublica;
   items?: ItemPublico[];
+  // Cómo pagar (texto del panel para la moneda del pedido). Solo en "Para pagar".
+  textoPago?: string | null;
 }) {
   const estado = estadoPublicoDe(op);
   const color = ESTADO_PUBLICO_COLOR[estado];
@@ -73,7 +77,7 @@ export default function StatusStub({
     },
     listo_para_pagar: {
       icon: "💳",
-      text: "Ya tenemos tus entradas. Entrá a Mis pedidos para ver cómo pagar.",
+      text: "Ya tenemos tus entradas. Para pagar:",
     },
     pago_recibido: {
       icon: "💸",
@@ -215,6 +219,23 @@ export default function StatusStub({
                   <span aria-hidden>{aviso.icon}</span>
                   <span>{aviso.text}</span>
                 </p>
+                {/* Para pagar: los datos de pago y, siempre, la opción de
+                    preguntar por WhatsApp. */}
+                {estado === "listo_para_pagar" && (
+                  <div className="mt-2 space-y-3 pl-6">
+                    <p className="whitespace-pre-line break-words text-sm text-ink">
+                      {textoPago ?? "Escribinos por WhatsApp y te pasamos los datos para pagar."}
+                    </p>
+                    <a
+                      href={waLink(`¡Hola! Quiero pagar mi pedido ${op.code}`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-lg border border-ink bg-[#25d366] px-3 py-2 text-xs font-bold text-[#06310f]"
+                    >
+                      Consultar por WhatsApp ↗
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 
