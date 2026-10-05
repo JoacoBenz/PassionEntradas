@@ -13,7 +13,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
-import { fmtPrice } from "@/lib/tickets";
+import { fmtPrice, type MonedaVenta } from "@/lib/tickets";
 import { TX, type Lang } from "@/lib/tienda-i18n";
 
 export type CartItem = {
@@ -23,6 +23,9 @@ export type CartItem = {
   comp: string;
   sector: string;
   monto: number; // precio UNITARIO (0 en consultas / sin precio)
+  // Moneda del precio. Opcional: los carritos guardados antes de este cambio
+  // no la tienen y eran todos en dólares.
+  moneda?: MonedaVenta;
   cantidad: number; // cuántas entradas de este sector
   maxStock: number; // tope por stock de la tienda (0 = sin tope conocido)
   tipo: "pedido" | "consulta";
@@ -124,8 +127,17 @@ export function CartBar() {
   const [estado, setEstado] = useState<Estado>("idle");
   const [error, setError] = useState("");
 
-  // Total = suma de (precio unitario × cantidad) de cada línea.
-  const total = items.reduce((a, i) => a + (i.monto || 0) * i.cantidad, 0);
+  // Un total POR MONEDA: pesos y dólares nunca se suman. Cada moneda termina
+  // siendo una operación aparte al enviar (ver /api/pedidos).
+  const totales = (["USD", "ARS"] as MonedaVenta[])
+    .map((moneda) => ({
+      moneda,
+      total: items
+        .filter((i) => (i.moneda ?? "USD") === moneda)
+        .reduce((a, i) => a + (i.monto || 0) * i.cantidad, 0),
+    }))
+    .filter((t) => t.total > 0);
+  const totalTexto = totales.map((t) => fmtPrice(t.total, lang, t.moneda)).join(" + ");
 
   function cerrar() {
     setOpen(false);
@@ -179,7 +191,7 @@ export function CartBar() {
           <button type="button" onClick={() => setOpen(true)}>
             <span className="cart-count">{count}</span>
             {c.revisar}
-            {total > 0 && <span className="cart-bar-total">{fmtPrice(total, lang)}</span>}
+            {totales.length > 0 && <span className="cart-bar-total">{totalTexto}</span>}
           </button>
         </div>
       )}
@@ -253,7 +265,9 @@ export function CartBar() {
                         )}
                       </div>
                       <span className="cart-it-price">
-                        {i.monto > 0 ? fmtPrice(i.monto * i.cantidad, lang) : c.aConsultar}
+                        {i.monto > 0
+                          ? fmtPrice(i.monto * i.cantidad, lang, i.moneda ?? "USD")
+                          : c.aConsultar}
                       </span>
                       <button
                         type="button"
@@ -267,12 +281,13 @@ export function CartBar() {
                   ))}
                 </ul>
 
-                {total > 0 && (
-                  <div className="cart-total">
-                    <span>{c.total}</span>
-                    <span>{fmtPrice(total, lang)}</span>
+                {totales.map((t) => (
+                  <div className="cart-total" key={t.moneda}>
+                    <span>{totales.length > 1 ? `${c.total} (${t.moneda})` : c.total}</span>
+                    <span>{fmtPrice(t.total, lang, t.moneda)}</span>
                   </div>
-                )}
+                ))}
+                {totales.length > 1 && <p className="cart-nota-monedas">{c.dosMonedas}</p>}
 
                 {estado === "err" && <p className="cart-err">{error}</p>}
 

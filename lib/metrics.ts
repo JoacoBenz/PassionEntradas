@@ -14,28 +14,38 @@ export type Metrics = {
   moneda: string;
   plataMovida: number; // suma de monto con pago confirmado
   comisionGanada: number; // suma de fee de esas operaciones
-  entradasVendidas: number; // cantidad de operaciones con pago confirmado
+  entradasVendidas: number; // entradas (suma de cantidades) con pago confirmado
   enJuegoMonto: number; // monto comprometido en operaciones abiertas sin pago
   enJuegoOps: number; // cuántas operaciones abiertas sin pago
-  ticketPromedio: number; // plataMovida / entradasVendidas (0 si no hay)
+  ticketPromedio: number; // plataMovida / entradasVendidas: precio medio por entrada
+  // Las otras monedas con movimiento (mismos campos, cada una en la suya).
+  // El tablero las muestra en pestañas: pesos y dólares nunca se suman.
+  otrasMonedas?: Metrics[];
 };
 
 type OpMetrica = Pick<
   Operacion,
-  "monto" | "fee" | "status" | "pago_confirmado_at" | "cerrada_at" | "moneda">;
+  "monto" | "fee" | "status" | "pago_confirmado_at" | "cerrada_at" | "moneda"
+> & { cantidad?: number | null };
+
+// Día (YYYY-MM-DD) en hora argentina: un pago confirmado a las 22 h de
+// Buenos Aires ya es el día siguiente en UTC, y caía en el rango equivocado.
+function diaAr(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(
+    new Date(iso)
+  );
+}
 
 // Rango opcional (fechas YYYY-MM-DD, inclusive): filtra las métricas de
-// venta por CUÁNDO se confirmó el pago. "En juego" no depende del rango
-// (es exposición actual).
+// venta por el DÍA en que se confirmó el pago, en hora argentina. "En juego"
+// no depende del rango (es exposición actual).
 //
 // Agrupa por moneda y devuelve la dominante, igual que el RPC: sumar pesos
 // con dólares en un solo pozo y etiquetarlo con la moneda de la primera
 // operación daba un número que no significaba nada (y mentía sobre la unidad).
 //
-// OJO: el RPC `metricas_operaciones` todavía cuenta la plata movida por
-// `cerrada_at` y las entradas por suma de `cantidad`; acá se usa el criterio
-// documentado arriba (pago confirmado, una por operación). Son dos
-// definiciones distintas del mismo tablero y hay que unificarlas.
+// Es el mismo criterio que el RPC `metricas_operaciones` (migración 0035):
+// producción calcula en la base y el modo demo acá, y tienen que coincidir.
 export function computeMetrics(
   ops: OpMetrica[],
   desde?: string | null,
@@ -71,12 +81,12 @@ export function computeMetrics(
     const a = acum(op.moneda ?? "USD");
 
     if (op.pago_confirmado_at) {
-      const dia = op.pago_confirmado_at.slice(0, 10);
+      const dia = diaAr(op.pago_confirmado_at);
       if (desde && dia < desde) continue;
       if (hasta && dia > hasta) continue;
       a.plata_movida += op.monto;
       a.comision_ganada += op.fee;
-      a.entradas_vendidas += 1;
+      a.entradas_vendidas += op.cantidad && op.cantidad > 0 ? op.cantidad : 1;
     } else if (!op.cerrada_at) {
       a.en_juego_monto += op.monto;
       a.en_juego_ops += 1;
@@ -87,23 +97,22 @@ export function computeMetrics(
 }
 
 
-// El RPC devuelve una fila por moneda. Se queda con la de mayor movimiento:
-// mezclarlas daría un número que no significa nada, y mostrar N tableros
-// complica una pantalla que hoy es de un vistazo.
-export function metricasDominantes(
-  filas: {
-    moneda?: string | null;
-    plata_movida?: number | null;
-    comision_ganada?: number | null;
-    entradas_vendidas?: number | null;
-    en_juego_monto?: number | null;
-    en_juego_ops?: number | null;
-  }[]
-): Metrics {
-  const orden = [...(filas ?? [])].sort(
-    (a, b) => Number(b.plata_movida ?? 0) - Number(a.plata_movida ?? 0)
-  );
-  const m = orden[0] ?? {};
+// El RPC devuelve una fila por moneda. La principal es USD si tuvo
+// movimiento (es la moneda de casi todo el negocio); si no, la de más
+// operaciones. Las demás van en `otrasMonedas` para verlas por separado.
+// Antes se elegía "la de mayor plata movida" comparando montos crudos: un
+// pedido de $ 1.200.000 le ganaba a US$ 50.000 y el tablero pasaba a pesos
+// mostrando los montos con "US$" adelante.
+type FilaMoneda = {
+  moneda?: string | null;
+  plata_movida?: number | null;
+  comision_ganada?: number | null;
+  entradas_vendidas?: number | null;
+  en_juego_monto?: number | null;
+  en_juego_ops?: number | null;
+};
+
+function aMetrics(m: FilaMoneda): Metrics {
   const plataMovida = Number(m.plata_movida ?? 0);
   const entradasVendidas = Number(m.entradas_vendidas ?? 0);
   return {
@@ -115,4 +124,15 @@ export function metricasDominantes(
     enJuegoOps: Number(m.en_juego_ops ?? 0),
     ticketPromedio: entradasVendidas > 0 ? Math.round(plataMovida / entradasVendidas) : 0,
   };
+}
+
+export function metricasDominantes(filas: FilaMoneda[]): Metrics {
+  const todas = (filas ?? []).map(aMetrics);
+  const actividad = (m: Metrics) => m.entradasVendidas + m.enJuegoOps;
+  const principal =
+    todas.find((m) => m.moneda === "USD" && actividad(m) > 0) ??
+    [...todas].sort((a, b) => actividad(b) - actividad(a))[0] ??
+    aMetrics({});
+  const otras = todas.filter((m) => m !== principal && actividad(m) > 0);
+  return { ...principal, otrasMonedas: otras };
 }

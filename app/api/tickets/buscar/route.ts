@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { esStaff, getRol } from "@/lib/auth";
-import { DEFAULT_EUR_USD, hoyArgentina } from "@/lib/tickets";
+import { DEFAULT_EUR_USD, factorAVenta, hoyArgentina, monedaDeVenta, type MonedaVenta, type Tasas } from "@/lib/tickets";
 import { fetchConfigTienda } from "@/lib/supabase/public";
 import { isMock, mockListManual } from "@/lib/mock-db";
 import { MOCK_TICKETS } from "@/lib/mock-tickets";
@@ -23,22 +23,27 @@ export type TicketMatch = {
   precio_costo: number | null;
   stock: number | null;
   source: "portal" | "manual";
-  // Costo y precio YA en USD, con la misma conversión que usa la tienda. Se
+  // Costo y precio YA en su moneda de venta (la misma regla que la tienda:
+  // una propia en pesos queda en pesos, el resto en dólares) y esa moneda. Se
   // resuelven acá porque el formulario no tiene la cotización (es de admin) y
-  // porque así la operación se carga con los mismos números que vio el
-  // cliente. Para las del portal, el costo es lo que cobra Passion y la
-  // diferencia con el precio es nuestro markup.
-  costo_usd: number | null;
-  precio_usd: number | null;
+  // porque así la operación se carga con los mismos números y la misma moneda
+  // que vio el cliente. Para las del portal, el costo es lo que cobra Passion.
+  moneda_venta: MonedaVenta;
+  costo_venta: number | null;
+  precio_venta: number | null;
 };
 
-// Misma conversión que la tienda: el portal guarda EUR, las propias ya USD.
-function enUsd(valor: unknown, source: "portal" | "manual", tasa: number): number | null {
+// Misma regla que la tienda (ver monedaDeVenta / factorAVenta).
+function enVenta(
+  valor: unknown,
+  source: "portal" | "manual",
+  moneda: string | null | undefined,
+  tasas: Tasas
+): number | null {
   if (valor == null) return null;
   const n = Number(valor);
   if (!Number.isFinite(n) || n <= 0) return null;
-  const usd = source === "portal" ? n * tasa : n;
-  return Math.round(usd * 100) / 100;
+  return Math.round(n * factorAVenta(source, moneda, tasas) * 100) / 100;
 }
 
 const LIMITE = 12;
@@ -49,8 +54,10 @@ export async function GET(request: Request) {
     return NextResponse.json([]);
   }
 
-  const { eurUsd } = await fetchConfigTienda().catch(() => ({ eurUsd: DEFAULT_EUR_USD }));
-  const tasa = eurUsd > 0 ? eurUsd : DEFAULT_EUR_USD;
+  const tasa: Tasas = await fetchConfigTienda().catch(() => ({
+    eurUsd: DEFAULT_EUR_USD,
+    arsPorUsd: null,
+  }));
 
   if (isMock()) {
     const hoy = hoyArgentina();
@@ -67,7 +74,11 @@ export async function GET(request: Request) {
       // Las del portal no tienen costo propio (se compran al publicarse), así
       // que solo las manuales traen `precio_costo`.
       .map(({ id, evento, competicion, fecha, categoria, precio_final, stock, source, ...resto }) => {
-        const r = resto as { precio_costo?: number | null; precio_origen?: number | null };
+        const r = resto as {
+          precio_costo?: number | null;
+          precio_origen?: number | null;
+          moneda_final?: string | null;
+        };
         // El costo del portal es lo que cobra Passion (precio_origen).
         const costo = source === "portal" ? r.precio_origen ?? null : r.precio_costo ?? null;
         return {
@@ -80,8 +91,9 @@ export async function GET(request: Request) {
           precio_costo: r.precio_costo ?? null,
           stock,
           source,
-          costo_usd: enUsd(costo, source, tasa),
-          precio_usd: enUsd(precio_final, source, tasa),
+          moneda_venta: monedaDeVenta(source, r.moneda_final),
+          costo_venta: enVenta(costo, source, r.moneda_final, tasa),
+          precio_venta: enVenta(precio_final, source, r.moneda_final, tasa),
         };
       });
     return NextResponse.json(out);
@@ -111,7 +123,7 @@ export async function GET(request: Request) {
   let query = createAdminSupabase()
     .from("tickets")
     .select(
-      "id, evento, competicion, fecha, categoria, precio_final, precio_origen, precio_costo, stock, source"
+      "id, evento, competicion, fecha, categoria, precio_final, precio_origen, precio_costo, moneda_final, stock, source"
     )
     .or(`fecha.is.null,fecha.gte.${hoy}`);
   for (const p of palabras) {
@@ -138,8 +150,9 @@ export async function GET(request: Request) {
       precio_costo: t.precio_costo ?? null,
       stock: t.stock ?? null,
       source,
-      costo_usd: enUsd(costo, source, tasa),
-      precio_usd: enUsd(t.precio_final, source, tasa),
+      moneda_venta: monedaDeVenta(source, t.moneda_final),
+      costo_venta: enVenta(costo, source, t.moneda_final, tasa),
+      precio_venta: enVenta(t.precio_final, source, t.moneda_final, tasa),
     };
   });
   return NextResponse.json(out);

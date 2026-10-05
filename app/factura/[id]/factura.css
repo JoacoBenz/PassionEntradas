@@ -228,3 +228,6 @@
 .fac-lineas td.num { font-variant-numeric: tabular-nums; }
 .fac-l-ev { display: block; font-weight: 600; }
 .fac-l-meta { display: block; margin-top: 2px; font-size: 11px; color: #8a8f9e; }
+/* Dólar del día y total en pesos: debajo del total en USD, más chicos, para
+   que quede claro que el importe de la factura es el de dólares. */
+.fac-totals .fx-row td { font-size: 12px; color: var(--mute); padding-top: 4px; }

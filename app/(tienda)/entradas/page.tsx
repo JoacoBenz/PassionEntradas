@@ -1,5 +1,5 @@
 import { fetchConfigTienda, fetchTickets } from "@/lib/supabase/public";
-import { normalizarPreciosUsd } from "@/lib/tickets";
+import { normalizarPrecios } from "@/lib/tickets";
 import { StorefrontHome } from "@/components/tienda/Storefront";
 import { requireAccesoTienda } from "@/lib/tienda-guard";
 
@@ -15,7 +15,11 @@ export default async function EntradasHome() {
   await requireAccesoTienda();
 
   let rows: Awaited<ReturnType<typeof fetchTickets>> = [];
-  let cfg = { eurUsd: 1.08, portalActivo: true };
+  let cfg: Awaited<ReturnType<typeof fetchConfigTienda>> = {
+    eurUsd: 1.08,
+    arsPorUsd: null,
+    portalActivo: true,
+  };
   try {
     [rows, cfg] = await Promise.all([fetchTickets(), fetchConfigTienda()]);
   } catch {
@@ -24,5 +28,5 @@ export default async function EntradasHome() {
   // Interruptor del panel: con Passion apagado quedan solo las propias.
   if (!cfg.portalActivo) rows = rows.filter((t) => t.source !== "portal");
   // Todo a USD antes de renderizar: la tienda no vuelve a convertir.
-  return <StorefrontHome rows={normalizarPreciosUsd(rows, cfg.eurUsd)} />;
+  return <StorefrontHome rows={normalizarPrecios(rows, cfg)} />;
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol, puedeVerTienda, nombreDe } from "@/lib/auth";
-import { formatUSD, generateCode, type TipoOperacion } from "@/lib/operaciones";
+import { formatMonto, generateCode, type TipoOperacion } from "@/lib/operaciones";
 import { notificarVendedores } from "@/lib/whatsapp";
 import { notificarVendedoresEmail } from "@/lib/email";
 import {
@@ -12,10 +12,11 @@ import {
   MOCK_USER,
 } from "@/lib/mock-db";
 import { fetchConfigTienda } from "@/lib/supabase/public";
-import { DEFAULT_EUR_USD } from "@/lib/tickets";
+import { DEFAULT_EUR_USD, type MonedaVenta } from "@/lib/tickets";
 import {
   evaluarLimite,
   reconciliarItem,
+  agruparPorMoneda,
   resumenOperacion,
   separarPorTipo,
   detalleDeLineas,
@@ -99,6 +100,7 @@ async function buscarTickets(ids: string[]): Promise<Map<string, TicketRef>> {
       source: t.source === "manual" ? "manual" : "portal",
       precio_origen: t.precio_origen ?? null,
       precio_costo: t.precio_costo ?? null,
+      moneda_final: t.moneda_final ?? null,
     });
 
   if (isMock()) {
@@ -110,7 +112,7 @@ async function buscarTickets(ids: string[]): Promise<Map<string, TicketRef>> {
   }
   const { data } = await createAdminSupabase()
     .from("tickets")
-    .select("id, evento, categoria, precio_final, stock, fecha, source, precio_origen, precio_costo")
+    .select("id, evento, categoria, precio_final, stock, fecha, source, precio_origen, precio_costo, moneda_final")
     .in("id", ids);
   for (const t of (data ?? []) as any[]) guardar(t);
   return map;
@@ -185,15 +187,12 @@ export async function POST(request: Request) {
   const refs = await buscarTickets(
     parsed.map((p) => p.ticket_id).filter((id): id is string => !!id)
   );
-  // La tienda muestra TODO en USD: las filas del portal están en EUR y se
-  // convierten con la cotización del panel; las propias ya están en USD. Hay que
-  // aplicar la misma conversión acá o el monto guardado quedaría por debajo del
+  // La tienda muestra TODO en USD: el portal está en EUR y las propias en la
+  // moneda con que se cargaron, y se convierten con las cotizaciones del panel.
+  // Hay que aplicar la misma conversión acá o el monto guardado no sería el
   // precio que vio el cliente.
-  const tasa = refs.size
-    ? await fetchConfigTienda()
-        .then((c) => (c.eurUsd > 0 ? c.eurUsd : DEFAULT_EUR_USD))
-        .catch(() => DEFAULT_EUR_USD)
-    : DEFAULT_EUR_USD;
+  const sinConfig = { eurUsd: DEFAULT_EUR_USD, arsPorUsd: null };
+  const tasa = refs.size ? await fetchConfigTienda().catch(() => sinConfig) : sinConfig;
 
   for (let i = 0; i < parsed.length; i++) {
     const p = parsed[i];
@@ -222,31 +221,42 @@ export async function POST(request: Request) {
   const { pedidos: lineasPedido, consultas: lineasConsulta } = separarPorTipo(parsed);
   const envioId = crypto.randomUUID();
 
-  type Creada = { id: string; code: string; evento: string; monto: number; cantidad: number };
-  let operacion: Creada | null = null;
+  type Creada = {
+    id: string;
+    code: string;
+    evento: string;
+    monto: number;
+    cantidad: number;
+    moneda: MonedaVenta;
+    lineas: ItemPedido[];
+  };
+  // Una operación por moneda (ver agruparPorMoneda): un carrito con entradas
+  // en pesos y en dólares no puede ser una sola deuda.
+  const operaciones: Creada[] = [];
   const consultasCreadas: { id: string; code: string; evento: string }[] = [];
-
-  const resumen = lineasPedido.length > 0 ? resumenOperacion(lineasPedido) : null;
+  const grupos = agruparPorMoneda(lineasPedido);
 
   if (isMock()) {
-    if (resumen) {
+    for (const g of grupos) {
+      const resumen = resumenOperacion(g.lineas);
       const op = mockCreateOp({
         evento: resumen.evento,
         comprador_alias: ctx.comprador,
         vendedor_alias: null,
         monto: resumen.monto,
+        moneda: g.moneda,
         cantidad: resumen.cantidad,
-        fee: comisionDe(lineasPedido),
+        fee: comisionDe(g.lineas),
         ticket_id: resumen.ticket_id,
         fecha_evento: resumen.fecha_evento,
-        notas: notasDePedido(lineasPedido),
+        notas: notasDePedido(g.lineas),
         cuenta_debitar: null,
         tipo: "pedido",
         cliente_id: ctx.cliente_id,
         cliente_email: ctx.cliente_email,
         sector: resumen.sector,
         envio_id: envioId,
-        items: lineasPedido.map((l) => ({
+        items: g.lineas.map((l) => ({
           ticket_id: l.ticket_id,
           evento: l.evento,
           sector: l.sector,
@@ -255,7 +265,15 @@ export async function POST(request: Request) {
           precio_unitario: l.cantidad > 0 ? l.monto / l.cantidad : 0,
         })),
       });
-      operacion = { id: op.id, code: op.code, evento: op.evento, monto: op.monto, cantidad: op.cantidad };
+      operaciones.push({
+        id: op.id,
+        code: op.code,
+        evento: op.evento,
+        monto: op.monto,
+        cantidad: op.cantidad,
+        moneda: g.moneda,
+        lineas: g.lineas,
+      });
     }
     for (const l of lineasConsulta) {
       const c = mockCrearConsulta({
@@ -268,14 +286,24 @@ export async function POST(request: Request) {
         sector: l.sector,
         fecha_evento: l.fecha_evento,
         cantidad: l.cantidad,
+        moneda: l.moneda ?? null,
         notas: notasDeConsulta(l, ctx),
       });
       consultasCreadas.push({ id: c.id, code: c.code, evento: c.evento });
     }
   } else {
     const admin = createAdminSupabase();
+    // Si falla una operación a mitad de un carrito de dos monedas, se borran
+    // las que ya se habían creado: nada a medias en el panel.
+    const deshacer = async () => {
+      if (operaciones.length) {
+        await admin.from("operaciones").delete().in("id", operaciones.map((o) => o.id));
+      }
+    };
 
-    if (resumen) {
+    for (const g of grupos) {
+      const resumen = resumenOperacion(g.lineas);
+      let creada: Creada | null = null;
       // Reintento por colisión de code (23505); muy improbable.
       for (let attempt = 0; attempt < 5; attempt++) {
         const { data, error } = await admin
@@ -285,11 +313,14 @@ export async function POST(request: Request) {
             evento: resumen.evento,
             comprador_alias: ctx.comprador,
             monto: resumen.monto,
+            // Siempre explícita: la base tenía default 'USD' y una operación
+            // en pesos sin moneda quedaba como dólares (el pedido de Boca).
+            moneda: g.moneda,
             cantidad: resumen.cantidad,
-            fee: comisionDe(lineasPedido),
+            fee: comisionDe(g.lineas),
             ticket_id: resumen.ticket_id,
             fecha_evento: resumen.fecha_evento,
-            notas: notasDePedido(lineasPedido),
+            notas: notasDePedido(g.lineas),
             tipo: "pedido",
             cliente_id: ctx.cliente_id,
             cliente_email: ctx.cliente_email,
@@ -299,25 +330,28 @@ export async function POST(request: Request) {
           .select("id, code, evento, monto, cantidad")
           .single();
         if (!error && data) {
-          operacion = data as Creada;
+          creada = { ...(data as Omit<Creada, "moneda" | "lineas">), moneda: g.moneda, lineas: g.lineas };
           break;
         }
         if (error && (error as any).code !== "23505") {
+          await deshacer();
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
       }
-      if (!operacion) {
+      if (!creada) {
+        await deshacer();
         return NextResponse.json(
           { error: "No se pudo registrar el pedido, reintentá" },
           { status: 500 }
         );
       }
+      operaciones.push(creada);
 
       // Las líneas. Si fallan, la operación queda sin detalle: se borra para
       // no dejar una operación a medias en el panel.
       const { error: errItems } = await admin.from("operacion_items").insert(
-        lineasPedido.map((l) => ({
-          operacion_id: operacion!.id,
+        g.lineas.map((l) => ({
+          operacion_id: creada!.id,
           ticket_id: l.ticket_id,
           evento: l.evento,
           sector: l.sector,
@@ -327,7 +361,7 @@ export async function POST(request: Request) {
         }))
       );
       if (errItems) {
-        await admin.from("operaciones").delete().eq("id", operacion.id);
+        await deshacer();
         return NextResponse.json(
           { error: "No se pudo registrar el detalle del pedido, reintentá" },
           { status: 500 }
@@ -350,6 +384,10 @@ export async function POST(request: Request) {
             sector: l.sector,
             fecha_evento: l.fecha_evento,
             cantidad: l.cantidad,
+            // Moneda en que se va a cobrar esa entrada: la cotización arranca
+            // en esa moneda (una consulta de una entrada en pesos se cotiza en
+            // pesos). null si no está vinculada a una entrada del catálogo.
+            moneda: l.moneda ?? null,
             notas: notasDeConsulta(l, ctx),
           })
           .select("id, code, evento")
@@ -371,13 +409,11 @@ export async function POST(request: Request) {
   const totalEntradas = parsed.reduce((a, p) => a + p.cantidad, 0);
   const bloques: string[] = [];
 
-  if (operacion && resumen) {
-    const ls = lineasPedido
-      .map((l, i) => `  ${i + 1}) ${detalle(l)} — ${formatUSD(l.monto)}`)
+  for (const op of operaciones) {
+    const ls = op.lineas
+      .map((l, i) => `  ${i + 1}) ${detalle(l)} — ${formatMonto(l.monto, op.moneda)}`)
       .join("\n");
-    bloques.push(
-      `OPERACIÓN ${operacion.code} — ${formatUSD(resumen.monto)}\n${ls}`
-    );
+    bloques.push(`OPERACIÓN ${op.code} — ${formatMonto(op.monto, op.moneda)}\n${ls}`);
   }
   if (consultasCreadas.length > 0) {
     const ls = lineasConsulta
@@ -397,9 +433,11 @@ export async function POST(request: Request) {
   // aceptan saltos de línea. El texto largo va igual por email y como fallback
   // cuando todavía no hay plantilla configurada.
   const tipoEnvio = tipoDelEnvio(lineasPedido, lineasConsulta);
+  // Un total por moneda: "$ 1.200.000 + US$ 500,00". Nunca se suman entre sí.
   const totalCorto =
-    operacion && resumen
-      ? formatUSD(resumen.monto) + (consultasCreadas.length > 0 ? " + a cotizar" : "")
+    operaciones.length > 0
+      ? operaciones.map((o) => formatMonto(o.monto, o.moneda)).join(" + ") +
+        (consultasCreadas.length > 0 ? " + a cotizar" : "")
       : "a cotizar";
 
   const [wa, mail] = await Promise.all([
@@ -420,7 +458,10 @@ export async function POST(request: Request) {
       // `count` sigue siendo la cantidad de entradas del envío (lo que el
       // carrito muestra); ahora además se devuelve qué se creó con cada una.
       count: totalEntradas,
-      operacion: operacion ? { id: operacion.id, code: operacion.code } : null,
+      // `operacion` (la primera) se mantiene por compatibilidad; un carrito
+      // con pesos y dólares devuelve las dos en `operaciones`.
+      operacion: operaciones[0] ? { id: operaciones[0].id, code: operaciones[0].code } : null,
+      operaciones: operaciones.map((o) => ({ id: o.id, code: o.code, moneda: o.moneda })),
       consultas: consultasCreadas.map((c) => ({ id: c.id, code: c.code })),
       // El error se manda al cliente (no solo el booleano) para poder ver el
       // motivo real desde la pestaña Network sin tener que ir a buscar los

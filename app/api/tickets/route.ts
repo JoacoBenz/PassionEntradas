@@ -5,6 +5,7 @@ import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server
 import { getRol } from "@/lib/auth";
 import { isMock, mockCreateManual } from "@/lib/mock-db";
 import { parsePrecio } from "@/lib/precios";
+import { ERROR_MONEDA, parseMoneda } from "@/lib/operaciones";
 
 // POST /api/tickets — publica una entrada manual en el catálogo.
 // Un evento puede traer VARIOS sectores (cada uno con su precio y stock):
@@ -50,10 +51,9 @@ function parseSectores(t: any): SectorInput[] | { error: string } {
     const n = crudos.length > 1 ? ` (sector ${i + 1})` : "";
     const categoria = String(crudos[i]?.categoria ?? "").trim();
     const stock = Math.trunc(Number(crudos[i]?.stock));
-    // Moneda de la entrada. Cualquier cosa que no sea una de las tres cae a
-    // USD, que es como se cargaban antes.
-    const monedaRaw = String(crudos[i]?.moneda ?? "USD").toUpperCase();
-    const moneda = ["ARS", "USD", "EUR"].includes(monedaRaw) ? monedaRaw : "USD";
+    // Moneda de la entrada: pesos o dólares (el euro es solo de Passion).
+    const moneda = parseMoneda(crudos[i]?.moneda);
+    if (!moneda) return { error: `${ERROR_MONEDA}${n}` };
     if (!categoria) {
       return { error: `El sector es obligatorio${n}` };
     }
@@ -154,9 +154,9 @@ export async function POST(request: Request) {
     fecha,
     ciudad,
     categoria: s.categoria,
-    // La entrada propia se carga en la moneda que elige el admin y se muestra
-    // en esa: no se convierte. (El portal es el único que convierte, EUR->USD,
-    // y eso lo hace el worker.)
+    // La entrada propia se guarda en la moneda que elige el admin. La tienda la
+    // pasa a dólares al mostrarla, con las cotizaciones del panel (ver
+    // factorAUsd en lib/tickets.ts).
     precio_origen: s.precio,
     moneda_origen: s.moneda ?? "USD",
     precio_final: s.precio,

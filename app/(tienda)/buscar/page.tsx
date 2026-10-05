@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { fetchConfigTienda, fetchTickets } from "@/lib/supabase/public";
-import { normalizarPreciosUsd } from "@/lib/tickets";
+import { normalizarPrecios } from "@/lib/tickets";
 import { StorefrontCatalog } from "@/components/tienda/Storefront";
 import { requireAccesoTienda } from "@/lib/tienda-guard";
 
@@ -12,7 +12,11 @@ export default async function BuscarPage() {
   await requireAccesoTienda();
 
   let rows: Awaited<ReturnType<typeof fetchTickets>> = [];
-  let cfg = { eurUsd: 1.08, portalActivo: true };
+  let cfg: Awaited<ReturnType<typeof fetchConfigTienda>> = {
+    eurUsd: 1.08,
+    arsPorUsd: null,
+    portalActivo: true,
+  };
   try {
     [rows, cfg] = await Promise.all([fetchTickets(), fetchConfigTienda()]);
   } catch {
@@ -24,7 +28,7 @@ export default async function BuscarPage() {
     // useSearchParams exige Suspense en páginas estáticas.
     <Suspense fallback={<div className="splash">Loading the listings…</div>}>
       {/* Todo a USD antes de renderizar: la tienda no vuelve a convertir. */}
-      <StorefrontCatalog rows={normalizarPreciosUsd(rows, cfg.eurUsd)} />
+      <StorefrontCatalog rows={normalizarPrecios(rows, cfg)} />
     </Suspense>
   );
 }

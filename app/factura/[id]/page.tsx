@@ -3,6 +3,9 @@ import { createPublicSupabase } from "@/lib/supabase/public";
 import {
   FACTURA_TX,
   fmtMontoFactura,
+  fmtArsFactura,
+  fmtMontoMoneda,
+  monedaFactura,
   numeroFactura,
   type Factura,
 } from "@/lib/factura";
@@ -59,7 +62,12 @@ export default async function FacturaPage({ params }: { params: { id: string } }
   const d = factura.datos;
   const t = FACTURA_TX[d.idioma] ?? FACTURA_TX.en;
   const num = numeroFactura(factura.numero, factura.created_at);
-  const usd = (n: number) => fmtMontoFactura(n, d.idioma);
+  // Todo en la moneda de la operación. `usd` conserva el nombre por historia:
+  // en una factura en pesos formatea pesos.
+  const moneda = monedaFactura(d);
+  const usd = (n: number) => fmtMontoMoneda(n, moneda, d.idioma);
+  const notaMoneda =
+    moneda === "ARS" ? t.arsOnlyNote : t.usdNote;
   // Facturas emitidas antes del modelo multi-línea no traen `items`: se arma
   // una línea con el resumen para que se sigan viendo igual.
   const lineas =
@@ -218,10 +226,34 @@ export default async function FacturaPage({ params }: { params: { id: string } }
                   <td>{t.total}</td>
                   <td>{usd(d.total)}</td>
                 </tr>
+                {/* Dólar del día que cargó el admin al emitir. Las facturas
+                    anteriores no lo tienen y se ven como siempre. */}
+                {d.cotizacion && moneda === "USD" && (
+                  <>
+                    <tr className="fx-row">
+                      <td className="t-label">
+                        {t.exchangeRate(fechaCorta(d.cotizacion.fecha, d.idioma))}
+                      </td>
+                      <td>
+                        {fmtMontoFactura(1, d.idioma)} = {fmtArsFactura(d.cotizacion.ars_por_usd, d.idioma)}
+                      </td>
+                    </tr>
+                    <tr className="fx-row">
+                      <td className="t-label">{t.totalArs}</td>
+                      <td>
+                        {fmtArsFactura(
+                          Math.round(d.total * d.cotizacion.ars_por_usd * 100) / 100,
+                          d.idioma
+                        )}
+                      </td>
+                    </tr>
+                  </>
+                )}
               </tbody>
             </table>
           </div>
-          <p className="fac-usd-note">{t.usdNote}</p>
+          <p className="fac-usd-note">{notaMoneda}</p>
+          {d.cotizacion && moneda === "USD" && <p className="fac-usd-note">{t.arsNote}</p>}
         </section>
 
         <section className="fac-pay">

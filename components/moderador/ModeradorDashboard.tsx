@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { whatsappMessage, type Operacion } from "@/lib/operaciones";
+import { useEffect, useState } from "react";
+import { whatsappMessage, type Consulta, type Moneda, type Operacion } from "@/lib/operaciones";
+import ConsultaCard from "@/components/admin/ConsultaCard";
 import NewOperacionForm from "@/components/admin/NewOperacionForm";
 import OperacionCard from "@/components/admin/OperacionCard";
 import MetricsBoard from "@/components/moderador/MetricsBoard";
@@ -10,6 +11,7 @@ import type { Metrics } from "@/lib/metrics";
 
 type Props = {
   initial: Operacion[];
+  consultas: Consulta[];
   metrics: Metrics;
   baseUrl: string;
   prefill?: { evento?: string; ticketId?: string };
@@ -19,13 +21,57 @@ type Props = {
 // comprador y vendedor, y comparte el link. Los estados los maneja el admin.
 export default function ModeradorDashboard({
   initial,
+  consultas: consultasIniciales,
   metrics,
   baseUrl,
   prefill,
 }: Props) {
   const [ops, setOps] = useState<Operacion[]>(initial);
+  // Lista viva: AutoRefresh vuelve a pedir la página cada tanto y `initial`
+  // llega con los datos nuevos (cambios de estado que hace el admin). Sin esto
+  // la lista quedaba congelada en lo que había al abrir la página.
+  useEffect(() => {
+    setOps(initial);
+  }, [initial]);
   const [lastCreated, setLastCreated] = useState<Operacion | null>(null);
   const { toasts, push } = useToast();
+
+  // Consultas de la tienda sin cotizar. El moderador las cotiza igual que el
+  // admin (misma tarjeta, mismo endpoint): al ponerle costo y comisión, la
+  // consulta se convierte en una operación.
+  const [consultas, setConsultas] = useState<Consulta[]>(consultasIniciales);
+  const [cotizando, setCotizando] = useState<string | null>(null);
+  useEffect(() => {
+    setConsultas(consultasIniciales);
+  }, [consultasIniciales]);
+
+  async function cotizar(
+    c: Consulta,
+    valores: { costo: number; comision: number; moneda: Moneda }
+  ): Promise<string | null> {
+    setCotizando(c.id);
+    try {
+      const res = await fetch(`/api/consultas/${c.id}/convertir`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(valores),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data.error ?? "No se pudo cargar la operación";
+        push("error", msg);
+        return msg;
+      }
+      setConsultas((prev) => prev.filter((x) => x.id !== c.id));
+      push("success", `Consulta cotizada: operación ${data.operacion?.code ?? ""} creada`);
+      return null;
+    } catch {
+      push("error", "Error de red al cotizar");
+      return "Error de red al cotizar";
+    } finally {
+      setCotizando(null);
+    }
+  }
 
   async function copy(text: string, label: string) {
     try {
@@ -94,6 +140,24 @@ export default function ModeradorDashboard({
           </div>
         )}
       </section>
+
+      {/* Consultas a cotizar */}
+      {consultas.length > 0 && (
+        <section className="mt-8 space-y-3">
+          <h2 className="text-xs font-medium uppercase tracking-widest text-muted">
+            Consultas a cotizar ({consultas.length})
+          </h2>
+          {consultas.map((c) => (
+            <ConsultaCard
+              key={c.id}
+              consulta={c}
+              busy={cotizando === c.id}
+              onCargar={cotizar}
+              onError={(m) => push("error", m)}
+            />
+          ))}
+        </section>
+      )}
 
       {/* Cargadas recientemente */}
       <section className="mt-8 space-y-3">

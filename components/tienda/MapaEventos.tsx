@@ -351,7 +351,7 @@ export function MapaEventos({ rows }: { rows: Ticket[] }) {
                         {date.full}
                         {" · "}
                         {ev.minPrice != null
-                          ? `${t.desdeMayus} ${fmtPrice(ev.minPrice, lang)}`
+                          ? `${t.desdeMayus} ${fmtPrice(ev.minPrice, lang, ev.minMoneda)}`
                           : t.aConsultar}
                       </span>
                     </div>

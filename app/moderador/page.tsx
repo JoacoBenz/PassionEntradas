@@ -4,10 +4,11 @@ import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server
 import { esStaff, getRol } from "@/lib/auth";
 import ModeradorDashboard from "@/components/moderador/ModeradorDashboard";
 import AppHeader from "@/components/AppHeader";
+import AutoRefresh from "@/components/AutoRefresh";
 import BottomNav from "@/components/BottomNav";
-import type { Operacion } from "@/lib/operaciones";
+import type { Consulta, Operacion } from "@/lib/operaciones";
 import { computeMetrics, type Metrics, metricasDominantes } from "@/lib/metrics";
-import { isMock, MOCK_USER, mockListOps } from "@/lib/mock-db";
+import { isMock, MOCK_USER, mockListConsultas, mockListOps } from "@/lib/mock-db";
 
 export const dynamic = "force-dynamic";
 
@@ -32,12 +33,15 @@ export default async function ModeradorPage({
   let esAdmin: boolean;
   let ops: Operacion[];
   let metrics: Metrics;
+  // Consultas de la tienda sin cotizar: el moderador también las cotiza.
+  let consultas: Consulta[] = [];
 
   if (isMock()) {
     email = MOCK_USER.email;
     esAdmin = true;
     ops = mockListOps(10);
     metrics = computeMetrics(mockListOps());
+    consultas = mockListConsultas().filter((c) => c.estado === "pendiente");
   } else {
     const supabase = createServerSupabase();
     const {
@@ -61,7 +65,7 @@ export default async function ModeradorPage({
     // Columnas explícitas: notas y cuenta_debitar son datos internos del
     // panel de administración, el módulo del moderador no los necesita.
     const admin = createAdminSupabase();
-    const [recentes, agregados] = await Promise.all([
+    const [recentes, agregados, pendientes] = await Promise.all([
       admin
         .from("operaciones")
         .select(
@@ -73,7 +77,16 @@ export default async function ModeradorPage({
       // filas históricas para sumar en JS — la única query sin tope del
       // panel, y crecía para siempre.
       admin.rpc("metricas_operaciones"),
+      admin
+        .from("consultas")
+        .select(
+          "id, code, envio_id, cliente_id, cliente_email, comprador_alias, ticket_id, evento, sector, fecha_evento, cantidad, moneda, notas, estado, operacion_id, resuelta_por, resuelta_at, created_at, updated_at"
+        )
+        .eq("estado", "pendiente")
+        .order("created_at", { ascending: false })
+        .limit(200),
     ]);
+    consultas = (pendientes.data ?? []) as Consulta[];
     ops = (recentes.data ?? []).map((o) => ({
       ...o,
       notas: null,
@@ -90,6 +103,7 @@ export default async function ModeradorPage({
       <AppHeader subtitle="Carga de operaciones" email={email} nav={esAdmin} />
       <ModeradorDashboard
         initial={ops}
+        consultas={consultas}
         metrics={metrics}
         baseUrl={getBaseUrl()}
         prefill={
@@ -98,6 +112,7 @@ export default async function ModeradorPage({
             : undefined
         }
       />
+      <AutoRefresh intervalMs={20000} />
       {esAdmin && <BottomNav />}
     </main>
   );

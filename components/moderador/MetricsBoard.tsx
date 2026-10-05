@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { formatUSD } from "@/lib/operaciones";
+import { formatMonto, type Moneda } from "@/lib/operaciones";
 import type { Metrics } from "@/lib/metrics";
 
 // Tablero del negocio en el módulo de carga: cuánta plata se movió (pagos
@@ -73,7 +73,13 @@ function rangoDePreset(p: Preset): { desde: string; hasta: string } {
 }
 
 export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics }) {
-  const [metrics, setMetrics] = useState<Metrics>(inicial);
+  const [metricsTodas, setMetrics] = useState<Metrics>(inicial);
+  // Pestaña de moneda: cada una se muestra por separado, nunca sumadas.
+  const [monedaSel, setMonedaSel] = useState<string | null>(null);
+  const monedas = [metricsTodas, ...(metricsTodas.otrasMonedas ?? [])];
+  const metrics = monedas.find((m) => m.moneda === monedaSel) ?? metricsTodas;
+  const fmt = (n: number) =>
+    formatMonto(n, (metrics.moneda as Moneda) ?? "USD", { sinDecimales: true });
   const [preset, setPreset] = useState<Preset>("todo");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
@@ -174,6 +180,25 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
           </div>
         </div>
       )}
+      {monedas.length > 1 && (
+        <div className="mb-2 flex gap-1.5" role="tablist" aria-label="Moneda">
+          {monedas.map((m) => (
+            <button
+              key={m.moneda}
+              role="tab"
+              aria-selected={m.moneda === metrics.moneda}
+              onClick={() => setMonedaSel(m.moneda)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                m.moneda === metrics.moneda
+                  ? "bg-ink text-white"
+                  : "border border-line bg-white text-[#4A4E5E] hover:bg-canvas"
+              }`}
+            >
+              {m.moneda === "ARS" ? "Pesos (ARS)" : "Dólares (USD)"}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="card-shadow overflow-hidden rounded-2xl bg-white">
         {/* Fila principal. En móvil la plata movida ocupa la fila entera
             (los montos en ARS no entran en tercios de 390px); comisión y
@@ -182,7 +207,7 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
           <Tile
             big
             label="Volumen operado"
-            value={formatUSD(metrics.plataMovida)}
+            value={fmt(metrics.plataMovida)}
             detail="Total con pago confirmado"
             accent="#0D9377"
             className="col-span-2 border-b border-dashed border-line md:col-span-1 md:border-b-0 md:border-r"
@@ -190,16 +215,16 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
           <Tile
             big
             label="Comisiones acumuladas"
-            value={formatUSD(metrics.comisionGanada)}
+            value={fmt(metrics.comisionGanada)}
             detail="Sobre ventas confirmadas"
             accent="#6C5BF2"
             className="border-r border-dashed border-line"
           />
           <Tile
             big
-            label="Ventas concretadas"
+            label="Entradas vendidas"
             value={String(metrics.entradasVendidas).padStart(2, "0")}
-            detail="Operaciones cobradas"
+            detail="Con pago confirmado"
             accent="#B07A14"
           />
         </div>
@@ -208,7 +233,7 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
         <div className="grid grid-cols-2">
           <Tile
             label="Capital comprometido"
-            value={formatUSD(metrics.enJuegoMonto)}
+            value={fmt(metrics.enJuegoMonto)}
             detail={`En ${metrics.enJuegoOps} ${
               metrics.enJuegoOps === 1
                 ? "operación en curso sin cobrar"
@@ -218,9 +243,9 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
             className="border-r border-dashed border-line"
           />
           <Tile
-            label="Valor promedio"
-            value={formatUSD(metrics.ticketPromedio)}
-            detail="Por operación concretada"
+            label="Precio promedio"
+            value={fmt(metrics.ticketPromedio)}
+            detail="Por entrada vendida"
             accent="#5F6577"
           />
         </div>

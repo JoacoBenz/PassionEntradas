@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol, nombreDe } from "@/lib/auth";
-import type { FacturaDatos, FacturaIdioma } from "@/lib/factura";
+import { metodoValido, parseCotizacion, type FacturaDatos, type FacturaIdioma } from "@/lib/factura";
 import {
   isMock,
   MOCK_USER,
@@ -89,6 +89,10 @@ export async function POST(
   const cantidad = Math.trunc(Number(body.cantidad));
   const metodo = String(body.metodo_pago ?? "").trim().slice(0, 80);
   const idioma: FacturaIdioma = body.idioma === "es" ? "es" : "en";
+  // Dólar del día: lo carga el admin a mano en cada emisión de una factura en
+  // DÓLARES (deja asentado su valor en pesos ese día). Una factura en pesos no
+  // lo necesita. La fecha es la de emisión, en hora argentina.
+  const arsPorUsd = parseCotizacion(body.cotizacion);
 
   if (!nombre) {
     return NextResponse.json(
@@ -105,6 +109,9 @@ export async function POST(
       { status: 400 }
     );
   }
+  const hoyAr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date());
 
   // Operación + entrada vinculada (para sede/competición/sector).
   type OpFactura = {
@@ -117,6 +124,7 @@ export async function POST(
     pago_confirmado_at: string | null;
     fecha_evento: string | null;
     ticket_id: string | null;
+    moneda?: "ARS" | "USD" | null;
     // Quién la pidió desde la tienda (null en las cargadas a mano).
     cliente_id?: string | null;
     cliente_email?: string | null;
@@ -137,7 +145,7 @@ export async function POST(
     const admin = createAdminSupabase();
     const { data, error } = await admin
       .from("operaciones")
-      .select("id, code, evento, monto, fee, status, pago_confirmado_at, fecha_evento, ticket_id, cliente_id, cliente_email")
+      .select("id, code, evento, monto, fee, moneda, status, pago_confirmado_at, fecha_evento, ticket_id, cliente_id, cliente_email")
       .eq("id", params.id)
       .maybeSingle();
     if (error) {
@@ -161,6 +169,19 @@ export async function POST(
     return NextResponse.json(
       { error: "La operación está cancelada: no se factura" },
       { status: 409 }
+    );
+  }
+  const monedaOp = op.moneda ?? "USD";
+  if (!metodoValido(metodo, monedaOp)) {
+    return NextResponse.json(
+      { error: `El método de pago tiene que ser en la moneda de la operación (${monedaOp})` },
+      { status: 400 }
+    );
+  }
+  if (monedaOp === "USD" && arsPorUsd == null) {
+    return NextResponse.json(
+      { error: "Cargá el dólar del día (pesos por dólar), por ejemplo 1465,50" },
+      { status: 400 }
     );
   }
   // El invoice es un recibo: recién existe cuando el pago está confirmado.
@@ -262,6 +283,8 @@ export async function POST(
     total: op.monto,
     metodo_pago: metodo,
     pago_confirmado_at: op.pago_confirmado_at,
+    cotizacion: monedaOp === "USD" && arsPorUsd != null ? { ars_por_usd: arsPorUsd, fecha: hoyAr } : null,
+    moneda: monedaOp,
   };
 
   if (isMock()) {

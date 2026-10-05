@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import { ToastViewport, useToast } from "./Toast";
@@ -143,11 +143,10 @@ function fmtFechaCorta(iso: string | null): string {
   return `${d}/${m}/${y}`;
 }
 
-// La moneda guardada es texto libre en la base; se acota a las tres que maneja
-// la app para poder formatear.
+// La moneda guardada es texto libre en la base; se acota a las dos que maneja
+// la app (una propia vieja en euros se vende en dólares: se edita como USD).
 function monedaDe(v: string | null | undefined): Moneda {
-  const u = String(v ?? "USD").toUpperCase();
-  return u === "ARS" || u === "EUR" ? u : "USD";
+  return String(v ?? "USD").toUpperCase() === "ARS" ? "ARS" : "USD";
 }
 
 const sectorVacio = (): SectorForm => ({
@@ -170,6 +169,13 @@ export default function TicketsPanel({
   competiciones,
 }: Props) {
   const [tickets, setTickets] = useState<TicketFull[]>(initial);
+  // Lista viva: AutoRefresh vuelve a pedir la página cada tanto y `initial`
+  // llega con los datos nuevos (entradas cargadas por otro admin). El
+  // formulario de edición tiene su propio estado, así que no se pisa. Sin
+  // esto la lista quedaba congelada en lo que había al abrir la página.
+  useEffect(() => {
+    setTickets(initial);
+  }, [initial]);
   // Sugerencias del dropdown de competición. Una nueva se suma al publicar,
   // así aparece en la próxima carga sin recargar la página.
   const [comps, setComps] = useState<string[]>(competiciones);
@@ -605,7 +611,6 @@ export default function TicketsPanel({
                       >
                         <option value="USD">USD</option>
                         <option value="ARS">ARS</option>
-                        <option value="EUR">EUR</option>
                       </select>
                     </div>
                     <div>

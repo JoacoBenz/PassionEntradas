@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Operacion } from "@/lib/operaciones";
-import { numeroFactura, type Factura } from "@/lib/factura";
+import { METODOS_PAGO, metodoValido, numeroFactura, parseCotizacion, type Factura } from "@/lib/factura";
 
 // Emite (o re-emite) la factura de una operación cobrada. Los 4 datos que
 // la operación no tiene (nombre real, contacto, cantidad, método de pago)
@@ -27,8 +27,15 @@ export default function FacturaModal({
   // Cantidad del pedido (topeada por el stock en la tienda). Arranca de la
   // operación; si ya hay factura emitida, gana su snapshot (efecto de más abajo).
   const [cantidad, setCantidad] = useState(String(op.cantidad || 1));
-  const [metodo, setMetodo] = useState("Bank transfer (USD)");
+  // Solo los métodos de la moneda de la operación (ver METODOS_PAGO).
+  const metodos = METODOS_PAGO[op.moneda ?? "USD"];
+  const [metodo, setMetodo] = useState(metodos[0]);
   const [idioma, setIdioma] = useState<"en" | "es">("en");
+  // Dólar del día, tipeado por el admin. Al re-emitir se precarga el que ya
+  // tenía la factura; si cambió, se corrige acá.
+  const [cotizacion, setCotizacion] = useState("");
+  // El dólar del día solo tiene sentido en una factura en dólares.
+  const esUsd = (op.moneda ?? "USD") === "USD";
   const [existente, setExistente] = useState<Factura | null>(null);
   const [cargando, setCargando] = useState(true);
   const [emitiendo, setEmitiendo] = useState(false);
@@ -46,8 +53,12 @@ export default function FacturaModal({
         setNombre(d.comprador.nombre);
         setContacto(d.comprador.contacto ?? "");
         setCantidad(String(d.cantidad));
-        setMetodo(d.metodo_pago);
+        // Una factura vieja puede tener un método de otra moneda (la de Boca
+        // salió con "Bank transfer (USD)"): al re-emitir arranca del primero
+        // de la moneda correcta en vez de arrastrar el error.
+        if (metodoValido(d.metodo_pago, op.moneda ?? "USD")) setMetodo(d.metodo_pago);
         setIdioma(d.idioma);
+        if (d.cotizacion) setCotizacion(String(d.cotizacion.ars_por_usd).replace(".", ","));
       })
       .catch(() => {})
       .finally(() => vivo && setCargando(false));
@@ -67,6 +78,10 @@ export default function FacturaModal({
       onToast("error", "Cantidad inválida");
       return;
     }
+    if (esUsd && parseCotizacion(cotizacion) == null) {
+      onToast("error", "Cargá el dólar del día (pesos por dólar), por ejemplo 1465,50");
+      return;
+    }
     enviando.current = true;
     setEmitiendo(true);
     try {
@@ -79,6 +94,7 @@ export default function FacturaModal({
           cantidad: cant,
           metodo_pago: metodo,
           idioma,
+          cotizacion,
         }),
       });
       const data = await res.json();
@@ -244,13 +260,30 @@ export default function FacturaModal({
                   value={metodo}
                   onChange={(e) => setMetodo(e.target.value)}
                 >
-                  <option>Bank transfer (USD)</option>
-                  <option>Transferencia (USD)</option>
-                  <option>Cash (USD)</option>
-                  <option>Efectivo (USD)</option>
-                  <option>Crypto (USDT)</option>
+                  {metodos.map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
                 </select>
               </div>
+
+              {esUsd && (
+              <div>
+                <label htmlFor="f-cotizacion" className={labelCls}>
+                  Dólar del día (pesos por dólar) *
+                </label>
+                <input
+                  id="f-cotizacion"
+                  inputMode="decimal"
+                  className={`${inputCls} font-mono`}
+                  value={cotizacion}
+                  onChange={(e) => setCotizacion(e.target.value)}
+                  placeholder="1465,50"
+                />
+                <p className="mt-1 text-[11px] text-muted">
+                  Queda fijo en la factura con la fecha de hoy. Se muestra el total en pesos al lado del total en dólares.
+                </p>
+              </div>
+              )}
 
               <div className="flex gap-2 pt-1">
                 <button

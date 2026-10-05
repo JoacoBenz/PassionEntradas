@@ -326,7 +326,8 @@ function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang 
   const t = TX[lang];
   const cart = useCart();
   const hasPrice = u.precio_final != null && Number(u.precio_final) > 0;
-  const precio = hasPrice ? fmtPrice(u.precio_final, lang) : null;
+  const moneda = u.moneda_venta ?? "USD";
+  const precio = hasPrice ? fmtPrice(u.precio_final, lang, moneda) : null;
   const stk = u.stock ?? 0;
   const bookable = stk > 0 && u.estado === "book" && hasPrice;
   const low = stk > 0 && stk <= 2;
@@ -349,6 +350,7 @@ function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang 
       comp: ev.comp,
       sector,
       monto: unit,
+      moneda,
       cantidad: 1,
       // Solo los pedidos con stock permiten más de una; el stepper se topea acá.
       maxStock: bookable ? stk : 0,
@@ -573,7 +575,7 @@ function TicketCard({
       <aside className="ticket-stub">
         <span className="stub-label">{ev.minPrice != null ? t.desde : t.precio}</span>
         <span className={`stub-price ${ev.minPrice == null ? "is-consult" : ""}`}>
-          {ev.minPrice != null ? fmtPrice(ev.minPrice, lang) : t.consultar}
+          {ev.minPrice != null ? fmtPrice(ev.minPrice, lang, ev.minMoneda) : t.consultar}
         </span>
         <span className="stub-meta">
           {t.ubicaciones(n)}
@@ -696,7 +698,7 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
                   </span>
                   <span className="rank-price">
                     {ev.minPrice != null
-                      ? t.desdeMayus + " " + fmtPrice(ev.minPrice, lang)
+                      ? t.desdeMayus + " " + fmtPrice(ev.minPrice, lang, ev.minMoneda)
                       : t.aConsultar}
                   </span>
                 </div>

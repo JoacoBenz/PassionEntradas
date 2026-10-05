@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { esStaff, getRol, nombreDe } from "@/lib/auth";
-import { generateCode, type Moneda } from "@/lib/operaciones";
+import { ERROR_MONEDA, generateCode, parseMoneda } from "@/lib/operaciones";
 import { parsePrecio } from "@/lib/precios";
 import { isMock, MOCK_USER, mockConvertirConsulta } from "@/lib/mock-db";
 
@@ -62,10 +62,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     fee = Math.max(0, Math.round(Number(body?.fee)) || 0);
   }
 
-  const monedaRaw = String(body?.moneda ?? "USD").toUpperCase();
-  const moneda: Moneda = (["ARS", "USD", "EUR"] as const).includes(monedaRaw as any)
-    ? (monedaRaw as Moneda)
-    : "USD";
+  const moneda = parseMoneda(body?.moneda);
+  if (!moneda) return NextResponse.json({ error: ERROR_MONEDA }, { status: 400 });
 
   if (isMock()) {
     const r = mockConvertirConsulta(params.id, { monto, fee, moneda, quien });
