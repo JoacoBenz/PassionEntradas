@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getRol } from "@/lib/auth";
 import { decidirRuteo } from "@/lib/ruteo";
 import { sesionCaida } from "@/lib/sesion";
+import { HDR_USUARIO, firmarUsuario } from "@/lib/usuario-firmado";
 
 // Refresca la sesión de Supabase Auth y RUTEA los módulos:
 // - /admin: solo administrador (los moderadores van a /moderador), salvo
@@ -98,7 +99,21 @@ export async function middleware(request: NextRequest) {
   if (decision.accion === "redirigir") {
     return redirectTo(decision.a);
   }
-  return response;
+
+  // Le pasa a la página el usuario YA verificado acá, firmado (HMAC, 60 s),
+  // para que no vuelva a preguntarle a Auth: un viaje menos por navegación.
+  // Se borra siempre lo que haya mandado el navegador en ese header; y aunque
+  // alguien lo forje, sin la clave del server la firma no valida
+  // (lib/usuario-verificado.ts cae a getUser()).
+  const headers = new Headers(request.headers);
+  headers.delete(HDR_USUARIO);
+  if (user) {
+    const firmado = await firmarUsuario(user);
+    if (firmado) headers.set(HDR_USUARIO, firmado);
+  }
+  const final = NextResponse.next({ request: { headers } });
+  response.cookies.getAll().forEach((cookie) => final.cookies.set(cookie));
+  return final;
 }
 
 export const config = {

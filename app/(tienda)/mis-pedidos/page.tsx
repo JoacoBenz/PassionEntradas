@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
-import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase } from "@/lib/supabase/server";
 import { getRol, puedeVerTienda } from "@/lib/auth";
 import { clientePuedeCancelar, estadoPublicoDe, type EstadoConsulta, type Moneda } from "@/lib/operaciones";
 import { estadoCotizacion } from "@/lib/cotizaciones";
 import { textoPagoDe } from "@/lib/textos";
 import { MisPedidos, type PedidoView } from "@/components/tienda/MisPedidos";
+import { usuarioVerificado } from "@/lib/usuario-verificado";
 import {
   isMock,
   mockFacturaDeOperacion,
@@ -149,10 +150,7 @@ export default async function MisPedidosPage() {
       ...consultas.map((c) => consultaToView(c as unknown as ConsultaRow)),
     ].sort(masNuevoPrimero);
   } else {
-    const supabase = createServerSupabase();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await usuarioVerificado();
     if (!user || !puedeVerTienda(getRol(user))) redirect("/ingresar");
 
     // Las tablas son deny-all para el cliente; leemos lo suyo con service role,

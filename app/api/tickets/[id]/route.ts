@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { mapaPropioValido } from "@/lib/tickets";
-import { revalidatePath } from "next/cache";
+import { refrescarTienda } from "@/lib/refrescar-tienda";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { ERROR_MONEDA, parseMoneda } from "@/lib/operaciones";
 import { getRol } from "@/lib/auth";
@@ -177,7 +177,7 @@ export async function PATCH(
     }
   }
 
-  revalidatePath("/(tienda)", "layout");
+  refrescarTienda();
   return NextResponse.json({ ok: true, row });
 }
 export async function DELETE(
@@ -215,7 +215,7 @@ export async function DELETE(
 
   // La tienda pública es ISR: sin esto, la entrada borrada sigue apareciendo
   // hasta la revalidación de fondo. También en mock (flujo local completo).
-  revalidatePath("/(tienda)", "layout");
+  refrescarTienda();
 
   return NextResponse.json({ ok: true });
 }

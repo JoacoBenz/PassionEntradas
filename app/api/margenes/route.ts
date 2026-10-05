@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { refrescarTienda } from "@/lib/refrescar-tienda";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import {
@@ -96,7 +96,7 @@ export async function PUT(request: Request) {
 
   if (isMock()) {
     const margen = mockUpsertMargen(competicion, porcentaje);
-    revalidatePath("/(tienda)", "layout"); // flujo local completo
+    refrescarTienda(); // flujo local completo
     return NextResponse.json({ margen, recalculadas: 370 });
   }
 
@@ -136,7 +136,7 @@ export async function PUT(request: Request) {
   // La tienda es ISR: sin esto los precios viejos siguen hasta la revalidación
   // de fondo. "layout" porque revalidatePath("/") a secas no invalida la
   // página raíz (quirk de Next 14 con route groups).
-  revalidatePath("/(tienda)", "layout");
+  refrescarTienda();
 
   return NextResponse.json({ margen, recalculadas });
 }
@@ -163,7 +163,7 @@ export async function DELETE(request: Request) {
     if (!mockDeleteMargen(competicion)) {
       return NextResponse.json({ error: "Regla no encontrada" }, { status: 404 });
     }
-    revalidatePath("/(tienda)", "layout"); // flujo local completo
+    refrescarTienda(); // flujo local completo
     return NextResponse.json({ ok: true, recalculadas: 370 });
   }
 
@@ -187,6 +187,6 @@ export async function DELETE(request: Request) {
       { status: 500 }
     );
   }
-  revalidatePath("/(tienda)", "layout");
+  refrescarTienda();
   return NextResponse.json({ ok: true, recalculadas });
 }

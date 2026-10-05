@@ -20,6 +20,7 @@ import {
 import { ubicarCiudad } from "@/lib/geo";
 import { MAPA_H, MAPA_W, proyectar, WORLD_PATH } from "@/lib/mapa-mundo";
 import { LANGS, TX, type Lang } from "@/lib/tienda-i18n";
+import { desempacarCatalogo, type CatalogoCompacto } from "@/lib/catalogo-compacto";
 
 function useLang() {
   const [lang, setLang] = useState<Lang>("es");
@@ -76,7 +77,9 @@ function clampVb(x: number, y: number, w: number): ViewBox {
   };
 }
 
-export function MapaEventos({ rows }: { rows: Ticket[] }) {
+export function MapaEventos({ catalogo }: { catalogo: CatalogoCompacto }) {
+  // Viaja empaquetado (lib/catalogo-compacto.ts): mucho más liviano.
+  const rows = useMemo(() => desempacarCatalogo<Ticket>(catalogo), [catalogo]);
   const [lang, setLang] = useLang();
   const t = TX[lang];
   const [sel, setSel] = useState<string | null>(null);

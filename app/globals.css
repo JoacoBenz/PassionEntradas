@@ -283,3 +283,28 @@ input[type="date"]::-webkit-date-and-time-value {
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
 }
+
+/* Barra de navegación (components/NavProgress.tsx). Global: vale para la
+   tienda y el panel. Crece rápido al principio y frena cerca del final, hasta
+   que llega la página. */
+.tm-nav-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10000;
+  height: 3px;
+  width: 0;
+  opacity: 0;
+  background: var(--brand);
+  box-shadow: 0 0 8px rgba(108, 91, 242, 0.6);
+  pointer-events: none;
+  transition: width 0.2s ease, opacity 0.3s ease 0.1s;
+}
+.tm-nav-progress.is-on {
+  opacity: 1;
+  width: 85%;
+  transition: width 8s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tm-nav-progress.is-on { transition: opacity 0s; width: 100%; }
+}

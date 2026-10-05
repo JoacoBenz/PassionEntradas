@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { refrescarTienda } from "@/lib/refrescar-tienda";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import { DEFAULT_EUR_USD } from "@/lib/tickets";
@@ -92,7 +92,7 @@ export async function PUT(request: Request) {
     } else {
       mockSetArsPorUsd(ars);
     }
-    revalidatePath("/(tienda)", "layout");
+    refrescarTienda();
     return NextResponse.json({ arsPorUsd: ars });
   }
 
@@ -120,7 +120,7 @@ export async function PUT(request: Request) {
 
   // La tienda es ISR: sin esto el precio viejo seguiría hasta la revalidación
   // de fondo. También en mock, para poder probar el flujo completo en local.
-  revalidatePath("/(tienda)", "layout");
+  refrescarTienda();
 
   return NextResponse.json({ eurUsd: redondeada });
 }

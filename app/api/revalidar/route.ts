@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { refrescarTienda } from "@/lib/refrescar-tienda";
 import { timingSafeEqual } from "crypto";
 import { isMock } from "@/lib/mock-db";
 
@@ -28,6 +28,6 @@ export async function POST(request: Request) {
   if (!tokenValido(request)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  revalidatePath("/(tienda)", "layout");
+  refrescarTienda();
   return NextResponse.json({ ok: true });
 }

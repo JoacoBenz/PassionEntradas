@@ -133,9 +133,7 @@ const en = {
   vacio1: "No events match these filters.",
   vacio2: "Can't find what you're looking for? Message us and we'll get it for you.",
   vacioLink: "Message us on WhatsApp",
-  anterior: "← Previous",
-  siguiente: "Next →",
-  pagina: (a: number, b: number) => `Page ${a} of ${b}`,
+  verMas: (n: number) => `Show more · ${n} left`,
   mesTBC: "TBC",
 
   // carrito: junta varias entradas y las envía todas juntas a revisión.
@@ -534,9 +532,7 @@ const es: typeof en = {
   vacio1: "Ningún evento coincide con estos filtros.",
   vacio2: "¿No está lo que buscás? Escribinos y te lo conseguimos.",
   vacioLink: "Escribinos por WhatsApp",
-  anterior: "← Anteriores",
-  siguiente: "Siguientes →",
-  pagina: (a, b) => `Página ${a} de ${b}`,
+  verMas: (n) => `Ver más · quedan ${n}`,
   mesTBC: "A confirmar",
 
   carrito: {

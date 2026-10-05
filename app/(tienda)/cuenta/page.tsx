@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
-import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase } from "@/lib/supabase/server";
 import { getRol, puedeVerTienda } from "@/lib/auth";
 import { CuentaCliente, type PerfilInicial } from "@/components/tienda/CuentaCliente";
 import { isMock } from "@/lib/mock-db";
+import { usuarioVerificado } from "@/lib/usuario-verificado";
 
 // Mi cuenta del cliente en la tienda: perfil (nombre/teléfono/dirección),
 // contraseña, idioma y contacto por WhatsApp. Acceso reafirmado en el servidor.
@@ -17,10 +18,7 @@ export default async function CuentaTiendaPage() {
   let perfil: PerfilInicial = { nombre: "", telefono: "", legajo: "", lang: null };
 
   if (!isMock()) {
-    const supabase = createServerSupabase();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await usuarioVerificado();
     if (!user || !puedeVerTienda(getRol(user))) redirect("/ingresar");
     const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
     const lang = metaStr(meta, "lang");

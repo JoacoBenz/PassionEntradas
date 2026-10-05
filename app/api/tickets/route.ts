@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { mapaPropioValido } from "@/lib/tickets";
-import { revalidatePath } from "next/cache";
+import { refrescarTienda } from "@/lib/refrescar-tienda";
 import { randomUUID } from "crypto";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
@@ -196,7 +196,7 @@ export async function POST(request: Request) {
   // La tienda pública es ISR: sin esto, la entrada nueva tarda hasta la
   // revalidación de fondo en aparecer. También en mock, para poder probar
   // el flujo completo en local.
-  revalidatePath("/(tienda)", "layout");
+  refrescarTienda();
 
   // `row` se mantiene por compatibilidad con el formato de un solo sector.
   return NextResponse.json({ ok: true, rows: creadas, row: creadas[0] }, { status: 201 });

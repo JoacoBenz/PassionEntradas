@@ -26,6 +26,9 @@ import {
 import { LANGS, mesLabelLang, TX, type Lang } from "@/lib/tienda-i18n";
 import { useCart } from "@/components/tienda/Cart";
 import { LegalLinks } from "@/components/tienda/LegalLinks";
+import { empezarNavegacion } from "@/components/NavProgress";
+import type { ResumenHome } from "@/lib/resumen-home";
+import { desempacarCatalogo, type CatalogoCompacto } from "@/lib/catalogo-compacto";
 
 // Idioma elegido: default español; se recuerda entre visitas.
 function useLang() {
@@ -453,6 +456,11 @@ function TicketCard({
 }) {
   const t = TX[lang];
   const [open, setOpen] = useState(defaultOpen);
+  // Los sectores (y el mapa) se dibujan recién la primera vez que se abre la
+  // card: cerradas son la mayoría y así la lista pesa mucho menos. Después
+  // quedan montados para que cerrar anime igual que antes.
+  const [abierta, setAbierta] = useState(defaultOpen);
+  if (open && !abierta) setAbierta(true);
   const [shared, setShared] = useState(false);
   // Mapa de sectores abierto a pantalla completa.
   const [plano, setPlano] = useState(false);
@@ -527,7 +535,7 @@ function TicketCard({
         </div>
         <div className="roll-wrap" ref={rollRef} style={{ maxHeight: 0 }}>
           <span className="scroll-rod" aria-hidden />
-          {ev.imagen && (
+          {abierta && ev.imagen && (
             // Botón y no <img> suelta: se abre con el dedo en celular y con
             // Enter en teclado. En PC además crece al pasar el mouse (CSS),
             // que para la mayoría de los mapas ya alcanza.
@@ -564,11 +572,13 @@ function TicketCard({
               onClose={() => setPlano(false)}
             />
           )}
-          <ul className="ladder">
-            {ev.ubicaciones.map((u) => (
-              <LadderRow key={u.id} u={u} ev={ev} lang={lang} />
-            ))}
-          </ul>
+          {abierta && (
+            <ul className="ladder">
+              {ev.ubicaciones.map((u) => (
+                <LadderRow key={u.id} u={u} ev={ev} lang={lang} />
+              ))}
+            </ul>
+          )}
           <span className="scroll-curl" aria-hidden />
         </div>
       </div>
@@ -589,33 +599,14 @@ function TicketCard({
 }
 
 // =============================== HOME ==========================================
-export function StorefrontHome({ rows }: { rows: Ticket[] }) {
+export function StorefrontHome({ resumen }: { resumen: ResumenHome }) {
   const router = useRouter();
   const [lang, setLang] = useLang();
   const t = TX[lang];
-  const events = useMemo(() => buildEvents(rows), [rows]);
+  // Calculado en el server (lib/resumen-home.ts): no viaja el catálogo entero.
+  const { totalEv, totalStock, populares, topCats } = resumen;
 
-  const totalEv = events.length;
-  const totalStock = events.reduce((a, e) => a + e.bookStock, 0);
-  // Los 6 más próximos por fecha, tengan stock de compra o sean "a pedido":
-  // un partidazo On Request (ej: una semi del Mundial) también va en la
-  // vidriera — cambia la acción (Consultar en vez de Reservar), no el lugar.
-  const populares = [...events]
-    .sort((a, b) => {
-      const da = a.fecha ? Date.parse(a.fecha) : Infinity;
-      const db = b.fecha ? Date.parse(b.fecha) : Infinity;
-      return da - db;
-    })
-    .slice(0, 6);
-  const catCounts = new Map<string, number>();
-  for (const e of events) catCounts.set(e.comp, (catCounts.get(e.comp) || 0) + 1);
-  // Las 8 categorías con más eventos, mostradas en orden alfabético.
-  const topCats = Array.from(catCounts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .sort((a, b) => compararAZ(a[0], b[0]));
-
-  if (!events.length) return <div className="splash">No events yet.</div>;
+  if (!totalEv) return <div className="splash">No events yet.</div>;
 
   return (
     <>
@@ -641,9 +632,9 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
           </h1>
           <p>{t.heroP}</p>
           <div className="cta-row">
-            <button className="btn-primary" onClick={() => router.push("/buscar")}>
+            <Link className="btn-primary" href="/buscar">
               {t.ctaSearch}
-            </button>
+            </Link>
             <a
               className="btn-ghost"
               href={waLink(t.waFloatMsg)}
@@ -677,7 +668,10 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
                 key={ev.comp + ev.evento}
                 className="rank-item"
                 style={{ "--i": idx } as React.CSSProperties}
-                onClick={() => router.push(`/buscar?q=${encodeURIComponent(ev.evento)}`)}
+                onClick={() => {
+                  empezarNavegacion();
+                  router.push(`/buscar?q=${encodeURIComponent(ev.evento)}`);
+                }}
               >
                 <div className="rank-main">
                   <span className="rank-eyebrow">
@@ -732,19 +726,15 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
         </div>
         <div className="catstrip">
           {topCats.map(([c, count]) => (
-            <button
-              key={c}
-              className="catlink"
-              onClick={() => router.push(`/buscar?cat=${encodeURIComponent(c)}`)}
-            >
+            <Link key={c} className="catlink" href={`/buscar?cat=${encodeURIComponent(c)}`}>
               {c}
               <small>{count}</small>
-            </button>
+            </Link>
           ))}
-          <button className="catlink catlink--all" onClick={() => router.push("/buscar")}>
+          <Link className="catlink catlink--all" href="/buscar">
             {t.verTodo}
             <small>{totalEv}</small>
-          </button>
+          </Link>
         </div>
       </section>
 
@@ -870,12 +860,16 @@ function Select({
   );
 }
 
-export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
-  const router = useRouter();
+export function StorefrontCatalog({ catalogo }: { catalogo: CatalogoCompacto }) {
   const params = useSearchParams();
   const [lang, setLang] = useLang();
   const t = TX[lang];
-  const events = useMemo(() => buildEvents(rows), [rows]);
+  // El catálogo viaja empaquetado (lib/catalogo-compacto.ts) y se arma acá una
+  // vez: los filtros corren en el navegador, sin volver a pedirle nada al server.
+  const events = useMemo(
+    () => buildEvents(desempacarCatalogo<Ticket>(catalogo)),
+    [catalogo]
+  );
   const [state, setState] = useState<FilterState>({
     cat: params.get("cat") || "*",
     lugar: params.get("lugar") || "*",
@@ -914,13 +908,14 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
     return out;
   }, [events, state]);
 
-  // Paginación client-side: la cartelera crece con cada sync y una lista
-  // infinita se vuelve inmanejable en móvil.
-  const PAGE_SIZE = 12;
-  const [page, setPage] = useState(1);
-  // Al cambiar cualquier filtro se vuelve a la primera página.
+  // Se muestran los primeros 30 y "Ver más" agrega otros 30: la cartelera
+  // tiene cientos de eventos y dibujarlos todos traba el celular. Filtrar no
+  // le pide nada al server (todo está en `events`).
+  const TANDA = 30;
+  const [mostrar, setMostrar] = useState(TANDA);
+  // Al cambiar cualquier filtro se vuelve a la primera tanda.
   useEffect(() => {
-    setPage(1);
+    setMostrar(TANDA);
   }, [state.cat, state.lugar, state.mes, state.q, state.evento]);
 
   // Link compartido: centrar la card del evento apenas se abre la página.
@@ -935,16 +930,8 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
     return () => clearTimeout(t);
   }, [state.evento]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageSafe = Math.min(page, totalPages);
-  const pageStart = (pageSafe - 1) * PAGE_SIZE;
-  const visible = filtered.slice(pageStart, pageStart + PAGE_SIZE);
-
-  function goToPage(p: number) {
-    setPage(p);
-    // La cartelera puede ser larga: al paginar volvemos al inicio de la lista.
-    document.querySelector(".result-line")?.scrollIntoView({ behavior: "smooth" });
-  }
+  const visible = filtered.slice(0, mostrar);
+  const quedan = filtered.length - visible.length;
 
   const catOpts = [
     { value: "*", label: t.todasCategorias },
@@ -976,9 +963,9 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
             <Link className="lp-nav-login" href="/cuenta">
               {t.lp.navCuenta}
             </Link>
-            <button className="back" onClick={() => router.push("/entradas")}>
+            <Link className="back" href="/entradas">
               {t.backHome}
-            </button>
+            </Link>
           </div>
         </div>
       </header>
@@ -1020,11 +1007,7 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
 
       <div className="result-line">
         <b>{filtered.length}</b> {t.eventos(filtered.length)}
-        {totalPages > 1 && (
-          <span className="range">
-            {t.mostrando(pageStart + 1, Math.min(pageStart + PAGE_SIZE, filtered.length))}
-          </span>
-        )}
+        {quedan > 0 && <span className="range">{t.mostrando(1, visible.length)}</span>}
         {filtrando && (
           <button
             className="clear"
@@ -1071,24 +1054,12 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
         )}
       </main>
 
-      {totalPages > 1 && (
-        <nav className="pager" aria-label="Pagination">
-          <button
-            className="pager-btn"
-            disabled={pageSafe <= 1}
-            onClick={() => goToPage(pageSafe - 1)}
-          >
-            {t.anterior}
+      {quedan > 0 && (
+        <div className="pager">
+          <button className="pager-btn ver-mas" onClick={() => setMostrar((m) => m + TANDA)}>
+            {t.verMas(quedan)}
           </button>
-          <span className="pager-info">{t.pagina(pageSafe, totalPages)}</span>
-          <button
-            className="pager-btn"
-            disabled={pageSafe >= totalPages}
-            onClick={() => goToPage(pageSafe + 1)}
-          >
-            {t.siguiente}
-          </button>
-        </nav>
+        </div>
       )}
 
       <Foot lang={lang} />
