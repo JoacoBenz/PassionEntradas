@@ -462,6 +462,10 @@ export function mockApplyAction(
       if (cancelada) return { ok: false, status: 409, error: "La operación está cancelada; no se puede cerrar" };
       op.cerrada_at = action.done ? new Date().toISOString() : null;
       op.cerrada_por = action.done ? MOCK_USER.email : null;
+      if (action.done && !op.confirmada_at) {
+        op.confirmada_at = new Date().toISOString();
+        op.confirmada_por = MOCK_USER.email;
+      }
       // Entregar ya no mueve stock: se descuenta al pagar (ver lib/stock.ts).
       break;
     case "cancelar":

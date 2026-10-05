@@ -173,6 +173,11 @@ export async function PATCH(
         cerrada_at: action.done ? new Date().toISOString() : null,
         cerrada_por: action.done ? quien : null,
       };
+      // Igual que los otros hitos: entregar un pedido nuevo lo confirma.
+      if (action.done && !current.confirmada_at) {
+        patch.confirmada_at = new Date().toISOString();
+        patch.confirmada_por = quien;
+      }
       break;
     }
     case "cancelar": {
@@ -293,6 +298,8 @@ function pickResult(
     confirmada_por: op.confirmada_por ?? null,
     cancelada_at: op.cancelada_at ?? null,
     cancelada_por: op.cancelada_por ?? null,
+    // El panel lo usa para no dejar que un refresco más viejo pise esto.
+    updated_at: op.updated_at ?? null,
     estado: estadoDe(op),
   };
 }

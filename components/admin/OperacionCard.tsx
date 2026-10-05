@@ -30,6 +30,8 @@ type Props = {
   items?: OperacionItem[];
   baseUrl: string;
   busy?: boolean;
+  // Hay clicks de estado guardándose (se ven ya marcados; esto solo avisa).
+  guardando?: boolean;
   // readOnly: modo moderador — sin botones de cambio de estado.
   readOnly?: boolean;
   // Arranca desplegada (ej: recién creada en el módulo de carga).
@@ -80,6 +82,7 @@ export default function OperacionCard({
   items = [],
   baseUrl,
   busy = false,
+  guardando = false,
   readOnly = false,
   defaultOpen = false,
   onAction,
@@ -392,7 +395,11 @@ export default function OperacionCard({
                 izquierda el proveedor (le pagamos / nos manda la entrada),
                 columna derecha el cliente (nos paga / le entregamos). */}
             {!readOnly && !cancelada && !cerrada && (
-              <div className="mt-4 grid grid-cols-2 gap-2">
+              <>
+              <p className="mt-4 h-4 text-right text-[10px] font-medium text-muted" aria-live="polite">
+                {guardando ? "Guardando…" : ""}
+              </p>
+              <div className="mt-1 grid grid-cols-2 gap-2">
                 <HitoButton
                   label="Pago a proveedor"
                   done={proveedor}
@@ -450,6 +457,7 @@ export default function OperacionCard({
                   }
                 />
               </div>
+              </>
             )}
 
             {/* Completa (los cuatro hitos): resumen con opción de reabrir.
