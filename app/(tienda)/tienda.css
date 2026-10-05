@@ -440,7 +440,21 @@
 /* ============ states / footer ============ */
 .splash { text-align: center; padding: 120px 20px; color: var(--mute); font-family: var(--font-mono), monospace; }
 .splash.err code { color: var(--flare); font-size: 12px; }
-.empty { padding: 60px; text-align: center; color: var(--mute); font-family: var(--font-mono), monospace; }
+.empty { padding: 60px 16px; text-align: center; color: var(--mute); font-family: var(--font-mono), monospace; }
+.empty p { margin: 0; }
+.empty-sub { margin-top: 8px !important; font-family: var(--font-body), sans-serif; font-size: 15px; color: var(--ink); }
+/* Botón de WhatsApp: verde de WhatsApp, borde y sombra de la tienda. */
+.empty-wa {
+  display: inline-flex; align-items: center; gap: 10px; margin-top: 18px;
+  padding: 12px 20px; background: #25d366; text-decoration: none;
+  border: 1.5px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+  font-weight: 700; font-size: 15px; transition: transform .12s, box-shadow .12s;
+}
+/* Más específico que .empty (gris y mono): mismo verde/tinta que .wa-float. */
+.empty .empty-wa { color: #06310f; font-family: var(--font-body), sans-serif; font-weight: 800; }
+.empty-wa svg { width: 20px; height: 20px; }
+.empty-wa:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--ink); }
+.empty-wa:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
 .foot {
   display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
   margin-top: 40px; padding-top: 18px; border-top: 2px solid var(--ink);
