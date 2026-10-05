@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { compararAZ } from "@/lib/orden";
 
 type Margen = {
   id: string;
@@ -185,11 +186,14 @@ export default function MargenesPanel() {
     () =>
       margenes
         .filter((m) => m.competicion !== null)
-        .sort((a, b) => (a.competicion as string).localeCompare(b.competicion as string)),
+        .sort((a, b) => compararAZ(a.competicion as string, b.competicion as string)),
     [margenes]
   );
   const sinRegla = useMemo(
-    () => competiciones.filter((c) => !margenes.some((m) => m.competicion === c)),
+    () =>
+      competiciones
+        .filter((c) => !margenes.some((m) => m.competicion === c))
+        .sort(compararAZ),
     [competiciones, margenes]
   );
 

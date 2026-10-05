@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mapaPropioValido } from "@/lib/tickets";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
@@ -146,6 +147,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: sectores.error }, { status: 400 });
   }
 
+  // Mapa del estadio (opcional): el que subió el panel a /api/tickets/mapa.
+  // Va en todos los sectores del evento; la tienda muestra el primero.
+  const imagenRaw = t.imagen_url ?? null;
+  const imagen_url = imagenRaw ? mapaPropioValido(imagenRaw, isMock()) : null;
+  if (imagenRaw && !imagen_url) {
+    return NextResponse.json({ error: "El mapa tiene que subirse desde el panel" }, { status: 400 });
+  }
+
   const scrapedAt = new Date().toISOString();
   const rows = sectores.map((s) => ({
     id: `manual::${randomUUID()}`,
@@ -168,6 +177,7 @@ export async function POST(request: Request) {
     estado: "book",
     url_origen: null,
     source: "manual",
+    imagen_url,
     scraped_at: scrapedAt,
   }));
 

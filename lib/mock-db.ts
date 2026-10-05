@@ -2,6 +2,7 @@
 // Vive en globalThis para sobrevivir al hot-reload del dev server; se
 // resetea al reiniciar el proceso. NO usar en producción.
 
+import { avisoDeSobreventa, movimientoDeStock, type LineaDescontada } from "@/lib/stock";
 import {
   generateCode,
   type Consulta,
@@ -316,7 +317,7 @@ export function mockListPedidosCliente(clienteId: string | null, email: string |
 export function mockApplyAction(
   id: string,
   action: StatusAction
-): { ok: true; op: Operacion } | { ok: false; status: number; error: string } {
+): { ok: true; op: Operacion; aviso?: string | null } | { ok: false; status: number; error: string } {
   const op = db().ops.find((o) => o.id === id);
   if (!op) return { ok: false, status: 404, error: "Operación no encontrada" };
   const cancelada = op.status === "cancelada";
@@ -351,11 +352,7 @@ export function mockApplyAction(
       if (cancelada) return { ok: false, status: 409, error: "La operación está cancelada; no se puede cerrar" };
       op.cerrada_at = action.done ? new Date().toISOString() : null;
       op.cerrada_por = action.done ? MOCK_USER.email : null;
-      // Entrada propia vinculada: cerrar descuenta 1 del stock de la tienda;
-      // reabrir el cierre lo repone (misma lógica que la API real).
-      if (op.ticket_id?.startsWith("manual::")) {
-        mockAjustarStockManual(op.ticket_id, action.done ? -1 : 1);
-      }
+      // Entregar ya no mueve stock: se descuenta al pagar (ver lib/stock.ts).
       break;
     case "cancelar":
       if (cancelada) return { ok: false, status: 409, error: "La operación ya está cancelada" };
@@ -370,7 +367,43 @@ export function mockApplyAction(
       break;
   }
   op.updated_at = new Date().toISOString();
-  return { ok: true, op };
+  // Stock: espejo de la función stock_operacion de la base.
+  const mov = movimientoDeStock(action, op);
+  const aviso = mov ? mockStockOperacion(op, mov === "tomar") : null;
+  return { ok: true, op, aviso };
+}
+
+// Espejo de stock_operacion (migración 0039): toma por línea y cantidad, nunca
+// negativo, registra lo tomado en la operación y devuelve exactamente eso.
+function mockStockOperacion(op: Operacion, tomar: boolean): string | null {
+  const reg = op as Operacion & { stock_descontado?: LineaDescontada[] };
+  const tomado = reg.stock_descontado ?? [];
+  if (!tomar) {
+    for (const l of tomado) mockAjustarStockManual(l.ticket_id, l.cantidad);
+    reg.stock_descontado = [];
+    return null;
+  }
+  if (tomado.length > 0) return null;
+  const items = db().items.filter((i) => i.operacion_id === op.id);
+  const porTicket = new Map<string, number>();
+  const lineas = items.length
+    ? items.map((i) => ({ ticket_id: i.ticket_id, cantidad: i.cantidad }))
+    : [{ ticket_id: op.ticket_id, cantidad: op.cantidad || 1 }];
+  for (const l of lineas) {
+    if (l.ticket_id?.startsWith("manual::")) {
+      porTicket.set(l.ticket_id, (porTicket.get(l.ticket_id) ?? 0) + l.cantidad);
+    }
+  }
+  const res: LineaDescontada[] = [];
+  for (const [ticket_id, pedido] of Array.from(porTicket.entries())) {
+    const t = db().manual.find((m) => m.id === ticket_id);
+    if (!t) continue;
+    const cantidad = Math.min(Math.max(t.stock ?? 0, 0), pedido);
+    mockAjustarStockManual(ticket_id, -cantidad);
+    res.push({ ticket_id, cantidad, pedido });
+  }
+  reg.stock_descontado = res;
+  return avisoDeSobreventa(res);
 }
 
 export function mockUpdateOp(

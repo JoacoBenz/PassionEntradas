@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { mapaPropioValido } from "@/lib/tickets";
 import { revalidatePath } from "next/cache";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { ERROR_MONEDA, parseMoneda } from "@/lib/operaciones";
 import { getRol } from "@/lib/auth";
-import { isMock, mockDeleteManual, mockUpdateManual } from "@/lib/mock-db";
+import { isMock, mockDeleteManual, mockListManual, mockUpdateManual } from "@/lib/mock-db";
 import { parsePrecio } from "@/lib/precios";
 
 // PATCH  /api/tickets/[id] — edita una entrada MANUAL (precio, stock, etc.)
@@ -98,6 +99,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Stock inválido" }, { status: 400 });
   }
 
+  // Mapa del estadio: undefined = no se tocó; null/"" = se quitó; si viene,
+  // tiene que ser uno subido por el panel. Es del EVENTO: se aplica a todos
+  // sus sectores propios (si no, al editar un sector quedaban mapas distintos).
+  const tocaMapa = t.imagen_url !== undefined;
+  const imagen_url = t.imagen_url ? mapaPropioValido(t.imagen_url, isMock()) : null;
+  if (tocaMapa && t.imagen_url && !imagen_url) {
+    return NextResponse.json({ error: "El mapa tiene que subirse desde el panel" }, { status: 400 });
+  }
+
   const id = decodeURIComponent(params.id);
   const patch = {
     evento,
@@ -139,6 +149,32 @@ export async function PATCH(
       return NextResponse.json({ error: "No encontrada" }, { status: 404 });
     }
     row = data;
+  }
+
+  // El mapa es del evento: se aplica a todos sus sectores propios.
+  if (tocaMapa) {
+    const r = row as { evento: string; competicion: string | null; fecha: string | null };
+    if (isMock()) {
+      for (const m of mockListManual()) {
+        if (m.evento === r.evento && m.competicion === r.competicion && m.fecha === r.fecha) {
+          mockUpdateManual(m.id, { imagen_url });
+        }
+      }
+      row = { ...(row as object), imagen_url };
+    } else {
+      let q = createAdminSupabase()
+        .from("tickets")
+        .update({ imagen_url })
+        .eq("source", "manual")
+        .eq("evento", r.evento);
+      q = r.competicion == null ? q.is("competicion", null) : q.eq("competicion", r.competicion);
+      q = r.fecha == null ? q.is("fecha", null) : q.eq("fecha", r.fecha);
+      const { error: errMapa } = await q;
+      if (errMapa) {
+        return NextResponse.json({ error: `Se guardó el sector pero no el mapa: ${errMapa.message}` }, { status: 500 });
+      }
+      row = { ...(row as object), imagen_url };
+    }
   }
 
   revalidatePath("/(tienda)", "layout");

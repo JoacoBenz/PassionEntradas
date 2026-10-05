@@ -7,6 +7,7 @@
 // el toggle del header se recuerda en localStorage.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { compararAZ } from "@/lib/orden";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -17,6 +18,7 @@ import {
   isWC,
   parseTitle,
   waLink,
+  WHATSAPP_TIENDA,
   zonaDelMapa,
   type EventoAgrupado,
   type Ticket,
@@ -226,13 +228,11 @@ function WcLogo({ comp }: { comp: string | null }) {
 // "Agente": quién responde es asunto interno, y así sumar o sacar gente del
 // equipo no obliga a tocar la tienda.
 //
-// El número sale de NEXT_PUBLIC_WHATSAPP si está definida; el default cubre
-// el caso de que no esté cargada en el entorno (hoy no lo está en Vercel).
-const WA_AGENTE_TEL =
-  (process.env.NEXT_PUBLIC_WHATSAPP || "").replace(/\D/g, "") || "5491136148053";
+// El número es el mismo de toda la tienda (WHATSAPP_TIENDA en lib/tickets).
+const WA_AGENTE_TEL = WHATSAPP_TIENDA;
 
 function waAgente(telefono: string, text: string): string {
-  return `https://wa.me/${telefono}?text=${encodeURIComponent(text)}`;
+  return waLink(text, telefono);
 }
 
 type EstadoAgente = "disponible" | "ocupado";
@@ -609,7 +609,11 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
     .slice(0, 6);
   const catCounts = new Map<string, number>();
   for (const e of events) catCounts.set(e.comp, (catCounts.get(e.comp) || 0) + 1);
-  const topCats = Array.from(catCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  // Las 8 categorías con más eventos, mostradas en orden alfabético.
+  const topCats = Array.from(catCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .sort((a, b) => compararAZ(a[0], b[0]));
 
   if (!events.length) return <div className="splash">No events yet.</div>;
 
@@ -820,7 +824,7 @@ type FilterState = { cat: string; lugar: string; mes: string; q: string; evento:
 function uniqueOptions(
   events: EventoAgrupado[],
   getter: (e: EventoAgrupado) => { key: string; label: string },
-  sortByCount: boolean
+  alfabetico: boolean
 ) {
   const counts = new Map<string, { label: string; key: string; n: number }>();
   for (const ev of events) {
@@ -828,8 +832,10 @@ function uniqueOptions(
     counts.set(v.key, { label: v.label, key: v.key, n: (counts.get(v.key)?.n || 0) + 1 });
   }
   let arr = Array.from(counts.values());
-  arr = sortByCount
-    ? arr.sort((a, b) => b.n - a.n || a.label.localeCompare(b.label))
+  // Categorías y lugares: A–Z (pedido del cliente). Las fechas se ordenan por
+  // su clave (YYYY-MM): cronológico, que es lo que se espera en un menú de meses.
+  arr = alfabetico
+    ? arr.sort((a, b) => compararAZ(a.label, b.label))
     : arr.sort((a, b) => a.key.localeCompare(b.key));
   return arr.map((a) => ({ value: a.key, label: `${a.label} (${a.n})` }));
 }

@@ -7,6 +7,7 @@
 // arrastrando (viewBox dinámico). Estética de la tienda; bilingüe EN/ES.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { compararAZ } from "@/lib/orden";
 import Link from "next/link";
 import {
   buildEvents,
@@ -165,9 +166,8 @@ export function MapaEventos({ rows }: { rows: Ticket[] }) {
       }
       c.eventos.push(ev);
     }
-    const ciudades = Array.from(porCiudad.values()).sort(
-      (a, b) => b.eventos.length - a.eventos.length || a.label.localeCompare(b.label)
-    );
+    // A–Z: la lista de ciudades es el menú para elegir una.
+    const ciudades = Array.from(porCiudad.values()).sort((a, b) => compararAZ(a.label, b.label));
     const totalUbicados = ciudades.reduce((a, c) => a + c.eventos.length, 0);
     return { ciudades, sinUbicar, totalUbicados };
   }, [rows]);
