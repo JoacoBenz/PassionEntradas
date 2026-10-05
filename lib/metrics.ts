@@ -26,7 +26,11 @@ export type Metrics = {
 type OpMetrica = Pick<
   Operacion,
   "monto" | "fee" | "status" | "pago_confirmado_at" | "cerrada_at" | "moneda"
-> & { cantidad?: number | null };
+> & {
+  cantidad?: number | null;
+  tipo?: Operacion["tipo"] | null;
+  confirmada_at?: string | null;
+};
 
 // Día (YYYY-MM-DD) en hora argentina: un pago confirmado a las 22 h de
 // Buenos Aires ya es el día siguiente en UTC, y caía en el rango equivocado.
@@ -44,7 +48,7 @@ function diaAr(iso: string): string {
 // con dólares en un solo pozo y etiquetarlo con la moneda de la primera
 // operación daba un número que no significaba nada (y mentía sobre la unidad).
 //
-// Es el mismo criterio que el RPC `metricas_operaciones` (migración 0035):
+// Es el mismo criterio que el RPC `metricas_operaciones` (migraciones 0035 y 0040):
 // producción calcula en la base y el modo demo acá, y tienen que coincidir.
 export function computeMetrics(
   ops: OpMetrica[],
@@ -87,7 +91,8 @@ export function computeMetrics(
       a.plata_movida += op.monto;
       a.comision_ganada += op.fee;
       a.entradas_vendidas += op.cantidad && op.cantidad > 0 ? op.cantidad : 1;
-    } else if (!op.cerrada_at) {
+    } else if (!op.cerrada_at && !(op.tipo === "pedido" && !op.confirmada_at)) {
+      // Un pedido de la tienda sin confirmar todavía no es plata comprometida.
       a.en_juego_monto += op.monto;
       a.en_juego_ops += 1;
     }

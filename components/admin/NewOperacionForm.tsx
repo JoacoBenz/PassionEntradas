@@ -174,6 +174,9 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
   // Clientes para el desplegable de comprador, ya rankeados por la API.
   const [clientes, setClientes] = useState<ClienteOpcion[]>([]);
   const [escribiendoComprador, setEscribiendoComprador] = useState(false);
+  // Cuenta del cliente elegido de la lista: la operación queda a su nombre y
+  // la ve en Mis pedidos. Escrito a mano ("Otro") no tiene cuenta.
+  const [clienteId, setClienteId] = useState<string | null>(null);
   // El disabled de React llega tarde si dos taps caen en el mismo tick:
   // el ref corta el segundo submit antes de que dispare otro POST.
   const enviando = useRef(false);
@@ -298,6 +301,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
         body: JSON.stringify({
           evento: form.evento,
           comprador_alias: form.comprador_alias || null,
+          cliente_id: escribiendoComprador ? null : clienteId,
           vendedor_alias: form.vendedor_alias || null,
           monto: precio.total,
           fee: precio.comision,
@@ -339,14 +343,15 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
         notas: form.notas.trim() || null,
         ticket_id: ticketId,
         tipo: "operacion",
-        cliente_id: null,
-        cliente_email: null,
+        cliente_id: data.cliente_id ?? null,
+        cliente_email: data.cliente_email ?? null,
         sector: null,
         created_at: now,
         updated_at: now,
       });
       setForm(empty);
       setTicketId(null);
+      setClienteId(null);
     } catch {
       onError("Error de red al crear la operación");
     } finally {
@@ -438,6 +443,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
                     onClick={() => {
                       setEscribiendoComprador(false);
                       set("comprador_alias", "");
+                      setClienteId(null);
                     }}
                     className="shrink-0 rounded-lg border border-line px-2.5 text-xs font-semibold text-[#4A4E5E] transition-colors hover:bg-canvas"
                     title="Volver a la lista de clientes"
@@ -449,21 +455,24 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
                 <select
                   id="comprador"
                   className={inputCls}
-                  value={form.comprador_alias}
+                  value={clienteId ?? ""}
                   onChange={(e) => {
                     if (e.target.value === OTRO) {
                       setEscribiendoComprador(true);
                       set("comprador_alias", "");
+                      setClienteId(null);
                       return;
                     }
-                    set("comprador_alias", e.target.value);
+                    const c = clientes.find((x) => x.id === e.target.value);
+                    setClienteId(c?.id ?? null);
+                    set("comprador_alias", c?.nombre ?? "");
                   }}
                 >
                   <option value="">
                     {clientes.length ? "Elegí un cliente…" : "Cargando clientes…"}
                   </option>
                   {clientes.map((c) => (
-                    <option key={c.id} value={c.nombre}>
+                    <option key={c.id} value={c.id}>
                       {c.nombre}
                       {c.operaciones > 0 ? ` · ${c.operaciones} ${c.operaciones === 1 ? "op." : "ops."}` : ""}
                     </option>

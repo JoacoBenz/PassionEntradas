@@ -41,6 +41,16 @@ describe("computeMetrics", () => {
     expect(m.enJuegoOps).toBe(2);
   });
 
+  it("en juego: un pedido de la tienda sin confirmar todavía no cuenta", () => {
+    const m = computeMetrics([
+      { ...base, tipo: "pedido", confirmada_at: null }, // nuevo
+      { ...base, tipo: "pedido", confirmada_at: "2026-07-01T00:00:00Z", monto: 40_000 },
+      { ...base, tipo: "operacion", monto: 20_000 }, // carga del staff: nace confirmada
+    ]);
+    expect(m.enJuegoMonto).toBe(60_000);
+    expect(m.enJuegoOps).toBe(2);
+  });
+
   it("vacío: todo en cero sin dividir por cero", () => {
     const m = computeMetrics([]);
     expect(m.ticketPromedio).toBe(0);

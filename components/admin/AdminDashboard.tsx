@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   diasHastaEvento,
   estadoDe,
+  necesitaConfirmar,
   SEMAFORO_COLOR,
   SEMAFORO_LABEL,
   SEMAFORO_LEYENDA,
@@ -34,10 +35,12 @@ type Fila =
   | { kind: "op"; id: string; created_at: string; op: Operacion }
   | { kind: "consulta"; id: string; created_at: string; consulta: Consulta };
 
-type Filter = "todas" | "en_curso" | "para_cerrar" | "cerradas" | "canceladas";
+type Filter = "todas" | "nuevos" | "en_curso" | "para_cerrar" | "cerradas" | "canceladas";
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "todas", label: "Todas" },
+  // Pedidos de la tienda que esperan "Confirmar pedido".
+  { key: "nuevos", label: "Nuevos" },
   { key: "en_curso", label: "En curso" },
   { key: "para_cerrar", label: "Para entregar" },
   { key: "cerradas", label: "Entregadas" },
@@ -49,6 +52,8 @@ function matches(op: Operacion, filter: Filter): boolean {
   switch (filter) {
     case "todas":
       return true;
+    case "nuevos":
+      return necesitaConfirmar(op);
     case "en_curso":
       return (
         estado !== "cerrada" &&
@@ -116,7 +121,8 @@ export default function AdminDashboard({
     ).length;
     const paraCerrar = estados.filter((e) => e === "lista_para_cerrar").length;
     const cerradas = estados.filter((e) => e === "cerrada").length;
-    return { enCurso, paraCerrar, cerradas, aCotizar: consultas.length };
+    const nuevos = ops.filter(necesitaConfirmar).length;
+    return { enCurso, paraCerrar, cerradas, aCotizar: consultas.length, nuevos };
   }, [ops, consultas]);
 
   const visible = useMemo<Fila[]>(() => {
@@ -157,7 +163,12 @@ export default function AdminDashboard({
           .map((c) => ({ kind: "consulta" as const, id: c.id, created_at: c.created_at, consulta: c }))
       : [];
 
-    return [...pendientes, ...filas];
+    // Los pedidos nuevos (sin confirmar) también esperan al admin: van arriba,
+    // justo después de las consultas.
+    const nuevos = filas.filter((f) => f.kind === "op" && necesitaConfirmar(f.op));
+    const resto = filas.filter((f) => !(f.kind === "op" && necesitaConfirmar(f.op)));
+
+    return [...pendientes, ...nuevos, ...resto];
   }, [ops, consultas, filter, query, sort]);
 
   // Paginado en el cliente: con historial grande, renderizar cientos de
@@ -202,6 +213,10 @@ export default function AdminDashboard({
                 entrada_recibida_por: data.entrada_recibida_por ?? null,
                 pago_confirmado_por: data.pago_confirmado_por ?? null,
                 cerrada_por: data.cerrada_por ?? null,
+                confirmada_at: data.confirmada_at ?? null,
+                confirmada_por: data.confirmada_por ?? null,
+                cancelada_at: data.cancelada_at ?? null,
+                cancelada_por: data.cancelada_por ?? null,
               }
             : o
         )
@@ -302,6 +317,8 @@ export default function AdminDashboard({
             pago_confirmado_por: null,
             pago_proveedor_por: null,
             cerrada_por: null,
+            // Cotiza el admin: el pedido nace confirmado (ver convertir).
+            confirmada_at: new Date().toISOString(),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           } as Operacion,
@@ -314,6 +331,25 @@ export default function AdminDashboard({
       const msg = "Error de red. Reintentá.";
       push("error", msg);
       return msg;
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // Consulta sin entrada: se cierra y el cliente la ve como "No disponible".
+  async function descartarConsulta(c: Consulta) {
+    setBusyId(c.id);
+    try {
+      const res = await fetch(`/api/consultas/${c.id}/descartar`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        push("error", data.error ?? "No se pudo descartar la consulta");
+        return;
+      }
+      setConsultas((prev) => prev.filter((x) => x.id !== c.id));
+      push("success", `Consulta ${c.code} marcada como no disponible`);
+    } catch {
+      push("error", "Error de red. Reintentá.");
     } finally {
       setBusyId(null);
     }
@@ -367,7 +403,7 @@ export default function AdminDashboard({
         </a>
       </div>
 
-      {/* Filtros por estado: la barra ocupa el ancho completo y los 5 tabs
+      {/* Filtros por estado: la barra ocupa el ancho completo y los 6 tabs
           lo reparten en partes iguales — nada de barra corta ni scroll
           horizontal con tabs cortados. */}
       <div
@@ -391,6 +427,15 @@ export default function AdminDashboard({
               title={f.label}
             >
               {f.label}
+              {f.key === "nuevos" && stats.nuevos > 0 && (
+                <span
+                  className={`ml-1 inline-flex min-w-[1.1rem] items-center justify-center rounded-full px-1 text-[10px] font-bold ${
+                    active ? "bg-white text-ink" : "bg-[#D14D68] text-white"
+                  }`}
+                >
+                  {stats.nuevos}
+                </span>
+              )}
             </button>
           );
         })}
@@ -436,6 +481,7 @@ export default function AdminDashboard({
                 consulta={fila.consulta}
                 busy={busyId === fila.id}
                 onCargar={cargarConsulta}
+                onDescartar={descartarConsulta}
                 onError={(m) => push("error", m)}
               />
             ) : (

@@ -1143,6 +1143,43 @@
 .mp-link:hover { background: var(--ink); color: var(--field); }
 .mp-link--factura { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
 .mp-link--factura:hover { background: var(--cobalt-d); border-color: var(--cobalt-d); color: #fff; }
+.mp-e-pagar { color: #8a5a00; background: #fde7b0; }
+.mp-monto {
+  margin: 6px 0 0; font-family: var(--font-mono), monospace; font-size: 15px; font-weight: 700;
+}
+/* Línea de tiempo del pedido: cinco pasos parejos, sin scroll en móvil. */
+.mp-pasos {
+  list-style: none; margin: 14px 0 0; padding: 0;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px;
+}
+.mp-paso { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; min-width: 0; }
+.mp-paso-dot {
+  width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--mute);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono), monospace; font-size: 10px; font-weight: 700; color: var(--mute);
+}
+.mp-paso-label {
+  font-family: var(--font-mono), monospace; font-size: 9.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .03em; color: var(--mute); line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.mp-paso.is-done .mp-paso-dot { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
+.mp-paso.is-done .mp-paso-label { color: var(--ink); }
+.mp-paso.is-actual .mp-paso-dot { box-shadow: 0 0 0 3px #e6e9fb; }
+.mp-pago {
+  margin-top: 14px; padding: 12px 14px; background: #fff7e0; border: 1.5px solid #b07a14;
+  display: grid; gap: 8px; justify-items: start;
+}
+.mp-pago strong { font-size: 14px; }
+.mp-pago-texto { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+.mp-nota { margin: 10px 0 0; font-size: 13px; color: var(--mute); }
+.mp-error {
+  margin: 0 0 14px; padding: 10px 14px; border: 1.5px solid #d14d68; background: #fbe9ed;
+  color: #8f2238; font-size: 14px;
+}
+.mp-link--cancelar { background: transparent; color: #b3263f; border-color: #b3263f; cursor: pointer; }
+.mp-link--cancelar:hover { background: #b3263f; color: #fff; }
+.mp-link--cancelar:disabled { opacity: .6; cursor: wait; }
 .mp-empty {
   text-align: center; background: var(--field); border: 1.5px dashed var(--ink);
   padding: 40px 24px; box-shadow: 4px 4px 0 var(--ink);

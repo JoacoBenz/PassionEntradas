@@ -7,6 +7,7 @@ import {
   estadoDe,
   formatMonto,
   formatFecha,
+  necesitaConfirmar,
   quienDe,
   whatsappMessage,
   TIPO_LABEL,
@@ -101,6 +102,8 @@ export default function OperacionCard({
   const entregada = !!op.cerrada_at;
   const dias = diasHastaEvento(op.fecha_evento);
   const enCurso = !cerrada && !cancelada;
+  // Pedido de la tienda que todavía no confirmó un admin.
+  const nuevo = necesitaConfirmar(op);
 
   const [open, setOpen] = useState(defaultOpen);
   const [editingNotas, setEditingNotas] = useState(false);
@@ -153,7 +156,14 @@ export default function OperacionCard({
             {op.fecha_evento ? ` · ${fechaCorta(op.fecha_evento)}` : ""}
           </span>
         </span>
-        {op.tipo !== "operacion" && (
+        {nuevo && (
+          // Visible también en celular: es lo primero que el admin tiene que
+          // atender, a diferencia del chip de origen.
+          <span className="shrink-0 rounded-full bg-[#D14D68] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+            Nuevo
+          </span>
+        )}
+        {!nuevo && op.tipo !== "operacion" && (
           // Origen: pedido/consulta del cliente desde la tienda. Se esconde en
           // celular: entre el chip y el monto le comían 90px al nombre del
           // evento, que es lo que sirve para reconocer la fila ("Match 12, …").
@@ -196,6 +206,37 @@ export default function OperacionCard({
       {open && (
         <div className="border-t border-dashed border-[#C5C9D6]">
           <div className="p-4">
+            {/* Pedido nuevo: el cliente lo ve como "Pedido recibido" hasta que
+                un admin lo confirma. Marcar un hito también lo confirma. */}
+            {nuevo && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#D14D68]/30 bg-[#D14D68]/5 px-3.5 py-2.5">
+                <span className="text-sm font-medium text-ink">
+                  Pedido nuevo de la tienda
+                  <span className="block text-[11px] font-normal text-muted">
+                    {readOnly
+                      ? "Espera la confirmación de un administrador."
+                      : "Revisalo y confirmalo: el cliente ve que su pedido fue confirmado."}
+                  </span>
+                </span>
+                {!readOnly && (
+                  <button
+                    onClick={() => onAction?.(op, { action: "confirmar" }, "Pedido confirmado")}
+                    disabled={busy}
+                    className="rounded-lg bg-ink px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-ink/85 disabled:opacity-60"
+                  >
+                    Confirmar pedido
+                  </button>
+                )}
+              </div>
+            )}
+            {cancelada && (op.cancelada_por || op.cancelada_at) && (
+              <p className="mb-3 text-xs font-medium text-estado-cancelada">
+                {op.cancelada_por === "cliente"
+                  ? "Cancelado por el cliente"
+                  : `Cancelada${quienDe(op.cancelada_por) ? ` por ${quienDe(op.cancelada_por)}` : ""}`}
+                {op.cancelada_at ? ` · ${fechaDia(op.cancelada_at)}` : ""}
+              </p>
+            )}
             {/* Sin chip de estado: el semáforo de la fila ya lo dice y los
                 cuatro hitos de abajo muestran el detalle. Lo que sí aporta
                 acá es la urgencia por fecha. */}

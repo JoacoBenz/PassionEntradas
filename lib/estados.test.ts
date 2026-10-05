@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   estadoDe,
   estadoPublicoDe,
+  clientePuedeCancelar,
+  necesitaConfirmar,
   semaforoDe,
   operacionCompleta,
   sePuedeFacturar,
@@ -122,32 +124,85 @@ describe("operacionCompleta / sePuedeFacturar", () => {
   });
 });
 
-describe("estadoPublicoDe — el cliente no ve los hitos internos", () => {
-  // Lo esencial: el comprador no tiene por qué enterarse de si ya le
-  // pagamos al proveedor o si tenemos la entrada en mano.
-  it("los hitos con el proveedor no cambian lo que ve", () => {
-    const sin = estadoPublicoDe({ status: "esperando_entrada", pago_confirmado_at: null, cerrada_at: null });
-    const con = estadoPublicoDe({ status: "esperando_entrada", pago_confirmado_at: null, cerrada_at: null });
-    expect(sin).toBe("pedido_recibido");
-    expect(con).toBe("pedido_recibido");
+describe("estadoPublicoDe — los pasos del cliente", () => {
+  const base = {
+    status: "esperando_entrada" as const,
+    entrada_recibida_at: null,
+    pago_confirmado_at: null,
+    cerrada_at: null,
+  };
+
+  it("un pedido de la tienda sin confirmar es 'pedido recibido'", () => {
+    expect(estadoPublicoDe({ ...base, tipo: "pedido", confirmada_at: null })).toBe("pedido_recibido");
   });
 
-  it("su pago sí lo ve", () => {
+  it("confirmado por un admin pasa a 'pedido confirmado'", () => {
+    expect(estadoPublicoDe({ ...base, tipo: "pedido", confirmada_at: AYER })).toBe("pedido_confirmado");
+  });
+
+  it("las cargas del staff y las consultas cotizadas nacen confirmadas", () => {
+    expect(estadoPublicoDe({ ...base, tipo: "operacion" })).toBe("pedido_confirmado");
+    expect(estadoPublicoDe({ ...base, tipo: "consulta" })).toBe("pedido_confirmado");
+  });
+
+  it("con la entrada en mano, el cliente ya puede pagar", () => {
     expect(
-      estadoPublicoDe({ status: "esperando_entrada", pago_confirmado_at: AYER, cerrada_at: null })
-    ).toBe("pago_recibido");
+      estadoPublicoDe({ ...base, tipo: "pedido", confirmada_at: null, entrada_recibida_at: AYER })
+    ).toBe("listo_para_pagar");
+  });
+
+  it("su pago gana aunque todavía no tengamos la entrada", () => {
+    expect(estadoPublicoDe({ ...base, pago_confirmado_at: AYER })).toBe("pago_recibido");
   });
 
   it("entregada cuando se cierra", () => {
-    expect(
-      estadoPublicoDe({ status: "esperando_entrada", pago_confirmado_at: AYER, cerrada_at: AYER })
-    ).toBe("entregada");
+    expect(estadoPublicoDe({ ...base, pago_confirmado_at: AYER, cerrada_at: AYER })).toBe("entregada");
   });
 
-  it("cancelada", () => {
-    expect(
-      estadoPublicoDe({ status: "cancelada", pago_confirmado_at: null, cerrada_at: null })
-    ).toBe("cancelada");
+  it("cancelada gana sobre todo", () => {
+    expect(estadoPublicoDe({ ...base, status: "cancelada", pago_confirmado_at: AYER })).toBe("cancelada");
+  });
+});
+
+describe("clientePuedeCancelar — solo antes de que se le pida pagar", () => {
+  const base = {
+    status: "esperando_entrada" as const,
+    entrada_recibida_at: null,
+    pago_confirmado_at: null,
+    cerrada_at: null,
+    tipo: "pedido" as const,
+  };
+  it("pasos 1 y 2 sí", () => {
+    expect(clientePuedeCancelar({ ...base, confirmada_at: null })).toBe(true);
+    expect(clientePuedeCancelar({ ...base, confirmada_at: AYER })).toBe(true);
+  });
+  it("listo para pagar, pagado, entregada o cancelada no", () => {
+    expect(clientePuedeCancelar({ ...base, entrada_recibida_at: AYER })).toBe(false);
+    expect(clientePuedeCancelar({ ...base, pago_confirmado_at: AYER })).toBe(false);
+    expect(clientePuedeCancelar({ ...base, cerrada_at: AYER })).toBe(false);
+    expect(clientePuedeCancelar({ ...base, status: "cancelada" })).toBe(false);
+  });
+});
+
+describe("necesitaConfirmar", () => {
+  const base = {
+    status: "esperando_entrada" as const,
+    entrada_recibida_at: null,
+    pago_confirmado_at: null,
+    cerrada_at: null,
+  };
+  it("solo los pedidos de la tienda sin confirmar", () => {
+    expect(necesitaConfirmar({ ...base, tipo: "pedido" })).toBe(true);
+    expect(necesitaConfirmar({ ...base, tipo: "pedido", confirmada_at: AYER })).toBe(false);
+    expect(necesitaConfirmar({ ...base, tipo: "operacion" })).toBe(false);
+    expect(necesitaConfirmar({ ...base, tipo: "consulta" })).toBe(false);
+  });
+  it("un pedido con algún hito ya se está trabajando", () => {
+    expect(necesitaConfirmar({ ...base, tipo: "pedido", entrada_recibida_at: AYER })).toBe(false);
+    expect(necesitaConfirmar({ ...base, tipo: "pedido", pago_confirmado_at: AYER })).toBe(false);
+  });
+  it("una cancelada no", () => {
+    expect(necesitaConfirmar({ ...base, tipo: "pedido", status: "cancelada" })).toBe(false);
   });
 });
 

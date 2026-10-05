@@ -62,18 +62,25 @@ export default function StatusStub({
   // puede hacer ahora, igual que lo haría el administrador en el grupo.
   // Los avisos hablan solo de lo que el comprador ve: su pedido y su pago.
   // Los pasos con el proveedor son internos y no se mencionan.
-  const aviso =
-    estado === "pago_recibido"
-      ? {
-          icon: "💸",
-          text: "Tu pago está confirmado. Estamos coordinando la entrega de las entradas.",
-        }
-      : estado === "pedido_recibido"
-        ? {
-            icon: "📝",
-            text: "Recibimos tu pedido. Un vendedor se contacta para coordinar el pago.",
-          }
-        : null;
+  const AVISOS: Partial<Record<typeof estado, { icon: string; text: string }>> = {
+    pedido_recibido: {
+      icon: "📝",
+      text: "Recibimos tu pedido. Lo estamos revisando para confirmarlo.",
+    },
+    pedido_confirmado: {
+      icon: "✅",
+      text: "Tu pedido está confirmado. Te avisamos apenas tengamos las entradas para que puedas pagar.",
+    },
+    listo_para_pagar: {
+      icon: "💳",
+      text: "Ya tenemos tus entradas. Entrá a Mis pedidos para ver cómo pagar.",
+    },
+    pago_recibido: {
+      icon: "💸",
+      text: "Tu pago está confirmado. Estamos coordinando la entrega de las entradas.",
+    },
+  };
+  const aviso = AVISOS[estado] ?? null;
   // Hora de Argentina explícita: esto se renderiza en el server (UTC en
   // Vercel) y sin timeZone mostraría la hora corrida 3 horas.
   const actualizado = new Date(op.updated_at).toLocaleString("es-AR", {
@@ -167,11 +174,7 @@ export default function StatusStub({
         <div className="punch-b bg-white">
           <div className="space-y-6 px-6 py-7">
             {/* Los tres pasos del proceso: entrada → pago → entrega */}
-            <ProgressSteps
-              pago={!!op.pago_confirmado_at}
-              entregada={!!op.cerrada_at}
-              cancelada={estado === "cancelada"}
-            />
+            <ProgressSteps estado={estado} />
 
             <dl className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
               <div className="col-span-2">

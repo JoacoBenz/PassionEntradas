@@ -12,6 +12,7 @@ import {
   type OperacionPublica,
   type StatusAction,
   operacionCompleta,
+  clientePuedeCancelar,
 } from "@/lib/operaciones";
 import type { SyncRun, TicketFull } from "@/lib/tickets";
 import type { Factura, FacturaDatos } from "@/lib/factura";
@@ -50,6 +51,8 @@ type MockDB = {
   solicitudes: SolicitudAcceso[];
   items: OperacionItem[];
   consultas: Consulta[];
+  // Textos de pago por moneda (espejo de textos_config).
+  textos: Record<string, string>;
 };
 
 function iso(minsAgo: number) {
@@ -58,6 +61,38 @@ function iso(minsAgo: number) {
 
 function seed(): MockDB {
   const ops: Operacion[] = [
+    {
+      id: "44444444-4444-4444-8444-444444444444",
+      code: "BX-DEMOPAGO",
+      evento: "Boca vs Vasco da Gama",
+      comprador_alias: "demo",
+      vendedor_alias: null,
+      monto: 1200000,
+      moneda: "ARS",
+      cantidad: 2,
+      fee: 420000,
+      status: "esperando_entrada",
+      entrada_recibida_at: iso(30),
+      pago_confirmado_at: null,
+      pago_proveedor_at: null,
+      cerrada_at: null,
+      entrada_recibida_por: MOCK_USER.email,
+      pago_confirmado_por: null,
+      pago_proveedor_por: null,
+      cerrada_por: null,
+      confirmada_at: iso(60 * 2),
+      confirmada_por: MOCK_USER.email,
+      fecha_evento: null,
+      notas: null,
+      cuenta_debitar: null,
+      ticket_id: "manual::demo-ars",
+      tipo: "pedido",
+      cliente_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      cliente_email: "demo@passion.local",
+      sector: "Platea Baja",
+      created_at: iso(60 * 5),
+      updated_at: iso(30),
+    },
     {
       id: "11111111-1111-4111-8111-111111111111",
       code: "BX-DEMO1234",
@@ -227,6 +262,10 @@ function seed(): MockDB {
     solicitudes,
     items: [],
     consultas: [],
+    textos: {
+      pago_ARS: "Transferencia a alias PASSION.ENTRADAS (Banco Demo). Mandanos el comprobante por WhatsApp.",
+      pago_USD: "Pago en dólares: transferencia o efectivo. Escribinos por WhatsApp y te pasamos los datos.",
+    },
   };
 }
 
@@ -245,8 +284,8 @@ export function mockListOps(limit?: number): Operacion[] {
 export function mockOpPublica(id: string): OperacionPublica | null {
   const op = db().ops.find((o) => o.id === id);
   if (!op) return null;
-  const { code, evento, comprador_alias, vendedor_alias, monto, moneda, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at } = op;
-  return { code, evento, comprador_alias, vendedor_alias, monto, moneda, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at };
+  const { code, evento, comprador_alias, vendedor_alias, monto, moneda, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at, tipo, confirmada_at } = op;
+  return { code, evento, comprador_alias, vendedor_alias, monto, moneda, status, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, updated_at, tipo, confirmada_at: confirmada_at ?? null };
 }
 
 export function mockCreateOp(input: {
@@ -266,6 +305,8 @@ export function mockCreateOp(input: {
   cantidad?: number;
   moneda?: Moneda;
   envio_id?: string | null;
+  confirmada_at?: string | null;
+  confirmada_por?: string | null;
   // Líneas del pedido: se guardan aparte, igual que en la base.
   items?: Omit<OperacionItem, "id" | "operacion_id" | "created_at">[];
 }): Operacion {
@@ -290,6 +331,10 @@ export function mockCreateOp(input: {
     pago_confirmado_por: null,
     pago_proveedor_por: null,
     cerrada_por: null,
+    confirmada_at: input.confirmada_at ?? null,
+    confirmada_por: input.confirmada_por ?? null,
+    cancelada_at: null,
+    cancelada_por: null,
     created_at: now,
     updated_at: now,
   };
@@ -307,7 +352,6 @@ export function mockListPedidosCliente(clienteId: string | null, email: string |
   return db()
     .ops.filter(
       (o) =>
-        (o.tipo === "pedido" || o.tipo === "consulta") &&
         ((clienteId && o.cliente_id === clienteId) ||
           (email && o.cliente_email?.toLowerCase() === email.toLowerCase()))
     )
@@ -346,8 +390,19 @@ export function mockApplyAction(
       const [col, colPor] = COLS[action.action];
       op[col] = action.done ? new Date().toISOString() : null;
       op[colPor] = action.done ? MOCK_USER.email : null;
+      // Espejo de la API: trabajar un pedido nuevo es confirmarlo.
+      if (action.done && !op.confirmada_at) {
+        op.confirmada_at = new Date().toISOString();
+        op.confirmada_por = MOCK_USER.email;
+      }
       break;
     }
+    case "confirmar":
+      if (cancelada) return { ok: false, status: 409, error: "La operación está cancelada; reabrila para confirmarla" };
+      if (op.confirmada_at) return { ok: false, status: 409, error: "El pedido ya está confirmado" };
+      op.confirmada_at = new Date().toISOString();
+      op.confirmada_por = MOCK_USER.email;
+      break;
     case "cerrar":
       if (cancelada) return { ok: false, status: 409, error: "La operación está cancelada; no se puede cerrar" };
       op.cerrada_at = action.done ? new Date().toISOString() : null;
@@ -356,14 +411,18 @@ export function mockApplyAction(
       break;
     case "cancelar":
       if (cancelada) return { ok: false, status: 409, error: "La operación ya está cancelada" };
-      if (operacionCompleta(op)) {
-        return { ok: false, status: 409, error: "La operación está completa; no se puede cancelar" };
+      if (op.cerrada_at) {
+        return { ok: false, status: 409, error: "La operación está cerrada; reabrí el cierre antes de cancelar" };
       }
       op.status = "cancelada";
+      op.cancelada_at = new Date().toISOString();
+      op.cancelada_por = MOCK_USER.email;
       break;
     case "reabrir":
       if (!cancelada) return { ok: false, status: 409, error: "Solo se puede reabrir una operación cancelada" };
       op.status = "esperando_entrada";
+      op.cancelada_at = null;
+      op.cancelada_por = null;
       break;
   }
   op.updated_at = new Date().toISOString();
@@ -667,16 +726,19 @@ export function mockListConsultas(): Consulta[] {
   return db().consultas;
 }
 
-// Consultas PENDIENTES del cliente (las convertidas ya se ven como operación,
-// mostrarlas otra vez sería duplicar el mismo pedido en la lista).
+// Consultas del cliente que no son (todavía) una operación: las pendientes y
+// las canceladas/descartadas de los últimos 30 días. Las convertidas ya se ven
+// como la operación que originaron; mostrarlas otra vez duplicaría el pedido.
 export function mockListConsultasCliente(
   clienteId: string | null,
   email: string | null
 ): Consulta[] {
+  const desde = new Date(Date.now() - 30 * 86400_000).toISOString();
   return db()
     .consultas.filter(
       (c) =>
-        c.estado === "pendiente" &&
+        (c.estado === "pendiente" ||
+          ((c.estado === "cancelada" || c.estado === "descartada") && c.updated_at >= desde)) &&
         ((clienteId && c.cliente_id === clienteId) ||
           (email && c.cliente_email?.toLowerCase() === email.toLowerCase()))
     )
@@ -743,6 +805,9 @@ export function mockConvertirConsulta(
     cliente_email: c.cliente_email,
     sector: c.sector,
     envio_id: c.envio_id,
+    // En demo cotiza el admin: el pedido nace confirmado (espejo de la API).
+    confirmada_at: new Date().toISOString(),
+    confirmada_por: opts.quien,
     items: [
       {
         ticket_id: c.ticket_id,
@@ -760,4 +825,61 @@ export function mockConvertirConsulta(
   c.resuelta_at = new Date().toISOString();
   c.updated_at = c.resuelta_at;
   return { ok: true, op };
+}
+
+// --- pasos del pedido y cancelación (espejo de 0040) ----------------------
+export function mockGetTextosPago(): Record<string, string> {
+  return { ...db().textos };
+}
+
+export function mockSetTextoPago(key: string, value: string): void {
+  if (value) db().textos[key] = value;
+  else delete db().textos[key];
+}
+
+// El cliente cancela su pedido: espejo de /api/mis-pedidos/[id]/cancelar y
+// del trigger (solo antes de que se le pida pagar).
+export function mockClienteCancelarOp(
+  id: string,
+  clienteId: string
+): { ok: true } | { ok: false; status: number; error: string } {
+  const op = db().ops.find((o) => o.id === id && o.cliente_id === clienteId);
+  if (!op) return { ok: false, status: 404, error: "Pedido no encontrado" };
+  if (!clientePuedeCancelar(op)) {
+    return { ok: false, status: 409, error: "El pedido ya avanzó; para cancelarlo escribinos" };
+  }
+  const now = new Date().toISOString();
+  op.status = "cancelada";
+  op.cancelada_at = now;
+  op.cancelada_por = "cliente";
+  op.updated_at = now;
+  return { ok: true };
+}
+
+export function mockClienteCancelarConsulta(
+  id: string,
+  clienteId: string
+): { ok: true } | { ok: false; status: number; error: string } {
+  const c = db().consultas.find((x) => x.id === id && x.cliente_id === clienteId);
+  if (!c) return { ok: false, status: 404, error: "Consulta no encontrada" };
+  if (c.estado !== "pendiente") return { ok: false, status: 409, error: "Esta consulta ya fue resuelta" };
+  c.estado = "cancelada";
+  c.resuelta_por = "cliente";
+  c.resuelta_at = new Date().toISOString();
+  c.updated_at = c.resuelta_at;
+  return { ok: true };
+}
+
+export function mockDescartarConsulta(
+  id: string,
+  quien: string
+): { ok: true } | { ok: false; status: number; error: string } {
+  const c = db().consultas.find((x) => x.id === id);
+  if (!c) return { ok: false, status: 404, error: "Consulta no encontrada" };
+  if (c.estado !== "pendiente") return { ok: false, status: 409, error: "Esta consulta ya fue resuelta" };
+  c.estado = "descartada";
+  c.resuelta_por = quien;
+  c.resuelta_at = new Date().toISOString();
+  c.updated_at = c.resuelta_at;
+  return { ok: true };
 }

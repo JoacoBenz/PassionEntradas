@@ -16,6 +16,9 @@ import { isMock, MOCK_USER, mockConvertirConsulta } from "@/lib/mock-db";
 // operación, para no perder el rastro de que el pedido original existió.
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   let quien = MOCK_USER.email;
+  // Solo un administrador confirma pedidos: si cotiza él, el pedido nace
+  // confirmado; si cotiza un moderador, queda "Nuevo" hasta que lo confirme.
+  let esAdmin = true;
 
   if (!isMock()) {
     const supabase = createServerSupabase();
@@ -26,6 +29,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
     quien = nombreDe(user) ?? user.email ?? "staff";
+    esAdmin = getRol(user) === "administrador";
   }
 
   let body: any;
@@ -107,6 +111,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         cliente_email: c.cliente_email,
         envio_id: c.envio_id,
         moneda,
+        ...(esAdmin ? { confirmada_at: new Date().toISOString(), confirmada_por: quien } : {}),
       })
       .select("id, code")
       .single();

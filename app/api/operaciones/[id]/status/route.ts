@@ -15,10 +15,11 @@ import { isMock, mockApplyAction } from "@/lib/mock-db";
 // "entrada" y "pago" son hitos independientes que se marcan/desmarcan por
 // separado; cancelar/reabrir manejan el enum. Solo admin; service role.
 //
-// Body: { action: "entrada"|"pago", done: boolean } | { action: "cancelar"|"reabrir" }
+// Body: { action: "entrada"|"pago"|"proveedor"|"cerrar", done: boolean }
+//     | { action: "confirmar"|"cancelar"|"reabrir" }
 
 function parseAction(body: any): StatusAction | null {
-  if (body?.action === "cancelar" || body?.action === "reabrir") {
+  if (body?.action === "cancelar" || body?.action === "reabrir" || body?.action === "confirmar") {
     return { action: body.action };
   }
   if (
@@ -86,7 +87,7 @@ export async function PATCH(
 
   const { data: current, error: readErr } = await admin
     .from("operaciones")
-    .select("status, entrada_recibida_at, pago_confirmado_at, pago_proveedor_at, cerrada_at, ticket_id")
+    .select("status, tipo, confirmada_at, entrada_recibida_at, pago_confirmado_at, pago_proveedor_at, cerrada_at, ticket_id")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -137,6 +138,25 @@ export async function PATCH(
         // Quién lo marcó; al desmarcar se limpia junto con el hito.
         [colPor]: action.done ? quien : null,
       };
+      // Trabajar un pedido nuevo es confirmarlo: si se marca un hito sin
+      // haber tocado "Confirmar pedido", queda confirmado igual.
+      if (action.done && !current.confirmada_at) {
+        patch.confirmada_at = new Date().toISOString();
+        patch.confirmada_por = quien;
+      }
+      break;
+    }
+    case "confirmar": {
+      if (cancelada) {
+        return NextResponse.json(
+          { error: "La operación está cancelada; reabrila para confirmarla" },
+          { status: 409 }
+        );
+      }
+      if (current.confirmada_at) {
+        return NextResponse.json({ error: "El pedido ya está confirmado" }, { status: 409 });
+      }
+      patch = { confirmada_at: new Date().toISOString(), confirmada_por: quien };
       break;
     }
     case "cerrar": {
@@ -170,7 +190,11 @@ export async function PATCH(
           { status: 409 }
         );
       }
-      patch = { status: "cancelada" };
+      patch = {
+        status: "cancelada",
+        cancelada_at: new Date().toISOString(),
+        cancelada_por: quien,
+      };
       break;
     }
     case "reabrir": {
@@ -180,7 +204,7 @@ export async function PATCH(
           { status: 409 }
         );
       }
-      patch = { status: "esperando_entrada" };
+      patch = { status: "esperando_entrada", cancelada_at: null, cancelada_por: null };
       break;
     }
   }
@@ -190,7 +214,7 @@ export async function PATCH(
     .update(patch)
     .eq("id", params.id)
     .select(
-      "id, status, entrada_recibida_at, pago_confirmado_at, pago_proveedor_at, cerrada_at, entrada_recibida_por, pago_confirmado_por, cerrada_por, updated_at"
+      "id, status, entrada_recibida_at, pago_confirmado_at, pago_proveedor_at, cerrada_at, entrada_recibida_por, pago_confirmado_por, pago_proveedor_por, cerrada_por, confirmada_at, confirmada_por, cancelada_at, cancelada_por, updated_at"
     )
     .single();
 
@@ -242,7 +266,14 @@ function pickResult(
     | "entrada_recibida_por"
     | "pago_confirmado_por"
     | "cerrada_por"
-  > & { updated_at?: string; pago_proveedor_por?: string | null }
+  > & {
+    updated_at?: string;
+    pago_proveedor_por?: string | null;
+    confirmada_at?: string | null;
+    confirmada_por?: string | null;
+    cancelada_at?: string | null;
+    cancelada_por?: string | null;
+  }
 ) {
   return {
     id: op.id,
@@ -258,6 +289,10 @@ function pickResult(
     entrada_recibida_por: op.entrada_recibida_por,
     pago_confirmado_por: op.pago_confirmado_por,
     cerrada_por: op.cerrada_por,
+    confirmada_at: op.confirmada_at ?? null,
+    confirmada_por: op.confirmada_por ?? null,
+    cancelada_at: op.cancelada_at ?? null,
+    cancelada_por: op.cancelada_por ?? null,
     estado: estadoDe(op),
   };
 }
