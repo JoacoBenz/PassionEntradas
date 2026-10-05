@@ -1,5 +1,25 @@
 # Backlog plan (analysis, no code yet)
 
+## Decisions (answers of 2026-10-05)
+
+1. Confirmations: inline in the same button ("¿Seguro? Sí / No").
+2. Review before "Enviar pedido": no notes field.
+3. Clickable metrics: the Panel cards **and** the Métricas money cards.
+4. Map: automatic color highlight, but only when the color match is ≥ 90%; otherwise the current chip.
+5. Stock: **unchanged**. It is still taken only when the client pays.
+6. More than the stock left → the line goes as "a consultar" (it shouldn't happen, since the cart caps it).
+7. No auto-cancel. A pedido left hanging becomes a **priority** (top of the list, red age badge, bell, WhatsApp).
+8. Un-marking pago still returns the stock.
+9. No backfill.
+10. Staff created from the app (email + temporary password).
+11. Moderators can see the Clientes list. **Agustin Acosta → moderador** (done in production).
+12. Pending requests stay on the "Accesos" page.
+13. Customer emails only on: **Confirmado**, **Para pagar**, **Entregada**.
+14. Email domain: later. Emails get built, but stay off until `EMAIL_FROM` is set.
+15. Staff get a bell in the Panel **and** WhatsApp.
+16. WhatsApp: reworked, see block 8.
+
+
 Branch `plan/backlog`, from `main` at #74. Each block below is planned as its
 own PR (with its migration, if any) so it can be tested and merged alone.
 Open questions are at the end of each block; answers go back into this file.
@@ -64,7 +84,11 @@ Production snapshot (2026-10-05):
   - Exact, but it means manual work on ~255 maps, and new Passion maps start without pins.
 - **C. Hybrid.** Automatic by default, plus manual pins where the automatic one is wrong.
 
-## 5. Stock taken at creation, returned on cancel
+## 5. Stock (decided: unchanged; only the "more than stock → consultar" rule)
+
+> Superseded by decisions 5–9. The analysis below is kept for reference. The only change is this: when an order line for an own ticket asks for more than the stock left (or the stock is 0), the server turns that line into a consulta instead of a pedido.
+
+### Original analysis
 
 **Today.**
 - Stock moves only when **payment** is marked: taken on pago ✓, returned on pago ✗ or on cancel.
@@ -122,20 +146,45 @@ Production snapshot (2026-10-05):
 - Each email links to the order page.
 - **Bell in the store header:** unread count plus a list of the same events, marked read on open. Backed by a `notificaciones` table filled by the same code that sends the emails.
 
-## 8. WhatsApp admin templates
+## 8. WhatsApp for staff (reworked)
 
-**Today.**
-- One message per new store order or access request.
-- Meta template params can't contain line breaks, so a multi-line summary can't go inside a template.
-- No scheduled jobs exist. The Vercel cron on the current plan is once a day.
+What changes the design:
+- Volume is low (a few operations a week) and the team is 3 people.
+- Meta charges per business-initiated template, and every template needs approval.
+- Template variables can't contain line breaks.
+- Staff will now also have the in-app bell (decision 15).
 
-**Approaches (from before).**
-- Daily digest.
-- Per-event alert with a deep link.
-- Urgent-only.
-- **Hybrid (recommended):** an instant short alert with a link for new orders/consults, plus a daily digest.
-  - The digest is one approved template with counts: "3 por confirmar · 2 a cotizar · 1 cotización vence hoy · 2 para entregar · 1 pago a proveedor pendiente" and a link to the panel.
-  - The panel opens already filtered (needs block 3).
+So WhatsApp is only for "someone has to act and you're probably not looking at the panel". The bell covers the rest.
+
+**Two kinds of message, three templates total.**
+1. **Instant: new work.** Sent for:
+   - A new pedido (to confirm).
+   - A new consulta (to quote).
+   - A customer accepting or cancelling.
+   - A new access request.
+
+   It's one short line plus a link that opens that exact operation. This reuses `nuevo_pedido` / `nuevo_acceso`, plus one new generic `aviso_operacion` template.
+2. **Reminder: left hanging** (decision 7). One message per item, never repeated:
+   - A pedido unconfirmed after **X h**.
+   - A consulta not quoted after **X h**.
+   - A quote expiring in < 6 h.
+   - An event in < 48 h that isn't delivered yet.
+
+   The item also turns red and jumps to the top of the Panel.
+   - If several items are due at once, they go together as one message: "3 pendientes: 2 por confirmar, 1 por entregar", with a link to the Panel already filtered.
+   - No daily digest when there's nothing pending.
+
+**The clock.** Reminders need something that checks every few minutes. Vercel's free cron only runs once a day, but **the worker already calls the app every 5 minutes** (`/api/revalidar`, with the server key). It will also call `/api/recordatorios`, so there's nothing new to host or pay for.
+
+**Who gets what.**
+- Each staff member uses the phone in their profile (it already exists in "Mi cuenta"), with an on/off switch in Equipo.
+- Instead of one global list (`WHATSAPP_VENDEDORES`):
+  - New pedidos and reminders for an operation go to its **vendedor** if it has one, otherwise to everyone.
+  - Consultas go to whoever can quote.
+
+**Quiet hours.** Reminders wait until morning; new pedidos are always sent (see question).
+
+**No duplicates.** Every notification is a row in the same `notificaciones` table the bell uses. The row records what was sent and to whom, so nothing is sent twice and failures stay visible in the panel, not only in the Vercel logs.
 
 ## Proposed order
 
