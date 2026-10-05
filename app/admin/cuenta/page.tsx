@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import { createServerSupabase } from "@/lib/supabase/server";
 import AppHeader from "@/components/AppHeader";
 import BottomNav from "@/components/BottomNav";
 import CambiarClave from "@/components/admin/CambiarClave";
 import MisDatos from "@/components/admin/MisDatos";
 import { isMock, MOCK_USER } from "@/lib/mock-db";
+import { usuarioVerificado } from "@/lib/usuario-verificado";
 
 export const dynamic = "force-dynamic";
 
@@ -18,10 +18,7 @@ export default async function CuentaPage() {
     email = MOCK_USER.email;
     datos = { nombre: "Demo", apellido: "Passion", telefono: "" };
   } else {
-    const supabase = createServerSupabase();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await usuarioVerificado();
     if (!user) redirect("/ingresar");
     email = user.email;
     const meta = (user.user_metadata ?? {}) as Record<string, unknown>;

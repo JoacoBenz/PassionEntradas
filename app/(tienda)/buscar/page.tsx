@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { fetchConfigTienda, fetchTickets } from "@/lib/supabase/public";
 import { normalizarPrecios } from "@/lib/tickets";
+import { empacarCatalogo } from "@/lib/catalogo-compacto";
 import { StorefrontCatalog } from "@/components/tienda/Storefront";
 import { requireAccesoTienda } from "@/lib/tienda-guard";
 
@@ -28,7 +29,7 @@ export default async function BuscarPage() {
     // useSearchParams exige Suspense en páginas estáticas.
     <Suspense fallback={<div className="splash">Loading the listings…</div>}>
       {/* Todo a USD antes de renderizar: la tienda no vuelve a convertir. */}
-      <StorefrontCatalog rows={normalizarPrecios(rows, cfg)} />
+      <StorefrontCatalog catalogo={empacarCatalogo(normalizarPrecios(rows, cfg))} />
     </Suspense>
   );
 }

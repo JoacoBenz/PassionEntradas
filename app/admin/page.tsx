@@ -1,12 +1,13 @@
 ﻿import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AppHeader from "@/components/AppHeader";
 import AutoRefresh from "@/components/AutoRefresh";
 import BottomNav from "@/components/BottomNav";
 import type { Consulta, Operacion, OperacionItem } from "@/lib/operaciones";
+import { usuarioVerificado } from "@/lib/usuario-verificado";
 import {
   isMock,
   MOCK_USER,
@@ -43,10 +44,7 @@ export default async function AdminPage() {
     items = ops.flatMap((o) => mockListItems(o.id));
     consultas = mockListConsultas().filter((c) => c.estado === "pendiente" || c.estado === "cotizada");
   } else {
-    const supabase = createServerSupabase();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await usuarioVerificado();
 
     // Refuerzo por si el middleware no corrió (defensa en profundidad).
     if (!user) {

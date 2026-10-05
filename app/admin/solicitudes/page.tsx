@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import AppHeader from "@/components/AppHeader";
 import AutoRefresh from "@/components/AutoRefresh";
@@ -7,6 +7,7 @@ import BottomNav from "@/components/BottomNav";
 import SolicitudesAcceso from "@/components/admin/SolicitudesAcceso";
 import type { SolicitudAcceso } from "@/lib/acceso";
 import { isMock, MOCK_USER, mockListSolicitudes } from "@/lib/mock-db";
+import { usuarioVerificado } from "@/lib/usuario-verificado";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +21,7 @@ export default async function SolicitudesPage() {
     email = MOCK_USER.email;
     solicitudes = mockListSolicitudes();
   } else {
-    const supabase = createServerSupabase();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await usuarioVerificado();
     if (!user) redirect("/ingresar");
     if (getRol(user) !== "administrador") redirect("/moderador");
     email = user.email;

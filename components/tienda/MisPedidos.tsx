@@ -178,7 +178,7 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
     <>
       {/* La página se actualiza sola: cuando el staff avanza la operación, el
           estado acá se refresca sin recargar. */}
-      <AutoRefresh intervalMs={20000} />
+      <AutoRefresh intervalMs={20000} versionUrl="/api/mis-pedidos/version" />
       <header className="masthead masthead--cat">
         <div className="toprow">
           <Link className="wm" href="/entradas">

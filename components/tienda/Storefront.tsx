@@ -6,7 +6,7 @@
 // Bilingüe EN/ES (default español): los textos viven en lib/tienda-i18n.ts y
 // el toggle del header se recuerda en localStorage.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { compararAZ } from "@/lib/orden";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -26,6 +26,9 @@ import {
 import { LANGS, mesLabelLang, TX, type Lang } from "@/lib/tienda-i18n";
 import { useCart } from "@/components/tienda/Cart";
 import { LegalLinks } from "@/components/tienda/LegalLinks";
+import { empezarNavegacion } from "@/components/NavProgress";
+import type { ResumenHome } from "@/lib/resumen-home";
+import { desempacarCatalogo, type CatalogoCompacto } from "@/lib/catalogo-compacto";
 
 // Idioma elegido: default español; se recuerda entre visitas.
 function useLang() {
@@ -440,7 +443,7 @@ function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang 
 }
 
 // ---- card de evento (talón) ----------------------------------------------------
-function TicketCard({
+function TicketCardBase({
   ev,
   i,
   lang,
@@ -453,6 +456,11 @@ function TicketCard({
 }) {
   const t = TX[lang];
   const [open, setOpen] = useState(defaultOpen);
+  // Los sectores (y el mapa) se dibujan recién la primera vez que se abre la
+  // card: cerradas son la mayoría y así la lista pesa mucho menos. Después
+  // quedan montados para que cerrar anime igual que antes.
+  const [abierta, setAbierta] = useState(defaultOpen);
+  if (open && !abierta) setAbierta(true);
   const [shared, setShared] = useState(false);
   // Mapa de sectores abierto a pantalla completa.
   const [plano, setPlano] = useState(false);
@@ -527,7 +535,7 @@ function TicketCard({
         </div>
         <div className="roll-wrap" ref={rollRef} style={{ maxHeight: 0 }}>
           <span className="scroll-rod" aria-hidden />
-          {ev.imagen && (
+          {abierta && ev.imagen && (
             // Botón y no <img> suelta: se abre con el dedo en celular y con
             // Enter en teclado. En PC además crece al pasar el mouse (CSS),
             // que para la mayoría de los mapas ya alcanza.
@@ -564,11 +572,13 @@ function TicketCard({
               onClose={() => setPlano(false)}
             />
           )}
-          <ul className="ladder">
-            {ev.ubicaciones.map((u) => (
-              <LadderRow key={u.id} u={u} ev={ev} lang={lang} />
-            ))}
-          </ul>
+          {abierta && (
+            <ul className="ladder">
+              {ev.ubicaciones.map((u) => (
+                <LadderRow key={u.id} u={u} ev={ev} lang={lang} />
+              ))}
+            </ul>
+          )}
           <span className="scroll-curl" aria-hidden />
         </div>
       </div>
@@ -588,34 +598,18 @@ function TicketCard({
   );
 }
 
+// Memo: al filtrar, las cards que siguen en la lista no se vuelven a dibujar.
+const TicketCard = memo(TicketCardBase);
+
 // =============================== HOME ==========================================
-export function StorefrontHome({ rows }: { rows: Ticket[] }) {
+export function StorefrontHome({ resumen }: { resumen: ResumenHome }) {
   const router = useRouter();
   const [lang, setLang] = useLang();
   const t = TX[lang];
-  const events = useMemo(() => buildEvents(rows), [rows]);
+  // Calculado en el server (lib/resumen-home.ts): no viaja el catálogo entero.
+  const { totalEv, totalStock, populares, topCats } = resumen;
 
-  const totalEv = events.length;
-  const totalStock = events.reduce((a, e) => a + e.bookStock, 0);
-  // Los 6 más próximos por fecha, tengan stock de compra o sean "a pedido":
-  // un partidazo On Request (ej: una semi del Mundial) también va en la
-  // vidriera — cambia la acción (Consultar en vez de Reservar), no el lugar.
-  const populares = [...events]
-    .sort((a, b) => {
-      const da = a.fecha ? Date.parse(a.fecha) : Infinity;
-      const db = b.fecha ? Date.parse(b.fecha) : Infinity;
-      return da - db;
-    })
-    .slice(0, 6);
-  const catCounts = new Map<string, number>();
-  for (const e of events) catCounts.set(e.comp, (catCounts.get(e.comp) || 0) + 1);
-  // Las 8 categorías con más eventos, mostradas en orden alfabético.
-  const topCats = Array.from(catCounts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .sort((a, b) => compararAZ(a[0], b[0]));
-
-  if (!events.length) return <div className="splash">No events yet.</div>;
+  if (!totalEv) return <div className="splash">No events yet.</div>;
 
   return (
     <>
@@ -641,9 +635,9 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
           </h1>
           <p>{t.heroP}</p>
           <div className="cta-row">
-            <button className="btn-primary" onClick={() => router.push("/buscar")}>
+            <Link className="btn-primary" href="/buscar">
               {t.ctaSearch}
-            </button>
+            </Link>
             <a
               className="btn-ghost"
               href={waLink(t.waFloatMsg)}
@@ -677,7 +671,10 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
                 key={ev.comp + ev.evento}
                 className="rank-item"
                 style={{ "--i": idx } as React.CSSProperties}
-                onClick={() => router.push(`/buscar?q=${encodeURIComponent(ev.evento)}`)}
+                onClick={() => {
+                  empezarNavegacion();
+                  router.push(`/buscar?q=${encodeURIComponent(ev.evento)}`);
+                }}
               >
                 <div className="rank-main">
                   <span className="rank-eyebrow">
@@ -732,19 +729,15 @@ export function StorefrontHome({ rows }: { rows: Ticket[] }) {
         </div>
         <div className="catstrip">
           {topCats.map(([c, count]) => (
-            <button
-              key={c}
-              className="catlink"
-              onClick={() => router.push(`/buscar?cat=${encodeURIComponent(c)}`)}
-            >
+            <Link key={c} className="catlink" href={`/buscar?cat=${encodeURIComponent(c)}`}>
               {c}
               <small>{count}</small>
-            </button>
+            </Link>
           ))}
-          <button className="catlink catlink--all" onClick={() => router.push("/buscar")}>
+          <Link className="catlink catlink--all" href="/buscar">
             {t.verTodo}
             <small>{totalEv}</small>
-          </button>
+          </Link>
         </div>
       </section>
 
@@ -856,26 +849,37 @@ function Select({
   options: { value: string; label: string }[];
   onChange: (v: string) => void;
 }) {
+  // Mismos elementos mientras no cambien las opciones: React no vuelve a
+  // recorrer los cientos de <option> en cada tecla del buscador.
+  const opciones = useMemo(
+    () =>
+      options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      )),
+    [options]
+  );
   return (
     <label className="sel">
       <span>{label}</span>
       <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
+        {opciones}
       </select>
     </label>
   );
 }
 
-export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
-  const router = useRouter();
+export function StorefrontCatalog({ catalogo }: { catalogo: CatalogoCompacto }) {
   const params = useSearchParams();
   const [lang, setLang] = useLang();
   const t = TX[lang];
-  const events = useMemo(() => buildEvents(rows), [rows]);
+  // El catálogo viaja empaquetado (lib/catalogo-compacto.ts) y se arma acá una
+  // vez: los filtros corren en el navegador, sin volver a pedirle nada al server.
+  const events = useMemo(
+    () => buildEvents(desempacarCatalogo<Ticket>(catalogo)),
+    [catalogo]
+  );
   const [state, setState] = useState<FilterState>({
     cat: params.get("cat") || "*",
     lugar: params.get("lugar") || "*",
@@ -885,18 +889,22 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
     comp: params.get("c") || "",
   });
 
+  // Los filtros responden al toque (selects e input usan `state`) y la lista
+  // se recalcula con la versión diferida: React la arma en segundo plano y
+  // la descarta si llega otra tecla, así escribir no se traba en el celular.
+  const filtro = useDeferredValue(state);
   const filtered = useMemo(() => {
     const out = events.filter((ev) => {
       // Link compartido: solo ese evento (y su competición, si vino en el
       // link: dos torneos pueden repetir nombre de partido).
-      if (state.evento) {
-        return ev.evento === state.evento && (!state.comp || ev.comp === state.comp);
+      if (filtro.evento) {
+        return ev.evento === filtro.evento && (!filtro.comp || ev.comp === filtro.comp);
       }
-      if (state.cat !== "*" && ev.comp !== state.cat) return false;
-      if (state.lugar !== "*" && ev.lugar !== state.lugar) return false;
-      if (state.mes !== "*" && ev.mes !== state.mes) return false;
-      if (state.q) {
-        const q = state.q.toLowerCase();
+      if (filtro.cat !== "*" && ev.comp !== filtro.cat) return false;
+      if (filtro.lugar !== "*" && ev.lugar !== filtro.lugar) return false;
+      if (filtro.mes !== "*" && ev.mes !== filtro.mes) return false;
+      if (filtro.q) {
+        const q = filtro.q.toLowerCase();
         const hit =
           ev.evento.toLowerCase().includes(q) ||
           (ev.ciudad || "").toLowerCase().includes(q) ||
@@ -912,15 +920,16 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
       return da - db;
     });
     return out;
-  }, [events, state]);
+  }, [events, filtro]);
 
-  // Paginación client-side: la cartelera crece con cada sync y una lista
-  // infinita se vuelve inmanejable en móvil.
-  const PAGE_SIZE = 12;
-  const [page, setPage] = useState(1);
-  // Al cambiar cualquier filtro se vuelve a la primera página.
+  // Se muestran los primeros 30 y "Ver más" agrega otros 30: la cartelera
+  // tiene cientos de eventos y dibujarlos todos traba el celular. Filtrar no
+  // le pide nada al server (todo está en `events`).
+  const TANDA = 30;
+  const [mostrar, setMostrar] = useState(TANDA);
+  // Al cambiar cualquier filtro se vuelve a la primera tanda.
   useEffect(() => {
-    setPage(1);
+    setMostrar(TANDA);
   }, [state.cat, state.lugar, state.mes, state.q, state.evento]);
 
   // Link compartido: centrar la card del evento apenas se abre la página.
@@ -935,30 +944,29 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
     return () => clearTimeout(t);
   }, [state.evento]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageSafe = Math.min(page, totalPages);
-  const pageStart = (pageSafe - 1) * PAGE_SIZE;
-  const visible = filtered.slice(pageStart, pageStart + PAGE_SIZE);
+  const visible = filtered.slice(0, mostrar);
+  const quedan = filtered.length - visible.length;
 
-  function goToPage(p: number) {
-    setPage(p);
-    // La cartelera puede ser larga: al paginar volvemos al inicio de la lista.
-    document.querySelector(".result-line")?.scrollIntoView({ behavior: "smooth" });
-  }
-
-  const catOpts = [
-    { value: "*", label: t.todasCategorias },
-    ...uniqueOptions(events, (e) => ({ key: e.comp, label: e.comp }), true),
-  ];
-  const lugarOpts = [
-    { value: "*", label: t.todosLugares },
-    ...uniqueOptions(events, (e) => ({ key: e.lugar, label: e.lugar }), true),
-  ];
-  // El label del mes se arma acá (no en buildEvents) para que siga el idioma.
-  const mesOpts = [
-    { value: "*", label: t.todasFechas },
-    ...uniqueOptions(events, (e) => ({ key: e.mes, label: mesLabelLang(e.mes, lang) }), false),
-  ];
+  // Memo: armar y ordenar las opciones (orden alfabético con acentos) sobre
+  // cientos de eventos en CADA tecla era buena parte de lo que trababa el buscador.
+  const { catOpts, lugarOpts, mesOpts } = useMemo(
+    () => ({
+      catOpts: [
+        { value: "*", label: t.todasCategorias },
+        ...uniqueOptions(events, (e) => ({ key: e.comp, label: e.comp }), true),
+      ],
+      lugarOpts: [
+        { value: "*", label: t.todosLugares },
+        ...uniqueOptions(events, (e) => ({ key: e.lugar, label: e.lugar }), true),
+      ],
+      // El label del mes se arma acá (no en buildEvents) para que siga el idioma.
+      mesOpts: [
+        { value: "*", label: t.todasFechas },
+        ...uniqueOptions(events, (e) => ({ key: e.mes, label: mesLabelLang(e.mes, lang) }), false),
+      ],
+    }),
+    [events, lang, t]
+  );
   const filtrando =
     state.cat !== "*" || state.lugar !== "*" || state.mes !== "*" || !!state.q || !!state.evento;
 
@@ -976,9 +984,9 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
             <Link className="lp-nav-login" href="/cuenta">
               {t.lp.navCuenta}
             </Link>
-            <button className="back" onClick={() => router.push("/entradas")}>
+            <Link className="back" href="/entradas">
               {t.backHome}
-            </button>
+            </Link>
           </div>
         </div>
       </header>
@@ -1020,11 +1028,7 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
 
       <div className="result-line">
         <b>{filtered.length}</b> {t.eventos(filtered.length)}
-        {totalPages > 1 && (
-          <span className="range">
-            {t.mostrando(pageStart + 1, Math.min(pageStart + PAGE_SIZE, filtered.length))}
-          </span>
-        )}
+        {quedan > 0 && <span className="range">{t.mostrando(1, visible.length)}</span>}
         {filtrando && (
           <button
             className="clear"
@@ -1041,7 +1045,7 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
             <TicketCard
               key={ev.comp + ev.evento}
               ev={ev}
-              i={i}
+              i={Math.min(i, 12)}
               lang={lang}
               defaultOpen={
                 !!state.evento &&
@@ -1071,24 +1075,12 @@ export function StorefrontCatalog({ rows }: { rows: Ticket[] }) {
         )}
       </main>
 
-      {totalPages > 1 && (
-        <nav className="pager" aria-label="Pagination">
-          <button
-            className="pager-btn"
-            disabled={pageSafe <= 1}
-            onClick={() => goToPage(pageSafe - 1)}
-          >
-            {t.anterior}
+      {quedan > 0 && (
+        <div className="pager">
+          <button className="pager-btn ver-mas" onClick={() => setMostrar((m) => m + TANDA)}>
+            {t.verMas(quedan)}
           </button>
-          <span className="pager-info">{t.pagina(pageSafe, totalPages)}</span>
-          <button
-            className="pager-btn"
-            disabled={pageSafe >= totalPages}
-            onClick={() => goToPage(pageSafe + 1)}
-          >
-            {t.siguiente}
-          </button>
-        </nav>
+        </div>
       )}
 
       <Foot lang={lang} />

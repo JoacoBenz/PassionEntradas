@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { avisoDeSobreventa, movimientoDeStock, type LineaDescontada } from "@/lib/stock";
-import { revalidatePath } from "next/cache";
+import { refrescarTienda } from "@/lib/refrescar-tienda";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import {
   estadoDe,
@@ -79,7 +79,7 @@ export async function PATCH(
       return NextResponse.json({ error: res.error }, { status: res.status });
     }
     // Pago, cancelar o reabrir pueden haber movido el stock de una propia.
-    if (movimientoDeStock(action, res.op)) revalidatePath("/(tienda)", "layout");
+    if (movimientoDeStock(action, res.op)) refrescarTienda();
     return NextResponse.json({ ...pickResult(res.op), ...(res.aviso ? { aviso: res.aviso } : {}) });
   }
 
@@ -252,7 +252,7 @@ export async function PATCH(
     } else {
       if (mov === "tomar") aviso = avisoDeSobreventa(lineas as LineaDescontada[]);
       // La tienda muestra el stock: reflejarlo al instante.
-      revalidatePath("/(tienda)", "layout");
+      refrescarTienda();
     }
   }
 

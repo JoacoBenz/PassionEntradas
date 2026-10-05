@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase } from "@/lib/supabase/server";
 import { esStaff, getRol } from "@/lib/auth";
 import ModeradorDashboard from "@/components/moderador/ModeradorDashboard";
 import AppHeader from "@/components/AppHeader";
@@ -9,6 +9,7 @@ import BottomNav from "@/components/BottomNav";
 import type { Consulta, Operacion } from "@/lib/operaciones";
 import { computeMetrics, type Metrics, metricasDominantes } from "@/lib/metrics";
 import { isMock, MOCK_USER, mockListConsultas, mockListOps } from "@/lib/mock-db";
+import { usuarioVerificado } from "@/lib/usuario-verificado";
 
 export const dynamic = "force-dynamic";
 
@@ -43,10 +44,7 @@ export default async function ModeradorPage({
     metrics = computeMetrics(mockListOps());
     consultas = mockListConsultas().filter((c) => c.estado === "pendiente" || c.estado === "cotizada");
   } else {
-    const supabase = createServerSupabase();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await usuarioVerificado();
 
     if (!user) {
       redirect("/ingresar");

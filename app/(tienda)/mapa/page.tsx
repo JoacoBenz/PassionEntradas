@@ -1,5 +1,6 @@
 import { fetchConfigTienda, fetchTickets } from "@/lib/supabase/public";
 import { normalizarPrecios } from "@/lib/tickets";
+import { empacarCatalogo } from "@/lib/catalogo-compacto";
 import { MapaEventos } from "@/components/tienda/MapaEventos";
 import { requireAccesoTienda } from "@/lib/tienda-guard";
 
@@ -23,5 +24,5 @@ export default async function MapaPage() {
   }
   // Interruptor del panel: con Passion apagado quedan solo las propias.
   if (!cfg.portalActivo) rows = rows.filter((t) => t.source !== "portal");
-  return <MapaEventos rows={normalizarPrecios(rows, cfg)} />;
+  return <MapaEventos catalogo={empacarCatalogo(normalizarPrecios(rows, cfg))} />;
 }

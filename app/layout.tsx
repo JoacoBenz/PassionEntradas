@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Archivo, Space_Mono } from "next/font/google";
 import "./globals.css";
+import NavProgress from "@/components/NavProgress";
 
 const display = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -43,7 +44,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={`${display.variable} ${body.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <NavProgress />
+        {children}
+      </body>
     </html>
   );
 }

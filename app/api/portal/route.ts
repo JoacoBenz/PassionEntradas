@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { refrescarTienda } from "@/lib/refrescar-tienda";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol } from "@/lib/auth";
 import { isMock, mockGetPortalActivo, mockSetPortalActivo } from "@/lib/mock-db";
@@ -78,7 +78,7 @@ export async function PUT(request: Request) {
 
   // La tienda es ISR: reflejar el cambio al instante (también en mock, para
   // poder probar el flujo completo en local).
-  revalidatePath("/(tienda)", "layout");
+  refrescarTienda();
 
   return NextResponse.json({ activo: body.activo });
 }

@@ -8,6 +8,7 @@ import TicketsPanel from "@/components/admin/TicketsPanel";
 import MargenesPanel from "@/components/admin/MargenesPanel";
 import TextosPagoPanel from "@/components/admin/TextosPagoPanel";
 import { hoyArgentina, type SyncRun, type TicketFull } from "@/lib/tickets";
+import { usuarioVerificado } from "@/lib/usuario-verificado";
 import {
   isMock,
   MOCK_USER,
@@ -47,9 +48,7 @@ export default async function AdminEntradasPage() {
     ).sort();
   } else {
     const supabase = createServerSupabase();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await usuarioVerificado();
 
     if (!user) redirect("/ingresar");
     if (getRol(user) !== "administrador") redirect("/moderador");

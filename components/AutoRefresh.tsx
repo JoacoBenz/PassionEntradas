@@ -75,8 +75,10 @@ export default function AutoRefresh({
 
     const id = setInterval(() => void tick(), intervalMs);
 
-    // Fijar línea de base apenas monta (no refresca: la página recién cargó).
-    void tick();
+    // Con versión: fijar la línea de base apenas monta (no refresca). Sin
+    // versión NO se llama: el tick refresca siempre, y re-pedir la página que
+    // acaba de llegar la armaba dos veces en cada visita.
+    if (versionUrl) void tick();
 
     // Al volver a la pestaña, chequear de inmediato.
     const onVisible = () => void tick();
