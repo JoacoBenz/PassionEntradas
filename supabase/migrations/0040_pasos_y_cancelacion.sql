@@ -102,8 +102,8 @@ alter table public.textos_config enable row level security;
 -- Sin policies: deny-all para anon/authenticated. Solo service role.
 revoke all on table public.textos_config from anon, authenticated;
 
-drop trigger if exists textos_config_updated_at on public.textos_config;
-create trigger textos_config_updated_at
+-- create or replace (Postgres 14+): idempotente sin borrar nada.
+create or replace trigger textos_config_updated_at
   before update on public.textos_config
   for each row execute function public.set_updated_at();
 
