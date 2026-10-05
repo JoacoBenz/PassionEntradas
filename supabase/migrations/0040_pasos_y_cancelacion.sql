@@ -19,7 +19,8 @@
 --    su pedido está listo para pagar (alias, CBU, link de pago...). Solo
 --    service role: el texto se le muestra al dueño del pedido desde el server.
 --
--- 5. El link público expone `tipo` y `confirmada_at` para mostrar el paso.
+-- 5. (El link público con `tipo` y `confirmada_at` está en 0042: cambia las
+--    columnas que devuelve la función, y eso exige recrearla.)
 --
 -- 6. "En juego" del tablero no cuenta los pedidos sin confirmar: todavía no
 --    son plata comprometida.
@@ -106,32 +107,8 @@ create trigger textos_config_updated_at
   before update on public.textos_config
   for each row execute function public.set_updated_at();
 
-drop function if exists public.operacion_publica(uuid);
-
-create function public.operacion_publica(op_id uuid)
-returns table (
-  code text, evento text, comprador_alias text, vendedor_alias text,
-  monto numeric, moneda text, status operacion_status,
-  entrada_recibida_at timestamptz, pago_confirmado_at timestamptz,
-  cerrada_at timestamptz, fecha_evento date, updated_at timestamptz,
-  tipo text, confirmada_at timestamptz
-)
-language sql stable security definer set search_path = public
-as $$
-  select o.code, o.evento, o.comprador_alias, o.vendedor_alias, o.monto, o.moneda,
-         o.status, o.entrada_recibida_at, o.pago_confirmado_at,
-         o.cerrada_at, o.fecha_evento, o.updated_at, o.tipo, o.confirmada_at
-  from public.operaciones o
-  where o.id = op_id
-$$;
-
-revoke all on function public.operacion_publica(uuid) from public;
-grant execute on function public.operacion_publica(uuid) to anon, authenticated, service_role;
-
 -- Misma definición que 0035, con "en juego" sin los pedidos por confirmar.
-drop function if exists public.metricas_operaciones(date, date);
-
-create function public.metricas_operaciones(p_desde date default null, p_hasta date default null)
+create or replace function public.metricas_operaciones(p_desde date default null, p_hasta date default null)
 returns table (
   moneda text, plata_movida numeric, comision_ganada numeric,
   entradas_vendidas bigint, en_juego_monto numeric, en_juego_ops bigint
