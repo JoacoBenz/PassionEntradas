@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import StatusStub from "@/components/StatusStub";
 import AutoRefresh from "@/components/AutoRefresh";
-import type { ItemPublico, OperacionPublica, Status } from "@/lib/operaciones";
-import { isMock, mockListItems, mockOpPublica } from "@/lib/mock-db";
+import { estadoPublicoDe, type ItemPublico, type OperacionPublica, type Status } from "@/lib/operaciones";
+import { claveTextoPago, textoPagoDe } from "@/lib/textos";
+import { isMock, mockGetTextosPago, mockListItems, mockOpPublica } from "@/lib/mock-db";
 
 // Página pública read-only. Se accede por el uuid (impredecible).
 // Lee vía el RPC `operacion_publica`, que exige el uuid exacto y devuelve
@@ -60,12 +61,29 @@ export default async function OperacionPublicaPage({
     items = (filas ?? []) as ItemPublico[];
   }
 
+  // "Para pagar": el link muestra cómo pagar (el texto de la moneda que se
+  // carga en el panel). Solo ese texto, y solo en ese paso; la tabla es
+  // deny-all, se lee con service role del lado del server.
+  let textoPago: string | null = null;
+  if (estadoPublicoDe(op) === "listo_para_pagar") {
+    if (isMock()) {
+      textoPago = textoPagoDe(mockGetTextosPago(), op.moneda);
+    } else {
+      const { data: tx } = await createAdminSupabase()
+        .from("textos_config")
+        .select("key, value")
+        .eq("key", claveTextoPago(op.moneda))
+        .maybeSingle();
+      textoPago = tx?.value?.trim() || null;
+    }
+  }
+
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-8">
       {/* Repolea una versión mínima y solo re-baja la página si la operación
           cambió: este link vive abierto en los grupos, es el tráfico grande. */}
       <AutoRefresh versionUrl={`/api/op/${params.id}/version`} />
-      <StatusStub op={op} items={items} />
+      <StatusStub op={op} items={items} textoPago={textoPago} />
       <footer className="mt-6 text-center text-xs text-muted">
         AdminTickets · Custodia de operaciones
       </footer>
