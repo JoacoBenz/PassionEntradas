@@ -54,9 +54,19 @@ export async function leerEquipo(admin: SupabaseClient): Promise<Map<string, Rol
   return mapaEquipo(users);
 }
 
-/** Rol de equipo de UN usuario (o null si es cliente / no existe). */
+/**
+ * Rol de equipo de UN usuario (null = cliente). Si no se puede leer el usuario
+ * TIRA: quien llama no tiene que seguir a ciegas (fallar cerrado).
+ */
 export async function rolEquipoDe(admin: SupabaseClient, userId: string): Promise<RolEquipo | null> {
-  const { data, error } = await admin.auth.admin.getUserById(userId);
-  if (error || !data?.user) return null;
-  return rolEquipoDeUsuario(data.user);
+  let res;
+  try {
+    res = await admin.auth.admin.getUserById(userId);
+  } catch (e) {
+    throw new Error(`No se pudo verificar el usuario: ${(e as Error).message}`);
+  }
+  if (res.error || !res.data?.user) {
+    throw new Error(`No se pudo verificar el usuario: ${res.error?.message ?? "no existe"}`);
+  }
+  return rolEquipoDeUsuario(res.data.user);
 }

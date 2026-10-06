@@ -65,7 +65,13 @@ export async function POST(
 
   // Accesos gestiona CLIENTES. Si esta persona hoy es del equipo, revocar le
   // borraría el rol y reactivar la devolvería como cliente.
-  const bloqueo = bloqueoEnAccesos(await rolEquipoDe(admin, sol.user_id), accion);
+  let rolEquipo;
+  try {
+    rolEquipo = await rolEquipoDe(admin, sol.user_id);
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 503 });
+  }
+  const bloqueo = bloqueoEnAccesos(rolEquipo, accion);
   if (bloqueo) return NextResponse.json({ error: bloqueo }, { status: 409 });
 
   const revocar = accion === "revocar";

@@ -72,7 +72,13 @@ export async function POST(
   }
 
   // A alguien del equipo no se le cambia la contraseña desde Accesos.
-  const bloqueo = bloqueoEnAccesos(await rolEquipoDe(admin, sol.user_id), "reenviar");
+  let rolEquipo;
+  try {
+    rolEquipo = await rolEquipoDe(admin, sol.user_id);
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 503 });
+  }
+  const bloqueo = bloqueoEnAccesos(rolEquipo, "reenviar");
   if (bloqueo) return NextResponse.json({ error: bloqueo }, { status: 409 });
 
   // Regenerar la contraseña del usuario cliente (la anterior no se guarda).
