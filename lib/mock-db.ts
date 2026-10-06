@@ -3,6 +3,7 @@
 // resetea al reiniciar el proceso. NO usar en producción.
 
 import { avisoDeSobreventa, movimientoDeStock, type LineaDescontada } from "@/lib/stock";
+import { bloqueoEnAccesos } from "@/lib/equipo";
 import {
   generateCode,
   type Consulta,
@@ -55,6 +56,8 @@ type MockDB = {
   textos: Record<string, string>;
   // Plazo para aceptar una cotización (config.cotizacion_vence_horas).
   venceHoras: number;
+  // Rol de equipo por user_id (espejo de app_metadata.role en Auth).
+  equipo: Map<string, "administrador" | "moderador">;
 };
 
 function iso(minsAgo: number) {
@@ -249,6 +252,25 @@ function seed(): MockDB {
       created_at: iso(60 * 22),
       updated_at: iso(60 * 20),
     },
+    {
+      // Era cliente y pasó al equipo (ver `equipo` más abajo).
+      id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      nombre: "Emilia Demo",
+      email: "emilia.demo@example.com",
+      telefono: "+54 9 351 555 0000",
+      legajo: null,
+      direccion: null,
+      mensaje: null,
+      estado: "aprobada",
+      user_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      decidida_por: MOCK_USER.email,
+      decidida_at: iso(60 * 40),
+      revocada_at: null,
+      revocada_por: null,
+      acepto_terminos: true,
+      created_at: iso(60 * 42),
+      updated_at: iso(60 * 40),
+    },
   ];
 
   return {
@@ -262,6 +284,7 @@ function seed(): MockDB {
     facturas: [],
     facturaNumero: 0,
     solicitudes,
+    equipo: new Map([["eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "administrador"]]),
     items: [],
     // Consultas del cliente demo: una para cotizar y una ya cotizada que
     // espera su respuesta (se ve en el panel y en Mis pedidos).
@@ -697,6 +720,10 @@ export function mockCrearSolicitud(input: SolicitudInput): { ok: true } | { ok: 
 }
 
 // Lista para el panel: pendientes primero, luego por fecha (más nuevas arriba).
+export function mockEquipo(): Map<string, "administrador" | "moderador"> {
+  return db().equipo;
+}
+
 export function mockListSolicitudes(): SolicitudAcceso[] {
   return [...db().solicitudes].sort((a, b) => {
     if (a.estado !== b.estado) {
@@ -747,6 +774,8 @@ export function mockReenviarSolicitud(
   if (s.estado !== "aprobada") {
     return { ok: false, status: 409, error: "Solo se reenvía el acceso de una solicitud aprobada" };
   }
+  const bloqueo = bloqueoEnAccesos(s.user_id ? db().equipo.get(s.user_id) ?? null : null, "reenviar");
+  if (bloqueo) return { ok: false, status: 409, error: bloqueo };
   const password = generarPassword();
   return { ok: true, solicitud: s, credenciales: { email: s.email, password } };
 }
@@ -762,6 +791,8 @@ export function mockRevocarSolicitud(
   if (s.estado !== "aprobada") {
     return { ok: false, status: 409, error: "Solo se revoca el acceso de una solicitud aprobada" };
   }
+  const bloqueo = bloqueoEnAccesos(s.user_id ? db().equipo.get(s.user_id) ?? null : null, accion);
+  if (bloqueo) return { ok: false, status: 409, error: bloqueo };
   if (accion === "revocar") {
     if (s.revocada_at) return { ok: false, status: 409, error: "El acceso ya está revocado" };
     s.revocada_at = new Date().toISOString();

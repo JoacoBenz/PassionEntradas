@@ -26,6 +26,9 @@ export type SolicitudAcceso = {
   acepto_terminos: boolean;
   created_at: string;
   updated_at: string;
+  // Lo completa la página de Accesos (no es columna): si el usuario de esta
+  // solicitud hoy es parte del equipo. Esas filas no se gestionan desde acá.
+  equipo?: "administrador" | "moderador" | null;
 };
 
 // Lo que entra desde el formulario público, ya saneado. Nombre, email,
