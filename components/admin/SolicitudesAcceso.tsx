@@ -436,7 +436,17 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
                       >
                         {revocada ? "Revocado" : s.estado === "aprobada" ? "Aprobada" : "Rechazada"}
                       </span>
-                      {s.estado === "aprobada" && !revocada && (
+                      {/* Pasó al equipo: Accesos ya no lo gestiona (revocar le
+                          quitaría el rol; reenviar, la contraseña). */}
+                      {s.equipo && (
+                        <span
+                          className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-800"
+                          title="Es parte del equipo: no se gestiona desde Accesos"
+                        >
+                          Equipo · {s.equipo === "administrador" ? "Admin" : "Moderador"}
+                        </span>
+                      )}
+                      {s.estado === "aprobada" && !revocada && !s.equipo && (
                         <>
                           <button
                             onClick={() => reenviar(s.id)}
@@ -456,7 +466,7 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
                           </button>
                         </>
                       )}
-                      {revocada && (
+                      {revocada && !s.equipo && (
                         <button
                           onClick={() => revocar(s.id, "reactivar")}
                           disabled={busy[s.id]}

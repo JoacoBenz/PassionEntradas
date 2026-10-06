@@ -6,10 +6,15 @@ import AutoRefresh from "@/components/AutoRefresh";
 import BottomNav from "@/components/BottomNav";
 import SolicitudesAcceso from "@/components/admin/SolicitudesAcceso";
 import type { SolicitudAcceso } from "@/lib/acceso";
-import { isMock, MOCK_USER, mockListSolicitudes } from "@/lib/mock-db";
+import { isMock, MOCK_USER, mockEquipo, mockListSolicitudes } from "@/lib/mock-db";
+import { leerEquipo, type RolEquipo } from "@/lib/equipo";
 import { usuarioVerificado } from "@/lib/usuario-verificado";
 
 export const dynamic = "force-dynamic";
+
+function conEquipo(sols: SolicitudAcceso[], equipo: Map<string, RolEquipo>): SolicitudAcceso[] {
+  return sols.map((s) => ({ ...s, equipo: s.user_id ? equipo.get(s.user_id) ?? null : null }));
+}
 
 // Cola de solicitudes de acceso a la tienda (SOLO administrador). Aprobar crea
 // el usuario cliente y muestra las credenciales para enviarlas.
@@ -19,7 +24,7 @@ export default async function SolicitudesPage() {
 
   if (isMock()) {
     email = MOCK_USER.email;
-    solicitudes = mockListSolicitudes();
+    solicitudes = conEquipo(mockListSolicitudes(), mockEquipo());
   } else {
     const user = await usuarioVerificado();
     if (!user) redirect("/ingresar");
@@ -34,7 +39,10 @@ export default async function SolicitudesPage() {
       )
       .order("created_at", { ascending: false })
       .limit(500);
-    solicitudes = (data ?? []) as SolicitudAcceso[];
+    // Si no se puede leer Auth, la página igual carga; la API vuelve a chequear
+    // antes de revocar o reenviar.
+    const equipo = await leerEquipo(createAdminSupabase()).catch(() => new Map<string, RolEquipo>());
+    solicitudes = conEquipo((data ?? []) as SolicitudAcceso[], equipo);
   }
 
   return (

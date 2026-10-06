@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol, nombreDe } from "@/lib/auth";
 import { isMock, MOCK_USER, mockRevocarSolicitud } from "@/lib/mock-db";
+import { bloqueoEnAccesos, rolEquipoDe } from "@/lib/equipo";
 
 // POST /api/acceso/[id]/revocar — SOLO administrador. Revoca o reactiva el
 // acceso de un cliente aprobado. Revocar = quitarle el rol al usuario de Auth
@@ -61,6 +62,11 @@ export async function POST(
       { status: 409 }
     );
   }
+
+  // Accesos gestiona CLIENTES. Si esta persona hoy es del equipo, revocar le
+  // borraría el rol y reactivar la devolvería como cliente.
+  const bloqueo = bloqueoEnAccesos(await rolEquipoDe(admin, sol.user_id), accion);
+  if (bloqueo) return NextResponse.json({ error: bloqueo }, { status: 409 });
 
   const revocar = accion === "revocar";
   if (revocar && sol.revocada_at) {

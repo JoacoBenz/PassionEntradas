@@ -4,6 +4,7 @@ import { getRol } from "@/lib/auth";
 import { generarPassword, mensajeCredenciales } from "@/lib/acceso";
 import { emailConfigurado } from "@/lib/email";
 import { isMock, mockReenviarSolicitud } from "@/lib/mock-db";
+import { bloqueoEnAccesos, rolEquipoDe } from "@/lib/equipo";
 
 function randomCrypto(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0]! / 2 ** 32;
@@ -69,6 +70,10 @@ export async function POST(
       { status: 409 }
     );
   }
+
+  // A alguien del equipo no se le cambia la contraseña desde Accesos.
+  const bloqueo = bloqueoEnAccesos(await rolEquipoDe(admin, sol.user_id), "reenviar");
+  if (bloqueo) return NextResponse.json({ error: bloqueo }, { status: 409 });
 
   // Regenerar la contraseña del usuario cliente (la anterior no se guarda).
   const password = generarPassword(randomCrypto);

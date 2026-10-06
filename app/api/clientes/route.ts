@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { esStaff, getRol } from "@/lib/auth";
 import { rankearClientes, type ClienteCuenta, type CompraDeCliente } from "@/lib/clientes";
-import { isMock, mockListOps, mockListSolicitudes } from "@/lib/mock-db";
+import { isMock, mockEquipo, mockListOps, mockListSolicitudes } from "@/lib/mock-db";
+import { leerEquipo } from "@/lib/equipo";
 
 // GET /api/clientes — los clientes aprobados, ordenados por cuánto compraron.
 // Alimenta el desplegable de comprador en "nueva operación": antes se escribía
@@ -27,6 +28,7 @@ export async function GET() {
   if (isMock()) {
     cuentas = mockListSolicitudes()
       .filter((s) => s.estado === "aprobada" && s.user_id && !s.revocada_at)
+      .filter((s) => !mockEquipo().has(s.user_id as string))
       .map((s) => ({ id: s.user_id as string, nombre: s.nombre, email: s.email }));
     compras = mockListOps().map((o) => ({
       cliente_id: o.cliente_id,
@@ -46,7 +48,11 @@ export async function GET() {
       .is("revocada_at", null)
       .not("user_id", "is", null)
       .limit(2000);
-    cuentas = ((sols ?? []) as any[]).map((s) => ({
+    // Los que hoy son del equipo no son compradores (antes eran clientes).
+    const equipo = await leerEquipo(admin).catch(() => new Map());
+    cuentas = ((sols ?? []) as any[])
+      .filter((s) => !equipo.has(String(s.user_id)))
+      .map((s) => ({
       id: String(s.user_id),
       nombre: String(s.nombre ?? s.email ?? "Cliente"),
       email: String(s.email ?? ""),
