@@ -12,12 +12,19 @@
 8. Un-marking pago still returns the stock.
 9. No backfill.
 10. Staff created from the app (email + temporary password).
-11. Moderators can see the Clientes list. **Agustin Acosta → moderador** (done in production).
+11. Moderators can see the Clientes list. (Agustin Acosta was moved to moderador and then back to **administrador**; Emilia Gallo → administradora.)
 12. Pending requests stay on the "Accesos" page.
 13. Customer emails only on: **Confirmado**, **Para pagar**, **Entregada**.
 14. Email domain: later. Emails get built, but stay off until `EMAIL_FROM` is set.
 15. Staff get a bell in the Panel **and** WhatsApp.
 16. WhatsApp: reworked, see block 8.
+
+## Decisions (answers of 2026-10-08)
+
+17. Priority after **2 h** for an unconfirmed pedido and **4 h** for a consulta without a quote.
+18. **No quiet hours**: reminders go out at any time.
+19. Customers get the **bell in the store + email**, for the same 3 moments (Confirmado, Para pagar, Entregada). Until the email domain exists, the bell is their only notice.
+20. More than the stock left: **split**. The available amount goes as a pedido and the rest as a consulta (e.g. ask 5, 3 left → 3 pedido + 2 consulta).
 
 
 Branch `plan/backlog`, from `main` at #74. Each block below is planned as its
@@ -182,7 +189,7 @@ So WhatsApp is only for "someone has to act and you're probably not looking at t
   - New pedidos and reminders for an operation go to its **vendedor** if it has one, otherwise to everyone.
   - Consultas go to whoever can quote.
 
-**Quiet hours.** Reminders wait until morning; new pedidos are always sent (see question).
+**Quiet hours.** None (decision 18).
 
 **No duplicates.** Every notification is a row in the same `notificaciones` table the bell uses. The row records what was sent and to whom, so nothing is sent twice and failures stay visible in the panel, not only in the Vercel logs.
 
