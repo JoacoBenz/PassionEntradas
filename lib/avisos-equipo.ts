@@ -8,7 +8,7 @@
 // lista fija WHATSAPP_VENDEDORES (así el deploy no cambia nada).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { guardarAviso, actualizarAviso, type AvisoGuardado } from "./avisos";
+import { guardarAvisos, actualizarAviso, type AvisoGuardado, type NuevoAviso } from "./avisos";
 import { leerUsuarios, listarMiembros, type MiembroEquipo } from "./equipo";
 import { isMock, mockListConsultas, mockListOps, mockListUsuarios } from "./mock-db";
 import {
@@ -74,11 +74,11 @@ export async function avisarEquipo(
     const dest = destinatariosDe(equipo, aviso.tipo, aviso.roles);
     const alguienActivo = equipo.some(conWhatsapp);
 
-    const nuevos: { m: MiembroEquipo; fila: AvisoGuardado }[] = [];
-    for (const m of dest) {
-      const fila = await guardarAviso(admin, {
+    const filas = await guardarAvisos(
+      admin,
+      dest.map((m) => ({
         clave: claveAvisoEquipo(m.id, aviso.tipo, aviso.ref),
-        audiencia: "equipo",
+        audiencia: "equipo" as const,
         destinatario_id: m.id,
         destinatario_email: m.email,
         tipo: aviso.tipo,
@@ -86,11 +86,14 @@ export async function avisarEquipo(
         consulta_id: aviso.consulta_id ?? null,
         datos: aviso.datos,
         url: urlPara(m, aviso.url),
-        email_estado: "no_aplica",
-        whatsapp_estado: enviarWhatsapp && conWhatsapp(m) ? "pendiente" : "no_aplica",
-      });
-      if (fila) nuevos.push({ m, fila });
-    }
+        email_estado: "no_aplica" as const,
+        whatsapp_estado: enviarWhatsapp && conWhatsapp(m) ? ("pendiente" as const) : ("no_aplica" as const),
+      }))
+    );
+    const nuevos = filas.flatMap((fila) => {
+      const m = dest.find((d) => d.id === fila.destinatario_id);
+      return m ? [{ m, fila }] : [];
+    });
     if (!enviarWhatsapp) return { nuevos: nuevos.length, whatsapp: null };
     if (nuevos.length === 0) {
       // Ya avisado (misma clave): nada. Pero si la tabla todavía no existe
@@ -187,26 +190,37 @@ export async function correrRecordatorios(
   let whatsapps = 0;
   const nuevosParaLista = new Map<string, Pendiente>();
 
+  // UNA escritura para todo (persona × pendiente); vuelven solo los nuevos.
+  const filas: { m: MiembroEquipo; p: Pendiente; aviso: NuevoAviso }[] = [];
   for (const m of equipo) {
-    const suyos = ps.filter((p) => m.rol === "administrador" || paraModeradores(`recordatorio_${p.tipo}`));
-    const nuevos: { p: Pendiente; fila: AvisoGuardado }[] = [];
-    for (const p of suyos) {
+    for (const p of ps) {
       const tipo = `recordatorio_${p.tipo}` as TipoAvisoEquipo;
-      const fila = await guardarAviso(admin, {
-        clave: claveAvisoEquipo(m.id, tipo, p.ref),
-        audiencia: "equipo",
-        destinatario_id: m.id,
-        destinatario_email: m.email,
-        tipo,
-        operacion_id: p.clase === "op" ? p.ref : null,
-        consulta_id: p.clase === "consulta" ? p.ref : null,
-        datos: { code: p.code, evento: p.evento },
-        url: urlPara(m, `/admin?q=${encodeURIComponent(p.code)}`),
-        email_estado: "no_aplica",
-        whatsapp_estado: conWhatsapp(m) ? "pendiente" : "no_aplica",
+      if (m.rol !== "administrador" && !paraModeradores(tipo)) continue;
+      filas.push({
+        m,
+        p,
+        aviso: {
+          clave: claveAvisoEquipo(m.id, tipo, p.ref),
+          audiencia: "equipo",
+          destinatario_id: m.id,
+          destinatario_email: m.email,
+          tipo,
+          operacion_id: p.clase === "op" ? p.ref : null,
+          consulta_id: p.clase === "consulta" ? p.ref : null,
+          datos: { code: p.code, evento: p.evento },
+          url: urlPara(m, `/admin?q=${encodeURIComponent(p.code)}`),
+          email_estado: "no_aplica",
+          whatsapp_estado: conWhatsapp(m) ? "pendiente" : "no_aplica",
+        },
       });
-      if (fila) nuevos.push({ p, fila });
     }
+  }
+  const guardados = new Map((await guardarAvisos(admin, filas.map((f) => f.aviso))).map((g) => [g.clave, g]));
+
+  for (const m of equipo) {
+    const nuevos: { p: Pendiente; fila: AvisoGuardado }[] = filas
+      .filter((f) => f.m.id === m.id && guardados.has(f.aviso.clave))
+      .map((f) => ({ p: f.p, fila: guardados.get(f.aviso.clave)! }));
     avisosNuevos += nuevos.length;
     if (nuevos.length === 0) continue;
     if (!alguienActivo) {

@@ -28,6 +28,8 @@ Next.js con un solo proyecto de Supabase:
 | `/admin`             | Panel: lista y estados de operaciones               | administrador  |
 | `/admin/entradas`    | Panel: carga manual de entradas + salud del worker  | administrador  |
 | `/admin/solicitudes` | Panel: cola de solicitudes de acceso (aprobar/rechazar/revocar) | administrador |
+| `/admin/equipo`      | Panel: equipo (alta, rol, desactivar, avisos por WhatsApp) | administrador |
+| `/admin/clientes`    | Panel: clientes con sus pedidos (revocar/reactivar)  | admin / moderador |
 | `/admin/cuenta`      | Panel: datos y contraseña del staff                 | staff logueado |
 | `/moderador`         | Carga de operaciones nuevas                         | staff logueado |
 | `/admin/login`       | Alias histórico: redirige a `/ingresar`             | —              |

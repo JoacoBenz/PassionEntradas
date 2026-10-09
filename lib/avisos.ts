@@ -52,6 +52,24 @@ export async function guardarAviso(admin: SupabaseClient | null, a: NuevoAviso):
   return ((data ?? [])[0] as AvisoGuardado | undefined) ?? null;
 }
 
+/**
+ * Varios avisos en UNA escritura. Devuelve solo los nuevos (los que ya
+ * existían por clave no vuelven). [] si falló (no se reenvía nada a ciegas).
+ */
+export async function guardarAvisos(admin: SupabaseClient | null, avisos: NuevoAviso[]): Promise<AvisoGuardado[]> {
+  if (avisos.length === 0) return [];
+  if (isMock() || !admin) return avisos.map(mockGuardarAviso).filter((a): a is AvisoGuardado => a !== null);
+  const { data, error } = await admin
+    .from("notificaciones")
+    .upsert(avisos, { onConflict: "clave", ignoreDuplicates: true })
+    .select(COLUMNAS);
+  if (error) {
+    console.error(`[avisos] no se pudieron guardar ${avisos.length} avisos: ${error.message}`);
+    return [];
+  }
+  return (data ?? []) as AvisoGuardado[];
+}
+
 export async function actualizarAviso(
   admin: SupabaseClient | null,
   id: string,
