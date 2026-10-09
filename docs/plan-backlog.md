@@ -7,7 +7,7 @@
 3. Clickable metrics: the Panel cards **and** the Métricas money cards.
 4. Map: automatic color highlight, but only when the color match is ≥ 90%; otherwise the current chip.
 5. Stock: **unchanged**. It is still taken only when the client pays.
-6. More than the stock left → the line goes as "a consultar" (it shouldn't happen, since the cart caps it).
+6. ~~More than the stock left → the line goes as "a consultar".~~ Superseded by decision 20 (split).
 7. No auto-cancel. A pedido left hanging becomes a **priority** (top of the list, red age badge, bell, WhatsApp).
 8. Un-marking pago still returns the stock.
 9. No backfill.
@@ -27,9 +27,9 @@
 20. More than the stock left: **split**. The available amount goes as a pedido and the rest as a consulta (e.g. ask 5, 3 left → 3 pedido + 2 consulta).
 
 
-Branch `plan/backlog`, from `main` at #74. Each block below is planned as its
-own PR (with its migration, if any) so it can be tested and merged alone.
-Open questions are at the end of each block; answers go back into this file.
+Branch `plan/backlog`, from `main` at #74. The Accesos bug from block 6
+shipped on its own in #76; blocks 1–8 are implemented together in #77
+(migrations 0044 and 0045). All open questions are answered above.
 
 Production snapshot (2026-10-05):
 - 5 operations, 3 of them open and unpaid.
@@ -45,14 +45,14 @@ Production snapshot (2026-10-05):
 **Today: 6 `confirm()` pop-ups.**
 - Accesos (3): reject request, resend access (new password), revoke/reactivate (`components/admin/SolicitudesAcceso.tsx:80,131,167`).
 - Mis pedidos (3): accept quote, reject quote, cancel order/consult (`components/tienda/MisPedidos.tsx:133,155`).
-- The panel's "Cancelar operación" has **no** confirmation at all.
+- The panel's "Cancelar operación" already had its own two-step confirmation ("¿Confirmás cancelar?"); it now uses the shared component.
 
 **Plan.**
 - One shared `ConfirmarBoton` component. The first tap turns the button into "¿Seguro? **Sí, cancelar** · No", inline in the same spot.
 - It resets after ~5 s or on tapping elsewhere.
 - No modal: it works the same on phone and desktop, and it is keyboard-accessible.
-- It replaces the 6 pop-ups.
-- Destructive actions also get a confirmation: cancelling an operation in the panel, and discarding a consult.
+- It replaces the 6 pop-ups and the panel's own cancel confirmation.
+- Discarding a consult also gets a confirmation.
 
 ## 2. Confirmation step before "Enviar pedido"
 
@@ -63,7 +63,7 @@ Production snapshot (2026-10-05):
 - A total per currency.
 - What happens next: "no se cobra nada ahora; te confirmamos y te pasamos cómo pagar".
 - Buttons: **Confirmar y enviar** / Volver.
-- A double tap can't send twice: the button disables while sending, and the server already de-duplicates.
+- A double tap can't send twice: the button disables while sending, and taps right after the review opens are ignored. (The server does **not** de-duplicate orders, so the guard is on the client.)
 
 ## 3. Clickable metrics in "Panel"
 
@@ -75,6 +75,8 @@ Production snapshot (2026-10-05):
 - **A cotizar** and **Esperando cliente** need 2 new filters that show only consults in that state. Today consults never filter by state.
 
 ## 4. Colored sector marker on the stadium map
+
+> Decided: option A (decision 4). When two different zones of the same event match the same map color, neither is highlighted and both keep the chip.
 
 **Today.**
 - A sector has `zona_color` (hex) shown as a dot and text chip, plus one map image per event.
@@ -91,9 +93,9 @@ Production snapshot (2026-10-05):
   - Exact, but it means manual work on ~255 maps, and new Passion maps start without pins.
 - **C. Hybrid.** Automatic by default, plus manual pins where the automatic one is wrong.
 
-## 5. Stock (decided: unchanged; only the "more than stock → consultar" rule)
+## 5. Stock (decided: unchanged; only the over-stock split)
 
-> Superseded by decisions 5–9. The analysis below is kept for reference. The only change is this: when an order line for an own ticket asks for more than the stock left (or the stock is 0), the server turns that line into a consulta instead of a pedido.
+> Superseded by decisions 5–9 and 20. The analysis below is kept for reference. The only change is this: when an order line for an own ticket asks for more than the stock left, the server **splits** it: the stock left goes as a pedido and the rest as a consulta (ask 5 with 3 left → 3 pedido + 2 consulta; 0 left → all consulta).
 
 ### Original analysis
 
@@ -102,18 +104,19 @@ Production snapshot (2026-10-05):
 - It only applies to **own** tickets (`manual::…`). Passion stock is overwritten by the worker every 5 min from the portal, so the app never touches it.
 - The store caps the cart at the visible stock. The server does not block a sold-out own ticket (stock 0 counts as "no data"), and nothing is reserved between order and payment.
 
-**Plan.**
-- Stock is taken for own tickets as soon as an operation exists (store order, staff-created op, accepted quote). It stays when paid/delivered and is returned when cancelled (by client or admin). Reopening takes it again.
-- Same SQL function (`stock_operacion`), so the move is atomic and recorded per line in `stock_descontado`.
-- One migration to take stock for the open unpaid ops that exist today.
+**Original plan (dropped by decision 5, not built).**
+- ~~Stock is taken for own tickets as soon as an operation exists (store order, staff-created op, accepted quote). It stays when paid/delivered and is returned when cancelled (by client or admin). Reopening takes it again.~~
+- ~~Same SQL function (`stock_operacion`), so the move is atomic and recorded per line in `stock_descontado`.~~
+- ~~One migration to take stock for the open unpaid ops that exist today.~~
 
 ## 6. "Equipo / Clientes" admin screen (+ Accesos bug)
 
-**Bug found.**
-- `revocar/route.ts:75-77` writes `role: null` on revoke and hardcodes `role: "cliente"` on reactivate.
-- A staff member who also has an access request (e.g. a client later made admin) loses their staff role on Revocar→Restaurar.
-- "Reenviar acceso" also resets their password, and `/api/clientes` lists them as a client.
-- No check prevents an admin from doing this to themselves.
+**Bug found (fixed in #76).**
+- `revocar/route.ts:75-77` wrote `role: null` on revoke and hardcoded `role: "cliente"` on reactivate.
+- A staff member who also had an access request (e.g. a client later made admin) lost their staff role on Revocar→Restaurar.
+- "Reenviar acceso" also reset their password, and `/api/clientes` listed them as a client.
+- No check prevented an admin from doing this to themselves.
+- Since #76, staff are no longer managed from Accesos at all.
 
 **Today.**
 - No way to create staff or change roles from the app (only the Supabase dashboard).
@@ -131,7 +134,7 @@ Production snapshot (2026-10-05):
   - Every client with orders, open orders, total bought per currency, and last order.
   - Click → their orders in the panel.
   - Revoke/reactivate.
-  - "Accesos" (pending requests) stays as is or moves in here (see question).
+  - "Accesos" (pending requests) stays on its own page (decision 12).
 - Every role change is logged: who, when, from→to.
 
 ## 7. Customer bell and emails (PR E)
@@ -141,17 +144,15 @@ Production snapshot (2026-10-05):
 - No status-change emails, no "your quote is ready", no bell.
 - Resend is wired (`lib/email.ts`) but production needs `RESEND_API_KEY` + `EMAIL_FROM` on a verified domain.
 
-**Plan.**
-- **Emails to the customer, in their language (es/en):**
-  - Pedido recibido.
+**Plan (narrowed by decisions 13, 14 and 19).**
+- **Emails to the customer, in their language (es/en), only for three moments:**
   - Confirmado.
   - **Para pagar** (with the payment text per currency).
-  - Pagado.
   - Entregada.
-  - Cotización lista (with expiry).
-  - Cotización por vencer.
-- Each email links to the order page.
-- **Bell in the store header:** unread count plus a list of the same events, marked read on open. Backed by a `notificaciones` table filled by the same code that sends the emails.
+- Only when the order moves **forward**: un-marking a step or reopening sends nothing.
+- They stay off until `EMAIL_FROM` is set (decision 14). Until then the bell is the customer's only notice.
+- Each email links to Mis pedidos.
+- **Bell in the store header:** unread count plus a list of the same three moments, marked read on open. Backed by a `notificaciones` table filled by the same code that sends the emails. The panel's order card shows what the customer was notified of and whether the email went out.
 
 ## 8. WhatsApp for staff (reworked)
 
@@ -172,8 +173,8 @@ So WhatsApp is only for "someone has to act and you're probably not looking at t
 
    It's one short line plus a link that opens that exact operation. This reuses `nuevo_pedido` / `nuevo_acceso`, plus one new generic `aviso_operacion` template.
 2. **Reminder: left hanging** (decision 7). One message per item, never repeated:
-   - A pedido unconfirmed after **X h**.
-   - A consulta not quoted after **X h**.
+   - A pedido unconfirmed after **2 h** (decision 17).
+   - A consulta not quoted after **4 h** (decision 17).
    - A quote expiring in < 6 h.
    - An event in < 48 h that isn't delivered yet.
 
@@ -186,18 +187,22 @@ So WhatsApp is only for "someone has to act and you're probably not looking at t
 **Who gets what.**
 - Each staff member uses the phone in their profile (it already exists in "Mi cuenta"), with an on/off switch in Equipo.
 - Instead of one global list (`WHATSAPP_VENDEDORES`):
-  - New pedidos and reminders for an operation go to its **vendedor** if it has one, otherwise to everyone.
-  - Consultas go to whoever can quote.
+  - Notices and reminders for an operation go to its **vendedor** when the vendedor names exactly one team member who can act on it (full name, first name or email); otherwise to everyone with the right role.
+  - Consultas go to whoever can quote (admins and moderators), including a customer cancelling one.
+- `WHATSAPP_VENDEDORES` stays as the fallback: it is used only while nobody on the team has the switch on, so the deploy changes nothing until someone turns it on.
 
 **Quiet hours.** None (decision 18).
 
-**No duplicates.** Every notification is a row in the same `notificaciones` table the bell uses. The row records what was sent and to whom, so nothing is sent twice and failures stay visible in the panel, not only in the Vercel logs.
+**No duplicates.** Every notification is a row in the same `notificaciones` table the bell uses. The row records what was sent and to whom (the person's phone or the fallback list), so nothing is sent twice and failures stay visible in the panel's bell with the reason, not only in the Vercel logs.
 
-## Proposed order
+## Order (as done)
 
-1. **UX batch, no migrations:** 1 + 2 + 3.
-2. **Equipo / Clientes**, including the Accesos bug fix: 6.
-3. **Stock at creation:** 5.
-4. **Map highlight:** 4.
-5. **Customer emails + bell:** 7.
-6. **WhatsApp digest:** 8. It reuses 3's filters and 7's event list.
+1. **Accesos bug fix** (block 6): #76, merged.
+2. **Blocks 1–8**, together in #77:
+   - UX batch: 1 + 2 + 3.
+   - Equipo / Clientes: 6 (migration 0044).
+   - Over-stock split: 5 (no migration; stock at creation was dropped).
+   - Map highlight: 4.
+   - Customer bell + emails: 7 (migration 0045).
+   - Staff bell, WhatsApp and reminders: 8 (migration 0045). It reuses 3's filters.
+3. **Release:** apply 0044 and 0045, merge #77, redeploy the worker, create and approve the `aviso_operacion` template and set `WHATSAPP_TEMPLATE_AVISO`. Later: `RESEND_API_KEY` and `EMAIL_FROM` for customer emails.
