@@ -7,6 +7,7 @@ import ConfirmarBoton from "@/components/ConfirmarBoton";
 import { fechaDia } from "@/lib/fechas";
 import { formatMonto, type Moneda } from "@/lib/operaciones";
 import type { FichaCliente } from "@/lib/clientes";
+import { urlPanel } from "@/lib/panel-filtros";
 
 // Pantalla Clientes: cada cliente con lo que pidió. El moderador la ve (para
 // saber a quién le carga); revocar/reactivar y el link al Panel son del admin.
@@ -135,7 +136,10 @@ export default function ClientesPanel({ fichas, esAdmin }: { fichas: FichaClient
                   {esAdmin && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {f.ultimoPedido && (
-                        <Link href={`/admin?q=${encodeURIComponent(f.email)}`} className={btnGhost}>
+                        <Link
+                          href={urlPanel({ filtro: "todas", cliente: { id: f.id, email: f.email.toLowerCase(), nombre: f.nombre } })}
+                          className={btnGhost}
+                        >
                           Ver sus pedidos
                         </Link>
                       )}

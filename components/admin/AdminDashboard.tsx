@@ -78,7 +78,8 @@ export default function AdminDashboard({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<FiltroPanel>(filtroInicial);
   const filter = filtro.filtro;
-  const setFilter = (f: Filtro) => setFiltro({ filtro: f });
+  // Cambiar de pestaña o de tarjeta conserva el cliente elegido (si hay).
+  const setFilter = (f: Filtro) => setFiltro((prev) => ({ filtro: f, ...(prev.cliente ? { cliente: prev.cliente } : {}) }));
   const listaRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState(busquedaInicial);
   const [sort, setSort] = useState<"recientes" | "urgentes">("recientes");
@@ -227,16 +228,31 @@ export default function AdminDashboard({
   // Tarjeta del resumen: filtra la lista y la trae a la vista. Tocar la
   // activa la saca.
   function tocarTarjeta(f: Filtro) {
-    setFiltro(filter === f ? { filtro: "todas" } : { filtro: f });
+    setFilter(filter === f ? "todas" : f);
     if (filter !== f) listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   // Al abrir con un filtro de la URL, la lista ya arranca a la vista.
   useEffect(() => {
-    if (filtroInicial.filtro !== "todas") listaRef.current?.scrollIntoView({ block: "start" });
+    if (filtroInicial.filtro !== "todas" || filtroInicial.cliente || busquedaInicial)
+      listaRef.current?.scrollIntoView({ block: "start" });
     // Solo al montar: después manda el estado local.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Si la URL cambia estando ya en el Panel (un aviso de la campana, un link de
+  // Clientes), la página no se vuelve a montar: el filtro y la búsqueda se
+  // aplican acá. Un refresco con la misma URL no pisa lo que se eligió a mano.
+  const firmaUrl = JSON.stringify([filtroInicial, busquedaInicial]);
+  const primeraFirma = useRef(firmaUrl);
+  useEffect(() => {
+    if (firmaUrl === primeraFirma.current) return;
+    primeraFirma.current = firmaUrl;
+    setFiltro(filtroInicial);
+    setQuery(busquedaInicial);
+    listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaUrl]);
   const chip = etiquetaFiltro(filtro);
 
   function irAPagina(n: number) {
@@ -550,17 +566,30 @@ export default function AdminDashboard({
       )}
 
       {/* Filtro que vino de una tarjeta y no es pestaña: se ve y se saca. */}
-      {chip && (
-        <div className="-mt-3 mb-4 flex">
-          <button
-            type="button"
-            onClick={() => setFilter("todas")}
-            className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-xs font-semibold text-white"
-            aria-label={`Quitar filtro: ${chip}`}
-          >
-            {chip}
-            <span aria-hidden>✕</span>
-          </button>
+      {(chip || filtro.cliente) && (
+        <div className="-mt-3 mb-4 flex flex-wrap gap-2">
+          {filtro.cliente && (
+            <button
+              type="button"
+              onClick={() => setFiltro((prev) => ({ ...prev, cliente: undefined }))}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-cobalt px-3 py-1 text-left text-xs font-semibold text-white"
+              aria-label={`Quitar filtro de cliente: ${filtro.cliente.nombre ?? filtro.cliente.email}`}
+            >
+              <span className="[overflow-wrap:anywhere]">Cliente: {filtro.cliente.nombre ?? filtro.cliente.email}</span>
+              <span aria-hidden>✕</span>
+            </button>
+          )}
+          {chip && (
+            <button
+              type="button"
+              onClick={() => setFilter("todas")}
+              className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-xs font-semibold text-white"
+              aria-label={`Quitar filtro: ${chip}`}
+            >
+              {chip}
+              <span aria-hidden>✕</span>
+            </button>
+          )}
         </div>
       )}
 

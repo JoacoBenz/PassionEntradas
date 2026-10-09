@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { capaDeFoco, colorDeZona, deltaE, hexARgb, mascaraDeZona, paletaDelMapa, similitud, type Rgb } from "./mapa-foco";
+import { capaDeFoco, colorDeZona, deltaE, hexARgb, mascaraDeZona, paletaDelMapa, similitud, zonasMarcables, type Rgb } from "./mapa-foco";
 
 // Mapa sintético: fondo blanco (60 %), una zona roja (20 %) y una azul (20 %),
 // con un "número" blanco adentro de la roja.
@@ -75,5 +75,19 @@ describe("mascaraDeZona / capaDeFoco", () => {
     expect(px(30, 10)[3]).toBeGreaterThan(100); // afuera: oscuro
     expect(px(2, 10)).toEqual([0, 0, 0, 0]); // adentro: transparente
     expect(px(9, 10)).toEqual([255, 255, 255, 255]); // borde
+  });
+});
+
+describe("zonasMarcables", () => {
+  const { data, ancho, alto } = mapa();
+  const paleta = paletaDelMapa(data, ancho, alto);
+  it("marca las zonas con un color propio en el mapa", () => {
+    const m = zonasMarcables(paleta, ["#BF191F", "#1f5fbf", "#BF191F", "verde", "#F2B705"]);
+    expect(Array.from(m.keys()).sort()).toEqual(["#1F5FBF", "#BF191F"]);
+  });
+  it("dos zonas distintas en el mismo color del mapa: ninguna se marca (queda el chip)", () => {
+    // A+ (#B01815) y A+ Low (#BF191F) caen en el mismo rojo del mapa.
+    const m = zonasMarcables(paleta, ["#BF191F", "#B01815", "#1F5FBF"]);
+    expect(Array.from(m.keys())).toEqual(["#1F5FBF"]);
   });
 });

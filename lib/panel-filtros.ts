@@ -48,7 +48,13 @@ export type FiltroPanel = {
   moneda?: Moneda;
   desde?: string; // YYYY-MM-DD, día del pago en hora argentina
   hasta?: string;
+  // Solo los pedidos de UN cliente ("Ver sus pedidos" en Clientes): por su
+  // cuenta, o por su email EXACTO para lo cargado a mano sin vincular. Antes
+  // era la búsqueda de texto y ana@gmail.com traía también a mariana@gmail.com.
+  cliente?: { id: string; email: string; nombre?: string };
 };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const FILTROS = new Set<Filtro>([
   ...PESTANAS.map((p) => p.key),
@@ -67,8 +73,15 @@ export function filtroDeParams(p: Record<string, string | string[] | undefined> 
     return typeof v === "string" ? v : undefined;
   };
   const f = uno("filtro");
-  if (!f || !FILTROS.has(f as Filtro)) return { filtro: "todas" };
-  const out: FiltroPanel = { filtro: f as Filtro };
+  const out: FiltroPanel = { filtro: f && FILTROS.has(f as Filtro) ? (f as Filtro) : "todas" };
+  const cid = uno("cliente");
+  if (cid && UUID.test(cid)) {
+    out.cliente = {
+      id: cid.toLowerCase(),
+      email: (uno("email") ?? "").trim().toLowerCase().slice(0, 200),
+      ...(uno("nombre") ? { nombre: (uno("nombre") as string).slice(0, 80) } : {}),
+    };
+  }
   if (f === "cobradas" || f === "sin_cobrar") {
     const m = uno("moneda");
     if (m === "USD" || m === "ARS") out.moneda = m;
@@ -86,7 +99,12 @@ export function filtroDeParams(p: Record<string, string | string[] | undefined> 
 
 /** URL del Panel con ese filtro (para las tarjetas de Métricas). */
 export function urlPanel(f: FiltroPanel): string {
-  const qs = new URLSearchParams({ filtro: f.filtro });
+  const qs = new URLSearchParams(f.filtro !== "todas" || !f.cliente ? { filtro: f.filtro } : {});
+  if (f.cliente) {
+    qs.set("cliente", f.cliente.id);
+    if (f.cliente.email) qs.set("email", f.cliente.email);
+    if (f.cliente.nombre) qs.set("nombre", f.cliente.nombre);
+  }
   if (f.moneda) qs.set("moneda", f.moneda);
   if (f.desde) qs.set("desde", f.desde);
   if (f.hasta) qs.set("hasta", f.hasta);
@@ -108,6 +126,8 @@ export function etiquetaFiltro(f: FiltroPanel): string | null {
 
 type OpFiltrable = Pick<
   Operacion,
+  | "cliente_id"
+  | "cliente_email"
   | "id"
   | "code"
   | "evento"
@@ -123,7 +143,17 @@ type OpFiltrable = Pick<
   | "cerrada_at"
 >;
 
+/** ¿Es de ese cliente? Por su cuenta, o por su email exacto si no se vinculó. */
+export function esDelCliente(
+  x: { cliente_id?: string | null; cliente_email?: string | null },
+  c: NonNullable<FiltroPanel["cliente"]>
+): boolean {
+  if (x.cliente_id) return x.cliente_id.toLowerCase() === c.id;
+  return !!c.email && (x.cliente_email ?? "").trim().toLowerCase() === c.email;
+}
+
 export function opCoincide(op: OpFiltrable, f: FiltroPanel, ahora: Date = new Date()): boolean {
+  if (f.cliente && !esDelCliente(op, f.cliente)) return false;
   const estado = estadoDe(op);
   const moneda = op.moneda ?? "USD";
   switch (f.filtro) {
@@ -165,10 +195,12 @@ export function opCoincide(op: OpFiltrable, f: FiltroPanel, ahora: Date = new Da
 }
 
 export function consultaCoincide(
-  c: Pick<Consulta, "id" | "code" | "evento" | "estado" | "vence_at" | "created_at">,
+  c: Pick<Consulta, "id" | "code" | "evento" | "estado" | "vence_at" | "created_at"> &
+    Partial<Pick<Consulta, "cliente_id" | "cliente_email">>,
   f: FiltroPanel,
   ahora: Date = new Date()
 ): boolean {
+  if (f.cliente && !esDelCliente(c, f.cliente)) return false;
   switch (f.filtro) {
     // Trabajo pendiente: va donde se mira lo que falta hacer.
     case "todas":

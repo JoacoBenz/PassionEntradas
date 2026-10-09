@@ -8,7 +8,7 @@
 // marca. Se analiza una vez por tarjeta abierta y en tamaño reducido.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { capaDeFoco, colorDeZona, hexARgb, mascaraDeZona, paletaDelMapa, type Rgb } from "@/lib/mapa-foco";
+import { capaDeFoco, hexARgb, mascaraDeZona, paletaDelMapa, zonasMarcables, type Rgb } from "@/lib/mapa-foco";
 
 // Ancho máximo al que se analiza: alcanza para marcar zonas y es rápido.
 const ANCHO_ANALISIS = 480;
@@ -46,11 +46,8 @@ export function useFocoMapa(src: string | null, hexas: string[], activo: boolean
         // Tira si el mapa no permite leerse (sin CORS): queda sin marcas.
         const { data } = ctx.getImageData(0, 0, ancho, alto);
         const paleta = paletaDelMapa(data, ancho, alto);
-        const colores = new Map<string, Rgb>();
-        for (const hex of firma.split(",")) {
-          const rgb = colorDeZona(paleta, hex);
-          if (rgb) colores.set(hex, rgb);
-        }
+        // Las que comparten color con otra zona del evento quedan afuera.
+        const colores = zonasMarcables(paleta, firma.split(","));
         setAnalisis({ data, ancho, alto, colores });
       } catch {
         /* sin marca: queda el chip de color */

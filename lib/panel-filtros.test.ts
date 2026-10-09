@@ -100,6 +100,37 @@ describe("prioridad", () => {
   });
 });
 
+describe("cliente (Ver sus pedidos)", () => {
+  const ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const c = { id: ID, email: "ana@gmail.com", nombre: "Ana" };
+  it("se lee de la URL y vuelve igual", () => {
+    const url = new URL(urlPanel({ filtro: "todas", cliente: c }), "https://x.test");
+    expect(url.searchParams.get("filtro")).toBeNull();
+    expect(filtroDeParams(Object.fromEntries(url.searchParams))).toEqual({ filtro: "todas", cliente: c });
+    expect(filtroDeParams({ cliente: "no-es-un-id" })).toEqual({ filtro: "todas" });
+    expect(filtroDeParams({ filtro: "en_curso", cliente: ID.toUpperCase(), email: " ANA@gmail.com " })).toEqual({
+      filtro: "en_curso",
+      cliente: { id: ID, email: "ana@gmail.com" },
+    });
+  });
+  it("exacto: por cuenta, o por email exacto si no se vinculó (mariana@ no es ana@)", () => {
+    const f = { filtro: "todas" as const, cliente: c };
+    expect(opCoincide(op({ cliente_id: ID }), f)).toBe(true);
+    expect(opCoincide(op({ cliente_id: "otro" }), f)).toBe(false);
+    expect(opCoincide(op({ cliente_id: null, cliente_email: "Ana@Gmail.com" }), f)).toBe(true);
+    expect(opCoincide(op({ cliente_id: null, cliente_email: "mariana@gmail.com" }), f)).toBe(false);
+    // Vinculada a otra cuenta con el mismo email: manda la cuenta.
+    expect(opCoincide(op({ cliente_id: "otro", cliente_email: "ana@gmail.com" }), f)).toBe(false);
+  });
+  it("se combina con los demás filtros y con las consultas", () => {
+    const AH = new Date("2026-10-09T12:00:00Z");
+    expect(opCoincide(op({ cliente_id: ID, status: "cancelada" }), { filtro: "en_curso", cliente: c })).toBe(false);
+    const cons = { id: "x", code: "C", evento: "E", estado: "pendiente" as const, vence_at: null, created_at: "2026-10-09T11:00:00Z" };
+    expect(consultaCoincide({ ...cons, cliente_id: ID }, { filtro: "todas", cliente: c }, AH)).toBe(true);
+    expect(consultaCoincide({ ...cons, cliente_id: "otro" }, { filtro: "todas", cliente: c }, AH)).toBe(false);
+  });
+});
+
 describe("etiquetaFiltro", () => {
   it("solo para filtros de tarjeta", () => {
     expect(etiquetaFiltro({ filtro: "en_curso" })).toBeNull();

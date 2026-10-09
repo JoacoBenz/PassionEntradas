@@ -123,6 +123,26 @@ export function colorDeZona(paleta: ColorDelMapa[], hex: string | null | undefin
 }
 
 /**
+ * Las zonas que se pueden marcar en este mapa: hexa (en mayúsculas) -> color
+ * del mapa. Si dos zonas DISTINTAS del evento caen en el mismo color del
+ * mapa (A+ y A+ Low pintadas con el mismo rojo), ninguna de las dos se marca:
+ * se iluminaba el mismo sector para las dos y el cliente no sabía cuál era el
+ * suyo. Esas quedan con el chip de color de siempre.
+ */
+export function zonasMarcables(paleta: ColorDelMapa[], hexas: string[]): Map<string, Rgb> {
+  const unicas = Array.from(new Set(hexas.filter((h) => hexARgb(h)).map((h) => h.trim().toUpperCase())));
+  const resueltas = unicas
+    .map((hex) => ({ hex, rgb: colorDeZona(paleta, hex) }))
+    .filter((z): z is { hex: string; rgb: Rgb } => z.rgb !== null);
+  const out = new Map<string, Rgb>();
+  for (const z of resueltas) {
+    const compartido = resueltas.some((o) => o.hex !== z.hex && deltaE(o.rgb, z.rgb) <= DELTA_PIXEL);
+    if (!compartido) out.set(z.hex, z.rgb);
+  }
+  return out;
+}
+
+/**
  * Máscara de la zona: 1 donde el píxel es del color de la zona. Se "engorda"
  * `radio` píxeles para tapar los números y las líneas finas dentro de la zona.
  */
