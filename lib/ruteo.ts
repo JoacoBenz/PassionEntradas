@@ -32,6 +32,9 @@ export function inicioDe(rol: Rol | null): string {
   return rol === "administrador" ? "/admin" : rol === "moderador" ? "/moderador" : "/entradas";
 }
 
+// Páginas de /admin que también abre un moderador.
+const RUTAS_MODERADOR = new Set(["/admin/cuenta", "/admin/clientes"]);
+
 export type Decision =
   | { accion: "seguir" }
   | { accion: "redirigir"; a: string }
@@ -73,9 +76,9 @@ export function decidirRuteo(
     return zona === "panel" ? { accion: "redirigir", a: "/entradas" } : { accion: "seguir" };
   }
 
-  // Moderador: su módulo, no el de administración. La excepción es su propia
-  // cuenta (cambiar la contraseña).
-  if (rol === "moderador" && path.startsWith("/admin") && path !== "/admin/cuenta") {
+  // Moderador: su módulo, no el de administración. Las excepciones: su propia
+  // cuenta (cambiar la contraseña) y la lista de Clientes, que también ve.
+  if (rol === "moderador" && path.startsWith("/admin") && !RUTAS_MODERADOR.has(path)) {
     return { accion: "redirigir", a: "/moderador" };
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { whatsappMessage, type Consulta, type Moneda, type Operacion } from "@/lib/operaciones";
 import ConsultaCard from "@/components/admin/ConsultaCard";
 import NewOperacionForm from "@/components/admin/NewOperacionForm";
@@ -16,6 +17,7 @@ type Props = {
   baseUrl: string;
   prefill?: { evento?: string; ticketId?: string };
   enlacesPanel?: boolean;
+  enlaceClientes?: boolean;
 };
 
 // Módulo del moderador: carga la entrada a vender con los datos de
@@ -27,6 +29,7 @@ export default function ModeradorDashboard({
   baseUrl,
   prefill,
   enlacesPanel = false,
+  enlaceClientes = false,
 }: Props) {
   const [ops, setOps] = useState<Operacion[]>(initial);
   // Lista viva: AutoRefresh vuelve a pedir la página cada tanto y `initial`
@@ -129,6 +132,13 @@ export default function ModeradorDashboard({
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
       {/* Resumen */}
+      {enlaceClientes && (
+        <div className="mb-3 flex justify-end">
+          <Link href="/admin/clientes" className="text-xs font-semibold text-brand hover:underline">
+            Ver clientes →
+          </Link>
+        </div>
+      )}
       <MetricsBoard metrics={metrics} enlacesPanel={enlacesPanel} />
 
       {/* Módulo de carga: el foco de esta página, a lo ancho y arriba de todo. */}

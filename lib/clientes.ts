@@ -84,3 +84,75 @@ export function rankearClientes(
     return a.nombre.localeCompare(b.nombre, "es");
   });
 }
+
+// ---- Pantalla Clientes -----------------------------------------------------
+// Cada cliente con lo que pidió: cuántas operaciones, cuántas siguen
+// abiertas, el total por moneda y cuándo fue la última. Mismo criterio de
+// vinculación que el ranking (por id, o por email si se cargó a mano).
+
+export type CuentaCliente = ClienteCuenta & {
+  // La solicitud de acceso que le dio la cuenta: con ella se revoca/reactiva.
+  solicitudId: string;
+  revocada: boolean;
+};
+
+export type OpDeCliente = CompraDeCliente & {
+  created_at: string;
+  cerrada_at: string | null;
+};
+
+export type FichaCliente = CuentaCliente & {
+  operaciones: number; // no canceladas
+  abiertas: number; // ni canceladas ni entregadas
+  totales: { moneda: string; total: number }[];
+  ultimoPedido: string | null;
+};
+
+export function fichasDeClientes(cuentas: CuentaCliente[], ops: OpDeCliente[]): FichaCliente[] {
+  const idPorEmail = new Map<string, string>();
+  for (const c of cuentas) if (c.email) idPorEmail.set(c.email.toLowerCase(), c.id);
+
+  type Acc = { n: number; abiertas: number; totales: Map<string, number>; ultimo: string | null };
+  const porId = new Map<string, Acc>();
+  for (const op of ops) {
+    const id =
+      op.cliente_id ?? (op.cliente_email ? idPorEmail.get(op.cliente_email.toLowerCase()) : undefined);
+    if (!id) continue;
+    let a = porId.get(id);
+    if (!a) {
+      a = { n: 0, abiertas: 0, totales: new Map(), ultimo: null };
+      porId.set(id, a);
+    }
+    // La última vez que pidió algo cuenta aunque después lo haya cancelado.
+    if (!a.ultimo || op.created_at > a.ultimo) a.ultimo = op.created_at;
+    if (op.status === "cancelada") continue;
+    a.n += 1;
+    if (!op.cerrada_at) a.abiertas += 1;
+    const moneda = op.moneda || "USD";
+    a.totales.set(moneda, (a.totales.get(moneda) ?? 0) + Number(op.monto || 0));
+  }
+
+  return cuentas
+    .map((c) => {
+      const a = porId.get(c.id);
+      return {
+        ...c,
+        operaciones: a?.n ?? 0,
+        abiertas: a?.abiertas ?? 0,
+        totales: a
+          ? Array.from(a.totales.entries())
+              .map(([moneda, total]) => ({ moneda, total }))
+              .sort((x, y) => y.total - x.total)
+          : [],
+        ultimoPedido: a?.ultimo ?? null,
+      };
+    })
+    .sort((a, b) => {
+      // Los que pidieron más recientemente arriba; los que nunca pidieron, al
+      // final por nombre.
+      if (a.ultimoPedido && b.ultimoPedido) return b.ultimoPedido.localeCompare(a.ultimoPedido);
+      if (a.ultimoPedido) return -1;
+      if (b.ultimoPedido) return 1;
+      return a.nombre.localeCompare(b.nombre, "es");
+    });
+}

@@ -106,6 +106,8 @@ export default async function ModeradorPage({
         baseUrl={getBaseUrl()}
         // Las tarjetas de plata abren el Panel filtrado: solo el admin entra ahí.
         enlacesPanel={esAdmin}
+        // El moderador no tiene barra de secciones: Clientes va como link.
+        enlaceClientes={!esAdmin}
         prefill={
           searchParams?.evento || searchParams?.ticket
             ? { evento: searchParams.evento, ticketId: searchParams.ticket }

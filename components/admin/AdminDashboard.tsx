@@ -41,6 +41,8 @@ type Props = {
   baseUrl: string;
   // Filtro con el que abre (?filtro=… desde las tarjetas de Métricas).
   filtroInicial?: FiltroPanel;
+  // Búsqueda con la que abre (?q=… desde "Ver sus pedidos" en Clientes).
+  busquedaInicial?: string;
 };
 
 // Fila de la lista: o una operación, o una consulta sin cotizar.
@@ -56,6 +58,7 @@ export default function AdminDashboard({
   consultas: consultasIniciales = [],
   baseUrl,
   filtroInicial = { filtro: "todas" },
+  busquedaInicial = "",
 }: Props) {
   // Índice operación -> líneas, armado una vez por render en vez de filtrar
   // el array completo dentro de cada tarjeta.
@@ -76,7 +79,7 @@ export default function AdminDashboard({
   const filter = filtro.filtro;
   const setFilter = (f: Filtro) => setFiltro({ filtro: f });
   const listaRef = useRef<HTMLDivElement>(null);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(busquedaInicial);
   const [sort, setSort] = useState<"recientes" | "urgentes">("recientes");
   const [page, setPage] = useState(1);
   const { toasts, push } = useToast();

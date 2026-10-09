@@ -114,6 +114,7 @@ export default async function AdminPage({
         consultas={consultas}
         baseUrl={getBaseUrl()}
         filtroInicial={filtroDeParams(searchParams)}
+        busquedaInicial={typeof searchParams?.q === "string" ? searchParams.q.slice(0, 120) : ""}
       />
       <BottomNav />
     </main>

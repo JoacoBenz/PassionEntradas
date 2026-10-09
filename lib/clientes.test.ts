@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rankearClientes, type ClienteCuenta, type CompraDeCliente } from "./clientes";
+import { fichasDeClientes, rankearClientes, type ClienteCuenta, type CompraDeCliente } from "./clientes";
 
 const cuentas: ClienteCuenta[] = [
   { id: "a", nombre: "Ana", email: "ana@x.com" },
@@ -81,5 +81,41 @@ describe("rankearClientes", () => {
     const r = rankearClientes(cuentas, [compra({ cliente_id: "fantasma" })]);
     expect(r).toHaveLength(3);
     expect(r.every((c) => c.operaciones === 0)).toBe(true);
+  });
+});
+
+describe("fichasDeClientes", () => {
+  const cuenta = (id: string, nombre: string, email: string) => ({
+    id, nombre, email, solicitudId: `s-${id}`, revocada: false,
+  });
+  const op = (extra: Partial<import("./clientes").OpDeCliente>) => ({
+    cliente_id: null, cliente_email: null, monto: 100, moneda: "USD", status: "esperando_entrada",
+    created_at: "2026-10-01T00:00:00Z", cerrada_at: null, ...extra,
+  });
+
+  it("cuenta operaciones, abiertas, totales por moneda y la última", () => {
+    const [ana] = fichasDeClientes(
+      [cuenta("a", "Ana", "ana@x.com")],
+      [
+        op({ cliente_id: "a", monto: 100, created_at: "2026-10-01T00:00:00Z" }),
+        op({ cliente_email: "ANA@x.com", monto: 50, cerrada_at: "x", created_at: "2026-10-03T00:00:00Z" }),
+        op({ cliente_id: "a", moneda: "ARS", monto: 9000, created_at: "2026-10-02T00:00:00Z" }),
+        op({ cliente_id: "a", status: "cancelada", monto: 999, created_at: "2026-10-05T00:00:00Z" }),
+      ]
+    );
+    expect(ana).toMatchObject({ operaciones: 3, abiertas: 2, ultimoPedido: "2026-10-05T00:00:00Z" });
+    expect(ana.totales).toEqual([
+      { moneda: "ARS", total: 9000 },
+      { moneda: "USD", total: 150 },
+    ]);
+  });
+
+  it("orden: pidió más reciente arriba; sin pedidos al final por nombre", () => {
+    const fichas = fichasDeClientes(
+      [cuenta("z", "Zoe", "z@x"), cuenta("b", "Beto", "b@x"), cuenta("a", "Ana", "a@x"), cuenta("c", "Carla", "c@x")],
+      [op({ cliente_id: "c", created_at: "2026-10-01T00:00:00Z" }), op({ cliente_id: "z", created_at: "2026-10-04T00:00:00Z" })]
+    );
+    expect(fichas.map((f) => f.nombre)).toEqual(["Zoe", "Carla", "Ana", "Beto"]);
+    expect(fichas[2]).toMatchObject({ operaciones: 0, abiertas: 0, totales: [], ultimoPedido: null });
   });
 });

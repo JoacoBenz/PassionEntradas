@@ -5,6 +5,7 @@ import AppHeader from "@/components/AppHeader";
 import AutoRefresh from "@/components/AutoRefresh";
 import BottomNav from "@/components/BottomNav";
 import SolicitudesAcceso from "@/components/admin/SolicitudesAcceso";
+import AccesosTabs from "@/components/admin/AccesosTabs";
 import type { SolicitudAcceso } from "@/lib/acceso";
 import { isMock, MOCK_USER, mockEquipo, mockListSolicitudes } from "@/lib/mock-db";
 import { leerEquipo, type RolEquipo } from "@/lib/equipo";
@@ -49,6 +50,7 @@ export default async function SolicitudesPage() {
     <main className="min-h-svh pb-16 md:pb-10">
       <AppHeader subtitle="Solicitudes" email={email} nav />
       <div className="mx-auto w-full max-w-5xl px-4 py-5">
+        <AccesosTabs activa="solicitudes" />
         <SolicitudesAcceso initial={solicitudes} />
       </div>
       <AutoRefresh intervalMs={20000} />
