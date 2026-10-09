@@ -16,6 +16,8 @@ import { DEFAULT_EUR_USD, type MonedaVenta } from "@/lib/tickets";
 import {
   evaluarLimite,
   reconciliarItem,
+  partirPorStock,
+  entradasAConsulta,
   agruparPorMoneda,
   resumenOperacion,
   separarPorTipo,
@@ -181,9 +183,9 @@ export async function POST(request: Request) {
 
   // Los items vinculados a una entrada del catálogo se reconcilian contra la
   // fila real: evento, sector, fecha y PRECIO salen de la base, no del cliente.
-  // La cantidad se topea por el stock conocido (la tienda ya lo limita; un
-  // desvío significa carrito viejo o manipulación). Los que no matchean quedan
-  // como vinieron.
+  // Lo que pide más que el stock que queda se parte: lo disponible como
+  // pedido y el resto como consulta (ver partirPorStock). Los que no matchean
+  // quedan como vinieron.
   const refs = await buscarTickets(
     parsed.map((p) => p.ticket_id).filter((id): id is string => !!id)
   );
@@ -194,10 +196,17 @@ export async function POST(request: Request) {
   const sinConfig = { eurUsd: DEFAULT_EUR_USD, arsPorUsd: null };
   const tasa = refs.size ? await fetchConfigTienda().catch(() => sinConfig) : sinConfig;
 
-  for (let i = 0; i < parsed.length; i++) {
-    const p = parsed[i];
-    parsed[i] = reconciliarItem(p, p.ticket_id ? refs.get(p.ticket_id) : undefined, tasa);
-  }
+  const pedidoOriginal = [...parsed];
+  parsed.splice(
+    0,
+    parsed.length,
+    ...pedidoOriginal.flatMap((p) => {
+      const ref = p.ticket_id ? refs.get(p.ticket_id) : undefined;
+      return partirPorStock(p, ref).map((parte) => reconciliarItem(parte, ref, tasa));
+    })
+  );
+  // Para avisarle al cliente que parte de lo que pidió quedó a consultar.
+  const aConsultaPorStock = entradasAConsulta(pedidoOriginal, parsed);
 
   // Comisión de la operación = suma de la de cada línea (precio − costo). Sin
   // esto el tablero mostraba "comisión ganada: 0" para TODO lo que entra por la
@@ -463,6 +472,8 @@ export async function POST(request: Request) {
       operacion: operaciones[0] ? { id: operaciones[0].id, code: operaciones[0].code } : null,
       operaciones: operaciones.map((o) => ({ id: o.id, code: o.code, moneda: o.moneda })),
       consultas: consultasCreadas.map((c) => ({ id: c.id, code: c.code })),
+      // Entradas pedidas que no tenían stock y quedaron como consulta.
+      aConsultaPorStock,
       // El error se manda al cliente (no solo el booleano) para poder ver el
       // motivo real desde la pestaña Network sin tener que ir a buscar los
       // logs del servidor — Meta no dice mucho más que "rejected" en la UI.

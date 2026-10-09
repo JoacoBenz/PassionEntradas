@@ -166,6 +166,8 @@ const en = {
     revConfirmar: "Confirm and send",
     revVolver: "Back",
     okTitulo: "Order sent ✓",
+    okStock: (n: number) =>
+      `${n === 1 ? "1 ticket" : `${n} tickets`} didn't have stock left and went as an inquiry: we'll check and send you a price.`,
     okP: "We got your tickets — a seller will reach out to close each one. Track them in My orders.",
     okCta: "Go to My orders",
     cerrar: "Close",
@@ -579,6 +581,8 @@ const es: typeof en = {
     revConfirmar: "Confirmar y enviar",
     revVolver: "Volver",
     okTitulo: "Pedido enviado ✓",
+    okStock: (n: number) =>
+      `${n === 1 ? "1 entrada no tenía" : `${n} entradas no tenían`} stock y ${n === 1 ? "quedó" : "quedaron"} como consulta: la chequeamos y te pasamos precio.`,
     okP: "Recibimos tus entradas — un vendedor te contacta para cerrar cada una. Seguilas en Mis pedidos.",
     okCta: "Ir a Mis pedidos",
     cerrar: "Cerrar",

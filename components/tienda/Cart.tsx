@@ -131,6 +131,8 @@ export function CartBar() {
   // qué es consulta, el total y qué pasa después). Recién "Confirmar y
   // enviar" hace el POST.
   const [revisando, setRevisando] = useState(false);
+  // Entradas que no tenían stock y el server pasó a consulta (ver partirPorStock).
+  const [aConsulta, setAConsulta] = useState(0);
 
   // Un total POR MONEDA: pesos y dólares nunca se suman. Cada moneda termina
   // siendo una operación aparte al enviar (ver /api/pedidos).
@@ -174,6 +176,7 @@ export function CartBar() {
       }
       clear();
       setRevisando(false);
+      setAConsulta(Number(data.aConsultaPorStock) || 0);
       setEstado("done");
     } catch {
       setError(c.errRed);
@@ -203,6 +206,7 @@ export function CartBar() {
               <div className="cart-ok">
                 <h2>{c.okTitulo}</h2>
                 <p>{c.okP}</p>
+                {aConsulta > 0 && <p className="cart-ok-nota">{c.okStock(aConsulta)}</p>}
                 <div className="cart-ok-acciones">
                   <Link className="btn-primary" href="/mis-pedidos" onClick={cerrar}>
                     {c.okCta}

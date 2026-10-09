@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  entradasAConsulta,
+  partirPorStock,
   evaluarLimite,
   precioVenta,
   reconciliarItem,
@@ -513,5 +515,37 @@ describe("aviso a los vendedores", () => {
     it("sin líneas devuelve vacío y no un separador suelto", () => {
       expect(detalleDeLineas([], [])).toBe("");
     });
+  });
+});
+
+describe("partirPorStock — más que el stock se parte en pedido + consulta", () => {
+  it("pedís 5, quedan 3: 3 pedido + 2 consulta", () => {
+    const partes = partirPorStock(item({ cantidad: 5, monto: 500 }), { ...PROPIA, stock: 3 });
+    expect(partes.map((p) => [p.tipo, p.cantidad])).toEqual([
+      ["pedido", 3],
+      ["consulta", 2],
+    ]);
+    expect(partes[0].monto).toBe(300);
+    expect(partes[1].monto).toBe(0);
+  });
+  it("con stock 0 la línea entera es consulta", () => {
+    const partes = partirPorStock(item({ cantidad: 2 }), { ...PROPIA, stock: 0 });
+    expect(partes).toHaveLength(1);
+    expect(partes[0]).toMatchObject({ tipo: "consulta", cantidad: 2, monto: 0 });
+  });
+  it("dentro del stock, sin dato de stock o sin entrada vinculada: no se toca", () => {
+    const p = item({ cantidad: 2 });
+    expect(partirPorStock(p, PROPIA)).toEqual([p]);
+    expect(partirPorStock(item({ cantidad: 9 }), { ...PROPIA, stock: null })).toHaveLength(1);
+    expect(partirPorStock(item({ cantidad: 9 }), undefined)).toHaveLength(1);
+    expect(partirPorStock(item({ tipo: "consulta", cantidad: 9 }), PROPIA)).toHaveLength(1);
+  });
+  it("cada parte se reconcilia con su precio y el resto queda a cotizar", () => {
+    const partes = partirPorStock(item({ cantidad: 5 }), PORTAL).map((p) => reconciliarItem(p, PORTAL, TASA));
+    expect(partes.map((p) => [p.tipo, p.cantidad, p.monto])).toEqual([
+      ["pedido", 4, 778 * 4],
+      ["consulta", 1, 0],
+    ]);
+    expect(entradasAConsulta([item({ cantidad: 5 })], partes)).toBe(1);
   });
 });

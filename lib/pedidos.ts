@@ -114,6 +114,30 @@ export function reconciliarItem(p: ItemPedido, t: TicketRef | undefined, tasa: n
   return out;
 }
 
+// --- más que el stock -------------------------------------------------------
+// Un pedido que pide más entradas de las que quedan se PARTE: lo disponible
+// sigue como pedido y el resto pasa a consulta (pedís 5, quedan 3 → 3 pedido +
+// 2 consulta). Con stock 0 la línea entera es consulta. La tienda ya topea el
+// carrito por stock, así que esto cubre un carrito viejo o el stock que bajó
+// entre que lo armó y lo mandó. Sin dato de stock (null) no se toca.
+//
+// Va ANTES de reconciliarItem (que pone precio y moneda a cada parte).
+export function partirPorStock(p: ItemPedido, t: TicketRef | undefined): ItemPedido[] {
+  if (p.tipo !== "pedido" || !t || typeof t.stock !== "number") return [p];
+  const stock = Math.max(0, Math.trunc(t.stock));
+  if (p.cantidad <= stock) return [p];
+  const consulta: ItemPedido = { ...p, tipo: "consulta", cantidad: p.cantidad - stock, monto: 0 };
+  if (stock === 0) return [{ ...consulta, cantidad: p.cantidad }];
+  const unit = p.cantidad > 0 ? p.monto / p.cantidad : 0;
+  return [{ ...p, cantidad: stock, monto: Math.round(unit * stock) }, consulta];
+}
+
+/** Cuántas entradas pasaron de pedido a consulta por falta de stock. */
+export function entradasAConsulta(antes: ItemPedido[], despues: ItemPedido[]): number {
+  const pedidas = (ls: ItemPedido[]) => ls.filter((l) => l.tipo === "pedido").reduce((a, l) => a + l.cantidad, 0);
+  return Math.max(0, pedidas(antes) - pedidas(despues));
+}
+
 // --- anti-flood --------------------------------------------------------------
 // Cada envío dispara UN aviso a los vendedores (WhatsApp + email), así que un
 // cliente que spamea les inunda el teléfono. Topes deliberadamente holgados: un
