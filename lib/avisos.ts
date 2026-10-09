@@ -24,6 +24,7 @@ export type NuevoAviso = {
   url: string | null;
   email_estado: EstadoEnvio;
   whatsapp_estado?: EstadoEnvio;
+  whatsapp_destino?: string | null;
 };
 
 export type AvisoGuardado = NuevoAviso & {
@@ -36,7 +37,7 @@ export type AvisoGuardado = NuevoAviso & {
 };
 
 const COLUMNAS =
-  "id, clave, audiencia, destinatario_id, destinatario_email, tipo, operacion_id, consulta_id, datos, url, leida_at, email_estado, email_error, whatsapp_estado, whatsapp_error, created_at";
+  "id, clave, audiencia, destinatario_id, destinatario_email, tipo, operacion_id, consulta_id, datos, url, leida_at, email_estado, email_error, whatsapp_estado, whatsapp_error, whatsapp_destino, created_at";
 
 /** Guarda el aviso. null si la clave ya existía (ya se avisó) o si falló. */
 export async function guardarAviso(admin: SupabaseClient | null, a: NuevoAviso): Promise<AvisoGuardado | null> {
@@ -70,14 +71,36 @@ export async function guardarAvisos(admin: SupabaseClient | null, avisos: NuevoA
   return (data ?? []) as AvisoGuardado[];
 }
 
-export async function actualizarAviso(
-  admin: SupabaseClient | null,
-  id: string,
-  patch: Partial<Pick<AvisoGuardado, "email_estado" | "email_error" | "whatsapp_estado" | "whatsapp_error">>
-): Promise<void> {
-  if (isMock() || !admin) return mockActualizarAviso(id, patch);
-  const { error } = await admin.from("notificaciones").update(patch).eq("id", id);
-  if (error) console.error(`[avisos] no se pudo actualizar ${id}: ${error.message}`);
+type PatchAviso = Partial<
+  Pick<AvisoGuardado, "email_estado" | "email_error" | "whatsapp_estado" | "whatsapp_error" | "whatsapp_destino">
+>;
+
+export async function actualizarAviso(admin: SupabaseClient | null, id: string, patch: PatchAviso): Promise<void> {
+  return actualizarAvisos(admin, [id], patch);
+}
+
+/** El mismo cambio en varias filas (un envío a la lista fija cubre a todos). */
+export async function actualizarAvisos(admin: SupabaseClient | null, ids: string[], patch: PatchAviso): Promise<void> {
+  if (ids.length === 0) return;
+  if (isMock() || !admin) {
+    for (const id of ids) mockActualizarAviso(id, patch);
+    return;
+  }
+  const { error } = await admin.from("notificaciones").update(patch).in("id", ids);
+  if (error) console.error(`[avisos] no se pudieron actualizar ${ids.length} avisos: ${error.message}`);
+}
+
+/** El resultado de un envío de WhatsApp, como queda registrado en la fila. */
+export function patchDeWhatsapp(
+  r: { ok: true } | { ok: false; error: string; noConfigurado?: boolean },
+  destino: string
+): PatchAviso {
+  if (r.ok) return { whatsapp_estado: "enviado", whatsapp_error: null, whatsapp_destino: destino };
+  return {
+    whatsapp_estado: r.noConfigurado ? "sin_configurar" : "error",
+    whatsapp_error: r.error.slice(0, 500),
+    whatsapp_destino: destino,
+  };
 }
 
 /** Estado inicial del email de un aviso que lo lleva. */

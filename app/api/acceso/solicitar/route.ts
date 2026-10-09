@@ -5,6 +5,7 @@ import { isMock, mockCrearSolicitud } from "@/lib/mock-db";
 import { notificarSolicitudAcceso } from "@/lib/whatsapp";
 import { notificarVendedoresEmail } from "@/lib/email";
 import { avisarEquipo } from "@/lib/avisos-equipo";
+import { baseUrlDe } from "@/lib/base-url";
 
 // POST /api/acceso/solicitar — PÚBLICO. Un visitante de la landing pide
 // acceso a la tienda. Se inserta con service role (la tabla es RLS deny-all).
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
       avisarEquipo(
         isMock() ? null : createAdminSupabase(),
         { tipo: "nuevo_acceso", ref: crypto.randomUUID(), datos: { nombre, email }, url: "/admin/solicitudes" },
-        (para) => notificarSolicitudAcceso({ nombre, email, telefono, legajo, texto }, para)
+        (para, url) => notificarSolicitudAcceso({ nombre, email, telefono, legajo, texto, link: `${baseUrlDe(request)}${url}` }, para)
       ),
       notificarVendedoresEmail(`Nueva solicitud de acceso — ${nombre}`, texto),
     ]).catch(() => [] as const);

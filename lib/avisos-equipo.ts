@@ -3,16 +3,22 @@
 // Cada aviso es una fila por persona del equipo (tabla notificaciones), con
 // su propia clave: nada se manda dos veces y cada uno marca leído lo suyo.
 //
+// A quién: por rol (lib/recordatorios: paraModeradores). Si la operación tiene
+// un vendedor que nombra a alguien del equipo, solo a esa persona (6a).
+//
 // WhatsApp: a cada persona con el aviso activado en Equipo, a su teléfono de
 // "Mi cuenta". Mientras nadie lo haya activado, sale como hasta ahora a la
-// lista fija WHATSAPP_VENDEDORES (así el deploy no cambia nada).
+// lista fija WHATSAPP_VENDEDORES (así el deploy no cambia nada). Cómo salió
+// queda en cada fila (whatsapp_estado / _error / _destino) y se ve en la
+// campana.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { guardarAvisos, actualizarAviso, type AvisoGuardado, type NuevoAviso } from "./avisos";
-import { leerUsuarios, listarMiembros, type MiembroEquipo } from "./equipo";
+import { guardarAvisos, actualizarAvisos, patchDeWhatsapp, type AvisoGuardado, type NuevoAviso } from "./avisos";
+import { leerUsuarios, listarMiembros, miembroPorAlias, type MiembroEquipo } from "./equipo";
 import { isMock, mockListConsultas, mockListOps, mockListUsuarios } from "./mock-db";
 import {
   claveAvisoEquipo,
+  DESTINO_LISTA_FIJA,
   paraModeradores,
   pendientes,
   resumenPendientes,
@@ -35,18 +41,35 @@ export function urlPara(m: Pick<MiembroEquipo, "rol">, url: string): string {
   return url;
 }
 
-export function destinatariosDe(equipo: MiembroEquipo[], tipo: TipoAvisoEquipo, roles?: MiembroEquipo["rol"][]) {
-  return equipo.filter((m) =>
-    roles ? roles.includes(m.rol) : m.rol === "administrador" || paraModeradores(tipo)
-  );
+/**
+ * Quiénes reciben el aviso: los del rol que corresponde. Si `vendedor` (el
+ * vendedor_alias de la operación) nombra sin dudas a uno de ellos, solo esa
+ * persona. Si nombra a alguien que no puede accionarlo (un moderador en un
+ * aviso de admin) o a nadie, a todos los del rol.
+ */
+export function destinatariosDe(
+  equipo: MiembroEquipo[],
+  tipo: TipoAvisoEquipo,
+  roles?: MiembroEquipo["rol"][],
+  vendedor?: string | null
+): MiembroEquipo[] {
+  const porRol = equipo.filter((m) => (roles ? roles.includes(m.rol) : m.rol === "administrador" || paraModeradores(tipo)));
+  const id = miembroPorAlias(equipo, vendedor);
+  const suyo = id ? porRol.filter((m) => m.id === id) : [];
+  return suyo.length > 0 ? suyo : porRol;
 }
 
 export type ResultadoAviso = { nuevos: number; whatsapp: WhatsappResult | null };
 
 /**
- * Registra un aviso para el equipo y manda el WhatsApp. `enviarWhatsapp`
- * recibe los teléfonos (o undefined = la lista fija de siempre). Nunca tira:
- * quien llama ya registró lo importante (el pedido, la solicitud…).
+ * Manda el WhatsApp: `para` son los teléfonos (undefined = la lista fija de
+ * siempre) y `url` el link del aviso para quien lo recibe (sin el dominio).
+ */
+export type EnviarWhatsapp = (para: string[] | undefined, url: string) => Promise<WhatsappResult>;
+
+/**
+ * Registra un aviso para el equipo y manda el WhatsApp. Nunca tira: quien
+ * llama ya registró lo importante (el pedido, la solicitud…).
  */
 export async function avisarEquipo(
   admin: SupabaseClient | null,
@@ -59,20 +82,29 @@ export async function avisarEquipo(
     consulta_id?: string | null;
     // Solo estos roles (para no avisar dos veces lo mismo en un envío mixto).
     roles?: MiembroEquipo["rol"][];
+    // vendedor_alias de la operación (ver destinatariosDe).
+    vendedor?: string | null;
+    // false: no mandar a la lista fija (en un envío mixto ya la avisó el
+    // otro aviso del mismo envío).
+    listaFija?: boolean;
   },
-  enviarWhatsapp: ((para?: string[]) => Promise<WhatsappResult>) | null
+  enviarWhatsapp: EnviarWhatsapp | null
 ): Promise<ResultadoAviso> {
+  const aLaLista = !!enviarWhatsapp && aviso.listaFija !== false;
   let equipo: MiembroEquipo[];
   try {
     equipo = await equipoActivo(admin);
   } catch (e) {
     // Sin poder leer el equipo, el WhatsApp sale igual a la lista fija.
     console.error(`[avisos] no se pudo leer el equipo: ${(e as Error).message}`);
-    return { nuevos: 0, whatsapp: enviarWhatsapp ? await enviarWhatsapp(undefined) : null };
+    return { nuevos: 0, whatsapp: aLaLista ? await enviarWhatsapp!(undefined, aviso.url) : null };
   }
   try {
-    const dest = destinatariosDe(equipo, aviso.tipo, aviso.roles);
+    const dest = destinatariosDe(equipo, aviso.tipo, aviso.roles, aviso.vendedor);
     const alguienActivo = equipo.some(conWhatsapp);
+    // Lo que se va a intentar con cada fila: a su teléfono, a la lista fija
+    // (nadie lo activó todavía) o nada.
+    const intenta = (m: MiembroEquipo) => !!enviarWhatsapp && (alguienActivo ? conWhatsapp(m) : aLaLista);
 
     const filas = await guardarAvisos(
       admin,
@@ -87,7 +119,7 @@ export async function avisarEquipo(
         datos: aviso.datos,
         url: urlPara(m, aviso.url),
         email_estado: "no_aplica" as const,
-        whatsapp_estado: enviarWhatsapp && conWhatsapp(m) ? ("pendiente" as const) : ("no_aplica" as const),
+        whatsapp_estado: intenta(m) ? ("pendiente" as const) : ("no_aplica" as const),
       }))
     );
     const nuevos = filas.flatMap((fila) => {
@@ -100,24 +132,25 @@ export async function avisarEquipo(
       // (migración sin aplicar) no hay filas y el WhatsApp tiene que salir
       // igual, como antes de este cambio.
       if (dest.length === 0 || (await hayTabla(admin))) return { nuevos: 0, whatsapp: null };
-      const telefonos = dest.filter(conWhatsapp).map((m) => m.telefono as string);
-      if (alguienActivo && telefonos.length === 0) return { nuevos: 0, whatsapp: null };
-      return { nuevos: 0, whatsapp: await enviarWhatsapp(alguienActivo ? telefonos : undefined) };
+      if (!alguienActivo) return { nuevos: 0, whatsapp: aLaLista ? await enviarWhatsapp(undefined, aviso.url) : null };
+      const rs = await Promise.all(
+        dest.filter(conWhatsapp).map((m) => enviarWhatsapp([m.telefono as string], urlPara(m, aviso.url)))
+      );
+      return { nuevos: 0, whatsapp: resumirEnvios(rs) };
     }
 
     if (!alguienActivo) {
-      return { nuevos: nuevos.length, whatsapp: await enviarWhatsapp(undefined) };
+      if (!aLaLista) return { nuevos: nuevos.length, whatsapp: null };
+      const r = await enviarWhatsapp(undefined, aviso.url);
+      await actualizarAvisos(admin, nuevos.map((n) => n.fila.id), patchDeWhatsapp(r, DESTINO_LISTA_FIJA));
+      return { nuevos: nuevos.length, whatsapp: r };
     }
     const resultados = await Promise.all(
       nuevos
         .filter(({ m }) => conWhatsapp(m))
         .map(async ({ m, fila }) => {
-          const r = await enviarWhatsapp([m.telefono as string]);
-          await actualizarAviso(
-            admin,
-            fila.id,
-            r.ok ? { whatsapp_estado: "enviado" } : { whatsapp_estado: r.noConfigurado ? "sin_configurar" : "error", whatsapp_error: r.error.slice(0, 500) }
-          );
+          const r = await enviarWhatsapp([m.telefono as string], urlPara(m, aviso.url));
+          await actualizarAvisos(admin, [fila.id], patchDeWhatsapp(r, m.telefono as string));
           return r;
         })
     );
@@ -156,8 +189,8 @@ export async function correrRecordatorios(
   ahora: Date,
   baseUrl: string
 ): Promise<ResumenRecordatorios> {
-  let ops;
-  let consultas;
+  let ops: (Parameters<typeof pendientes>[0][number] & { vendedor_alias?: string | null })[];
+  let consultas: Parameters<typeof pendientes>[1];
   if (isMock() || !admin) {
     ops = mockListOps();
     consultas = mockListConsultas();
@@ -165,7 +198,7 @@ export async function correrRecordatorios(
     const [o, c] = await Promise.all([
       admin
         .from("operaciones")
-        .select("id, code, evento, status, tipo, confirmada_at, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, created_at")
+        .select("id, code, evento, status, tipo, confirmada_at, entrada_recibida_at, pago_confirmado_at, cerrada_at, fecha_evento, created_at, vendedor_alias")
         .neq("status", "cancelada")
         .is("cerrada_at", null)
         .order("created_at", { ascending: false })
@@ -178,24 +211,23 @@ export async function correrRecordatorios(
     ]);
     if (o.error) throw new Error(o.error.message);
     if (c.error) throw new Error(c.error.message);
-    ops = (o.data ?? []) as Parameters<typeof pendientes>[0];
-    consultas = (c.data ?? []) as Parameters<typeof pendientes>[1];
+    ops = (o.data ?? []) as typeof ops;
+    consultas = (c.data ?? []) as typeof consultas;
   }
   const ps = pendientes(ops, consultas, ahora);
   if (ps.length === 0) return { pendientes: 0, avisosNuevos: 0, whatsapps: 0 };
 
   const equipo = await equipoActivo(admin);
   const alguienActivo = equipo.some(conWhatsapp);
+  const vendedorDe = new Map(ops.map((o) => [o.id, o.vendedor_alias ?? null]));
   let avisosNuevos = 0;
   let whatsapps = 0;
-  const nuevosParaLista = new Map<string, Pendiente>();
 
   // UNA escritura para todo (persona × pendiente); vuelven solo los nuevos.
   const filas: { m: MiembroEquipo; p: Pendiente; aviso: NuevoAviso }[] = [];
-  for (const m of equipo) {
-    for (const p of ps) {
-      const tipo = `recordatorio_${p.tipo}` as TipoAvisoEquipo;
-      if (m.rol !== "administrador" && !paraModeradores(tipo)) continue;
+  for (const p of ps) {
+    const tipo = `recordatorio_${p.tipo}` as TipoAvisoEquipo;
+    for (const m of destinatariosDe(equipo, tipo, undefined, p.clase === "op" ? vendedorDe.get(p.ref) : null)) {
       filas.push({
         m,
         p,
@@ -210,13 +242,18 @@ export async function correrRecordatorios(
           datos: { code: p.code, evento: p.evento },
           url: urlPara(m, `/admin?q=${encodeURIComponent(p.code)}`),
           email_estado: "no_aplica",
-          whatsapp_estado: conWhatsapp(m) ? "pendiente" : "no_aplica",
+          // Sin nadie activado, todo va a la lista fija.
+          whatsapp_estado: !alguienActivo || conWhatsapp(m) ? "pendiente" : "no_aplica",
         },
       });
     }
   }
   const guardados = new Map((await guardarAvisos(admin, filas.map((f) => f.aviso))).map((g) => [g.clave, g]));
 
+  // Nadie activó el aviso en Equipo todavía: un solo mensaje a la lista fija
+  // con todo lo nuevo, y su resultado en cada fila.
+  const paraLista = new Map<string, Pendiente>();
+  const filasLista: string[] = [];
   for (const m of equipo) {
     const nuevos: { p: Pendiente; fila: AvisoGuardado }[] = filas
       .filter((f) => f.m.id === m.id && guardados.has(f.aviso.clave))
@@ -224,31 +261,29 @@ export async function correrRecordatorios(
     avisosNuevos += nuevos.length;
     if (nuevos.length === 0) continue;
     if (!alguienActivo) {
-      if (m.rol === "administrador") for (const { p } of nuevos) nuevosParaLista.set(`${p.tipo}:${p.ref}`, p);
+      for (const { p, fila } of nuevos) {
+        paraLista.set(`${p.tipo}:${p.ref}`, p);
+        filasLista.push(fila.id);
+      }
       continue;
     }
     if (!conWhatsapp(m)) continue;
     const r = await notificarAviso(mensajeRecordatorio(nuevos.map((n) => n.p), baseUrl, m), [m.telefono as string]);
     if (r.ok) whatsapps++;
-    for (const { fila } of nuevos) {
-      await actualizarAviso(
-        admin,
-        fila.id,
-        r.ok ? { whatsapp_estado: "enviado" } : { whatsapp_estado: r.noConfigurado ? "sin_configurar" : "error", whatsapp_error: r.error.slice(0, 500) }
-      );
-    }
+    await actualizarAvisos(admin, nuevos.map((n) => n.fila.id), patchDeWhatsapp(r, m.telefono as string));
   }
-
-  // Nadie activó el aviso en Equipo todavía: un solo mensaje a la lista fija.
-  if (!alguienActivo && nuevosParaLista.size > 0) {
-    const r = await notificarAviso(mensajeRecordatorio(Array.from(nuevosParaLista.values()), baseUrl, { rol: "administrador" }));
+  if (paraLista.size > 0) {
+    const r = await notificarAviso(mensajeRecordatorio(Array.from(paraLista.values()), baseUrl, { rol: "administrador" }));
     if (r.ok) whatsapps++;
+    await actualizarAvisos(admin, filasLista, patchDeWhatsapp(r, DESTINO_LISTA_FIJA));
   }
   return { pendientes: ps.length, avisosNuevos, whatsapps };
 }
 
 export function mensajeRecordatorio(ps: Pendiente[], baseUrl: string, m: Pick<MiembroEquipo, "rol">) {
-  const link = `${baseUrl}${urlPara(m, "/admin?filtro=prioridad")}`;
+  // Uno solo: directo a ese pedido. Varios: el Panel filtrado por prioridad.
+  const destino = ps.length === 1 ? `/admin?q=${encodeURIComponent(ps[0].code)}` : "/admin?filtro=prioridad";
+  const link = `${baseUrl}${urlPara(m, destino)}`;
   const aviso = resumenPendientes(ps);
   return {
     aviso,

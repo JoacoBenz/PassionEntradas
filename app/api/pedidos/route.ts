@@ -4,6 +4,7 @@ import { getRol, puedeVerTienda, nombreDe } from "@/lib/auth";
 import { formatMonto, generateCode, type TipoOperacion } from "@/lib/operaciones";
 import { notificarVendedores, type WhatsappResult } from "@/lib/whatsapp";
 import { avisarEquipo } from "@/lib/avisos-equipo";
+import { baseUrlDe } from "@/lib/base-url";
 import { notificarVendedoresEmail } from "@/lib/email";
 import {
   isMock,
@@ -475,7 +476,14 @@ export async function POST(request: Request) {
     total: totalCorto,
     texto: mensaje,
   };
-  const enviarWa = (para?: string[]) => notificarVendedores(avisoPedido, para);
+  // Link directo a lo que entró (un solo pedido o una sola consulta: su
+  // código en el buscador del Panel; si son varios, el filtro).
+  const urlPedidos = operaciones.length === 1 ? `/admin?q=${encodeURIComponent(operaciones[0].code)}` : "/admin?filtro=nuevos";
+  const urlConsultas =
+    consultasCreadas.length === 1 ? `/admin?q=${encodeURIComponent(consultasCreadas[0].code)}` : "/admin?filtro=a_cotizar";
+  const base = baseUrlDe(request);
+  const enviarWa = (para: string[] | undefined, url: string) =>
+    notificarVendedores({ ...avisoPedido, link: `${base}${url}` }, para);
   const admin = isMock() ? null : createAdminSupabase();
   const datos = { cliente: ctx.comprador, detalle: avisoPedido.detalle, total: totalCorto };
 
@@ -488,7 +496,7 @@ export async function POST(request: Request) {
     avisos.push(
       avisarEquipo(
         admin,
-        { tipo: "nuevo_pedido", ref: envioId, datos, url: "/admin?filtro=nuevos", operacion_id: operaciones[0].id, roles: ["administrador"] },
+        { tipo: "nuevo_pedido", ref: envioId, datos, url: urlPedidos, operacion_id: operaciones[0].id, roles: ["administrador"] },
         enviarWa
       )
     );
@@ -501,15 +509,14 @@ export async function POST(request: Request) {
           tipo: "nueva_consulta",
           ref: envioId,
           datos,
-          url: "/admin?filtro=a_cotizar",
+          url: urlConsultas,
           consulta_id: consultasCreadas[0].id,
           roles: operaciones.length > 0 ? ["moderador"] : ["administrador", "moderador"],
+          // En un envío mixto la lista fija ya recibió el aviso del pedido:
+          // acá solo van los moderadores que lo activaron.
+          listaFija: operaciones.length === 0,
         },
-        // En un envío mixto la lista fija (sin `para`) ya recibió el aviso
-        // del pedido: acá solo van los moderadores que lo activaron.
-        operaciones.length > 0
-          ? (para) => (para ? enviarWa(para) : Promise.resolve({ ok: false, noConfigurado: true, error: "Ya avisado." }))
-          : enviarWa
+        enviarWa
       )
     );
   }

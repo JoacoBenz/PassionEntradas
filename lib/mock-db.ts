@@ -1185,6 +1185,7 @@ export function mockGuardarAviso(a: NuevoAviso): AvisoGuardado | null {
     leida_at: null,
     whatsapp_estado: a.whatsapp_estado ?? "no_aplica",
     whatsapp_error: null,
+    whatsapp_destino: a.whatsapp_destino ?? null,
     email_error: null,
     created_at: new Date().toISOString(),
   };

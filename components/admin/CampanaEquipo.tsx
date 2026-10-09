@@ -8,9 +8,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { fechaHora } from "@/lib/fechas";
-import { textoAvisoEquipo, type DatosAvisoEquipo } from "@/lib/recordatorios";
+import { textoAvisoEquipo, type DatosAvisoEquipo, type EstadoWhatsappAviso } from "@/lib/recordatorios";
 
-type Aviso = { id: string; tipo: string; datos: DatosAvisoEquipo; url: string | null; leida: boolean; created_at: string };
+type Aviso = {
+  id: string;
+  tipo: string;
+  datos: DatosAvisoEquipo;
+  url: string | null;
+  leida: boolean;
+  created_at: string;
+  // Cómo salió el WhatsApp de este aviso (null: no se mandó).
+  whatsapp?: EstadoWhatsappAviso | null;
+};
+
+const TONO_WA: Record<EstadoWhatsappAviso["tono"], string> = {
+  ok: "text-[#2E7D4F]",
+  error: "text-[#B5304B]",
+  gris: "text-muted",
+};
 
 const CADA_MS = 60_000;
 const API = "/api/notificaciones?audiencia=equipo";
@@ -79,6 +94,8 @@ export default function CampanaEquipo() {
     if (!abrir) setAvisos((a) => a.map((x) => ({ ...x, leida: true })));
   }
 
+  const fallidos = avisos.filter((a) => a.whatsapp?.tono === "error").length;
+
   return (
     <div className="relative" ref={caja}>
       <button
@@ -109,6 +126,11 @@ export default function CampanaEquipo() {
           <p className="border-b border-dashed border-line px-4 py-2.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
             Avisos
           </p>
+          {fallidos > 0 && (
+            <p role="status" className="border-b border-dashed border-line bg-[#FCEBEE] px-4 py-2 text-xs font-medium text-[#B5304B]">
+              {fallidos === 1 ? "1 WhatsApp no salió" : `${fallidos} WhatsApp no salieron`}: el motivo está en cada aviso.
+            </p>
+          )}
           {avisos.length === 0 ? (
             <p className="px-4 py-5 text-sm text-muted">Sin avisos todavía.</p>
           ) : (
@@ -126,6 +148,9 @@ export default function CampanaEquipo() {
                     >
                       <span className={`text-[13px] font-semibold ${recordatorio ? "text-[#B5304B]" : "text-ink"}`}>{txt.titulo}</span>
                       {txt.cuerpo && <span className="text-xs text-[#4A4E5E]">{txt.cuerpo}</span>}
+                      {a.whatsapp && (
+                        <span className={`text-[11px] leading-snug ${TONO_WA[a.whatsapp.tono]}`}>{a.whatsapp.texto}</span>
+                      )}
                       <time className="font-mono text-[10px] text-muted" dateTime={a.created_at}>
                         {fechaHora(a.created_at)}
                       </time>

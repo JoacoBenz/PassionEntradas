@@ -40,6 +40,8 @@ export type AvisoPedido = {
   total: string;
   /** Mensaje completo, multilínea: email y fallback de texto libre. */
   texto: string;
+  /** Link al pedido en el panel: va al final del detalle, entero. */
+  link?: string;
 };
 
 /** Datos de una solicitud de acceso nueva desde la landing. */
@@ -49,6 +51,8 @@ export type AvisoAcceso = {
   telefono: string;
   legajo: string;
   texto: string;
+  /** La plantilla `nuevo_acceso` no tiene dónde: solo va en el texto libre. */
+  link?: string;
 };
 
 // Meta rechaza parámetros con saltos de línea, tabs o espacios repetidos, y
@@ -61,6 +65,23 @@ export function limpiarParametro(valor: string, max = 300): string {
     .trim();
   if (plano.length <= max) return plano || "—";
   return plano.slice(0, max - 1).trimEnd() + "…";
+}
+
+/**
+ * El detalle con el link al final, en un parámetro de plantilla. Si no entra,
+ * se corta el detalle y nunca el link: un link cortado no abre nada.
+ */
+export function detalleConLink(detalle: string, link: string | undefined, max = 400): string {
+  const l = limpiarParametro(link ?? "", max);
+  if (!link || l === "—") return limpiarParametro(detalle, max);
+  const lugar = max - l.length - 3;
+  if (lugar < 10) return l;
+  return `${limpiarParametro(detalle, lugar)} · ${l}`;
+}
+
+/** El texto libre con el link al final (si no lo tenía ya). */
+export function textoConLink(texto: string, link: string | undefined): string {
+  return link && !texto.includes(link) ? `${texto}\n\n${link}` : texto;
 }
 
 // Nombres de las variables, EXACTAMENTE como figuran en la plantilla de
@@ -82,10 +103,10 @@ export function plantillaAvisoConfigurada(): boolean {
 }
 
 /** Aviso genérico al equipo: qué pasó y el detalle, en una línea cada uno. */
-export type AvisoGenerico = { aviso: string; detalle: string; texto: string };
+export type AvisoGenerico = { aviso: string; detalle: string; texto: string; link?: string };
 
 export function parametrosAviso(a: AvisoGenerico): string[] {
-  return [limpiarParametro(a.aviso, 200), limpiarParametro(a.detalle, 400)];
+  return [limpiarParametro(a.aviso, 200), detalleConLink(a.detalle, a.link, 400)];
 }
 
 export type ParametroPlantilla =
@@ -112,7 +133,7 @@ export function parametrosPlantilla(aviso: AvisoPedido): string[] {
     limpiarParametro(aviso.tipo, 40),
     limpiarParametro(aviso.cliente, 120),
     limpiarParametro(String(aviso.entradas), 10),
-    limpiarParametro(aviso.detalle, 400),
+    detalleConLink(aviso.detalle, aviso.link, 400),
     limpiarParametro(aviso.total, 60),
   ];
 }
@@ -318,7 +339,7 @@ export function notificarVendedores(aviso: AvisoPedido, para?: string[]): Promis
     idiomaPedido(),
     PARAMS_PEDIDO,
     parametrosPlantilla(aviso),
-    aviso.texto,
+    textoConLink(aviso.texto, aviso.link),
     para
   );
 }
@@ -330,7 +351,7 @@ export function notificarSolicitudAcceso(aviso: AvisoAcceso, para?: string[]): P
     idiomaAcceso(),
     PARAMS_ACCESO,
     parametrosAcceso(aviso),
-    aviso.texto,
+    textoConLink(aviso.texto, aviso.link),
     para
   );
 }
@@ -346,7 +367,7 @@ export function notificarAviso(aviso: AvisoGenerico, para?: string[]): Promise<W
     process.env.WHATSAPP_TEMPLATE_AVISO_LANG || idiomaPedido(),
     PARAMS_AVISO,
     parametrosAviso(aviso),
-    aviso.texto,
+    textoConLink(aviso.texto, aviso.link),
     para
   );
 }

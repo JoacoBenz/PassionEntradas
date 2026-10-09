@@ -3,6 +3,7 @@ import { timingSafeEqual } from "crypto";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { correrRecordatorios } from "@/lib/avisos-equipo";
 import { isMock } from "@/lib/mock-db";
+import { baseUrlDe } from "@/lib/base-url";
 
 // POST /api/recordatorios — revisa lo que quedó esperando (pedido sin
 // confirmar 2 h, consulta sin cotizar 4 h, cotización por vencer, evento en
@@ -25,11 +26,6 @@ function tokenValido(request: Request): boolean {
   return timingSafeEqual(a, b);
 }
 
-function baseUrlDe(request: Request): string {
-  return process.env.NEXT_PUBLIC_SITE_URL
-    ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
-    : new URL(request.url).origin;
-}
 
 export async function POST(request: Request) {
   if (!tokenValido(request)) {

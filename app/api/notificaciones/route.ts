@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { esStaff, getRol, puedeVerTienda } from "@/lib/auth";
 import type { AvisoGuardado } from "@/lib/avisos";
+import { estadoWhatsappAviso } from "@/lib/recordatorios";
 import { isMock, MOCK_USER, mockActualizarAviso, mockListAvisos } from "@/lib/mock-db";
 
 // La campana. GET: los últimos avisos de quien pregunta y cuántos no leyó.
@@ -43,20 +44,28 @@ const esDe = (q: Quien) => (a: AvisoGuardado) =>
     (q.audiencia === "cliente" && !a.destinatario_id && !!q.email && a.destinatario_email?.toLowerCase() === q.email));
 
 const COLUMNAS = "id, tipo, datos, url, leida_at, created_at";
+// El equipo ve además cómo salió el WhatsApp de cada aviso.
+const COLUMNAS_EQUIPO = "id, tipo, datos, url, leida_at, created_at, whatsapp_estado, whatsapp_error, whatsapp_destino";
+
+type Fila = Pick<
+  AvisoGuardado,
+  "id" | "tipo" | "datos" | "url" | "leida_at" | "created_at" | "whatsapp_estado" | "whatsapp_error" | "whatsapp_destino"
+>;
 
 export async function GET(request: Request) {
   const q = await quien(request);
   if ("error" in q) return NextResponse.json({ error: q.error }, { status: q.status });
 
-  let filas: Pick<AvisoGuardado, "id" | "tipo" | "datos" | "url" | "leida_at" | "created_at">[];
+  let filas: Fila[];
   if (isMock()) {
     filas = mockListAvisos(esDe(q), LIMITE);
   } else {
     const admin = createAdminSupabase();
+    const columnas: string = q.audiencia === "equipo" ? COLUMNAS_EQUIPO : COLUMNAS;
     const consultas = [
       admin
         .from("notificaciones")
-        .select(COLUMNAS)
+        .select(columnas)
         .eq("audiencia", q.audiencia)
         .eq("destinatario_id", q.id)
         .order("created_at", { ascending: false })
@@ -66,7 +75,7 @@ export async function GET(request: Request) {
       consultas.push(
         admin
           .from("notificaciones")
-          .select(COLUMNAS)
+          .select(columnas)
           .eq("audiencia", "cliente")
           .is("destinatario_id", null)
           .ilike("destinatario_email", q.email.replace(/[%_\\]/g, "\\$&"))
@@ -77,7 +86,7 @@ export async function GET(request: Request) {
     const res = await Promise.all(consultas);
     // Sin la tabla (migración sin aplicar) la campana queda vacía, sin error.
     filas = res
-      .flatMap((r) => (r.data ?? []) as typeof filas)
+      .flatMap((r) => (r.data ?? []) as unknown as Fila[])
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
       .slice(0, LIMITE);
   }
@@ -91,6 +100,9 @@ export async function GET(request: Request) {
       url: f.url,
       leida: !!f.leida_at,
       created_at: f.created_at,
+      ...(q.audiencia === "equipo"
+        ? { whatsapp: estadoWhatsappAviso(f) }
+        : {}),
     })),
   });
 }

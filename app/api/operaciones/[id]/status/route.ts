@@ -11,12 +11,8 @@ import {
 import { getRol, nombreDe } from "@/lib/auth";
 import { isMock, mockApplyAction, mockListOps } from "@/lib/mock-db";
 import { avisarCambioAlCliente, COLUMNAS_AVISO, type OpParaAviso } from "@/lib/avisos-cliente";
+import { baseUrlDe } from "@/lib/base-url";
 
-function baseUrlDe(request: Request): string {
-  return process.env.NEXT_PUBLIC_SITE_URL
-    ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
-    : new URL(request.url).origin;
-}
 
 // PATCH /api/operaciones/[id]/status — aplica una acción sobre la operación.
 // "entrada" y "pago" son hitos independientes que se marcan/desmarcan por

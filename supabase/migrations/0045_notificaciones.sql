@@ -32,6 +32,8 @@ create table if not exists public.notificaciones (
   whatsapp_estado text not null default 'no_aplica'
     check (whatsapp_estado in ('no_aplica', 'pendiente', 'enviado', 'error', 'sin_configurar')),
   whatsapp_error text,
+  -- A dónde salió el WhatsApp: el teléfono de la persona, o la lista fija.
+  whatsapp_destino text,
   created_at timestamptz not null default now()
 );
 

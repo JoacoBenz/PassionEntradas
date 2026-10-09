@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   claveAvisoEquipo,
+  DESTINO_LISTA_FIJA,
   edad,
+  estadoWhatsappAviso,
   etiquetaPrioridad,
+  motivoWhatsapp,
   paraModeradores,
   pendienteDeConsulta,
   pendienteDeOp,
@@ -83,5 +86,46 @@ describe("resumen y textos", () => {
     });
     expect(textoAvisoEquipo("raro", {})).toBeNull();
     expect(claveAvisoEquipo("u1", "recordatorio_cotizar", "c1")).toBe("equipo:u1:recordatorio_cotizar:c1");
+  });
+});
+
+describe("estado del WhatsApp en la campana", () => {
+  const meta = (code: number, message: string) =>
+    `WhatsApp no aceptó ningún envío. 5491100000000: 400 {"error":{"message":"${message}","type":"OAuthException","code":${code}}}`;
+
+  it("dice el motivo de los errores de Meta conocidos", () => {
+    expect(motivoWhatsapp(meta(131030, "(#131030) Recipient phone number not in allowed list"))).toBe(
+      "ese número no está en la lista de permitidos de Meta"
+    );
+    expect(motivoWhatsapp(meta(131047, "Re-engagement message"))).toMatch(/24 h/);
+  });
+
+  it("si no lo conoce, el mensaje de Meta; si no hay JSON, el texto", () => {
+    expect(motivoWhatsapp(meta(999, "Something new"))).toBe("Something new");
+    expect(motivoWhatsapp("No hay vendedores cargados en WHATSAPP_VENDEDORES.")).toBe(
+      "No hay vendedores cargados en WHATSAPP_VENDEDORES."
+    );
+    expect(motivoWhatsapp("")).toBe("sin detalle");
+    expect(motivoWhatsapp("x".repeat(300)).length).toBeLessThanOrEqual(140);
+  });
+
+  it("a quién salió, sin mostrar el número", () => {
+    expect(estadoWhatsappAviso({ whatsapp_estado: "enviado", whatsapp_destino: "5491100000000" })).toEqual({
+      tono: "ok",
+      texto: "WhatsApp enviado a tu teléfono",
+    });
+    expect(estadoWhatsappAviso({ whatsapp_estado: "enviado", whatsapp_destino: DESTINO_LISTA_FIJA })?.texto).toBe(
+      "WhatsApp enviado a la lista fija"
+    );
+    expect(
+      estadoWhatsappAviso({ whatsapp_estado: "error", whatsapp_destino: DESTINO_LISTA_FIJA, whatsapp_error: meta(190, "x") })
+    ).toEqual({ tono: "error", texto: "El WhatsApp a la lista fija no salió: el token de WhatsApp venció o no es válido" });
+  });
+
+  it("sin WhatsApp (o todavía saliendo), nada", () => {
+    expect(estadoWhatsappAviso({ whatsapp_estado: "no_aplica" })).toBeNull();
+    expect(estadoWhatsappAviso({ whatsapp_estado: "pendiente" })).toBeNull();
+    expect(estadoWhatsappAviso({})).toBeNull();
+    expect(estadoWhatsappAviso({ whatsapp_estado: "sin_configurar" })?.tono).toBe("gris");
   });
 });

@@ -3,6 +3,7 @@ import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server
 import { esStaff, getRol, nombreDe, puedeVerTienda } from "@/lib/auth";
 import { notificarVendedoresEmail } from "@/lib/email";
 import { avisarEquipo } from "@/lib/avisos-equipo";
+import { baseUrlDe } from "@/lib/base-url";
 import { notificarAviso } from "@/lib/whatsapp";
 import { isMock, MOCK_USER, mockAceptarCotizacion } from "@/lib/mock-db";
 
@@ -99,6 +100,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   // Aviso a los vendedores. Best-effort: el pedido ya quedó creado.
+  const base = baseUrlDe(request);
   try {
     const texto = `${porWhatsapp ? `${quien} registró que el cliente aceptó por WhatsApp` : `El cliente ${quien} aceptó la cotización en la web`}. Se creó el pedido ${op.op_code}.`;
     await Promise.all([
@@ -116,7 +118,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
         // ya lo sabe: queda en la campana, sin WhatsApp.
         porWhatsapp
           ? null
-          : (para) => notificarAviso({ aviso: `✅ Cotización aceptada · pedido ${op.op_code}`, detalle: `El cliente ${quien} la aceptó en la web`, texto }, para)
+          : (para, url) =>
+              notificarAviso(
+                { aviso: `✅ Cotización aceptada · pedido ${op.op_code}`, detalle: `El cliente ${quien} la aceptó en la web`, texto, link: `${base}${url}` },
+                para
+              )
       ),
     ]);
   } catch (e) {

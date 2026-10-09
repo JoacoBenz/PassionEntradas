@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { avisoDeCambio, claveAvisoCliente, emailAviso, idiomaDe, textoAviso } from "./notificaciones";
+import { avisoDeCambio, claveAvisoCliente, emailAviso, estadoAvisoCliente, idiomaDe, textoAviso } from "./notificaciones";
 
 const op = (extra: Record<string, unknown> = {}) =>
   ({
@@ -59,5 +59,27 @@ describe("textos", () => {
     expect(claveAvisoCliente("op1", "entregada")).toBe("cliente:op1:entregada");
     expect(idiomaDe("en")).toBe("en");
     expect(idiomaDe(null)).toBe("es");
+  });
+});
+
+describe("estadoAvisoCliente (tarjeta del panel)", () => {
+  it("dice qué se avisó y cómo salió el email", () => {
+    expect(estadoAvisoCliente({ tipo: "para_pagar", email_estado: "enviado" })).toEqual({
+      titulo: "Ya puede pagar",
+      email: "Email enviado",
+      tono: "ok",
+    });
+    const err = estadoAvisoCliente({ tipo: "entregada", email_estado: "error", email_error: "422 invalid from" });
+    expect(err.tono).toBe("error");
+    expect(err.email).toBe("El email no salió: 422 invalid from");
+  });
+
+  it("sin proveedor o sin email del cliente, en gris", () => {
+    expect(estadoAvisoCliente({ tipo: "pedido_confirmado", email_estado: "sin_configurar" }).email).toMatch(/RESEND_API_KEY/);
+    expect(estadoAvisoCliente({ tipo: "pedido_confirmado", email_estado: "no_aplica" }).tono).toBe("gris");
+  });
+
+  it("un error largo se corta", () => {
+    expect(estadoAvisoCliente({ tipo: "entregada", email_estado: "error", email_error: "x".repeat(400) }).email.length).toBeLessThan(170);
   });
 });

@@ -129,3 +129,36 @@ export function emailAviso(
 export function idiomaDe(v: unknown): Lang {
   return v === "en" ? "en" : "es";
 }
+
+// ---- en el panel: qué se le avisó al cliente y si el email salió -----------
+
+const NOMBRE_AVISO: Record<TipoAvisoCliente, string> = {
+  pedido_confirmado: "Pedido confirmado",
+  para_pagar: "Ya puede pagar",
+  entregada: "Entregada",
+};
+
+export type EstadoEmailCliente = { titulo: string; email: string; tono: "ok" | "error" | "gris" };
+
+/** Una línea por aviso en la tarjeta de la operación (panel, en español). */
+export function estadoAvisoCliente(a: {
+  tipo: string;
+  email_estado: string | null;
+  email_error?: string | null;
+}): EstadoEmailCliente {
+  const titulo = NOMBRE_AVISO[a.tipo as TipoAvisoCliente] ?? a.tipo;
+  switch (a.email_estado) {
+    case "enviado":
+      return { titulo, email: "Email enviado", tono: "ok" };
+    case "error": {
+      const e = String(a.email_error ?? "").trim() || "sin detalle";
+      return { titulo, email: `El email no salió: ${e.length > 140 ? e.slice(0, 139).trimEnd() + "…" : e}`, tono: "error" };
+    }
+    case "sin_configurar":
+      return { titulo, email: "Sin email: falta configurar el envío (RESEND_API_KEY y EMAIL_FROM)", tono: "gris" };
+    case "pendiente":
+      return { titulo, email: "Email saliendo…", tono: "gris" };
+    default:
+      return { titulo, email: "Sin email del cliente: solo en su campana", tono: "gris" };
+  }
+}

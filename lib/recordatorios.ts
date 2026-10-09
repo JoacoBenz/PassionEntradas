@@ -189,3 +189,51 @@ export function textoAvisoEquipo(tipo: string, d: DatosAvisoEquipo): { titulo: s
 export function claveAvisoEquipo(staffId: string, tipo: TipoAvisoEquipo, ref: string): string {
   return `equipo:${staffId}:${tipo}:${ref}`;
 }
+
+// ---- cómo salió el WhatsApp de un aviso (campana del equipo) ----------------
+
+/** `whatsapp_destino` cuando salió a la lista fija WHATSAPP_VENDEDORES. */
+export const DESTINO_LISTA_FIJA = "lista_fija";
+
+// Los errores de Meta que de verdad pasan, dichos para quien mira el panel.
+const MOTIVOS_META: Record<number, string> = {
+  131030: "ese número no está en la lista de permitidos de Meta",
+  131047: "pasaron más de 24 h desde que esa persona le escribió al número (hace falta la plantilla aprobada)",
+  132001: "la plantilla no existe con ese nombre o idioma",
+  132000: "los datos no coinciden con la plantilla",
+  132012: "los datos no coinciden con la plantilla",
+  131026: "ese número no puede recibir mensajes (¿tiene WhatsApp?)",
+  190: "el token de WhatsApp venció o no es válido",
+};
+
+/** El motivo de un envío fallido, corto y en castellano. */
+export function motivoWhatsapp(error: string | null | undefined): string {
+  const e = String(error ?? "").trim();
+  if (!e) return "sin detalle";
+  const code = /"code"\s*:\s*(\d+)/.exec(e);
+  if (code && MOTIVOS_META[Number(code[1])]) return MOTIVOS_META[Number(code[1])];
+  const msg = /"message"\s*:\s*"([^"]+)"/.exec(e);
+  const texto = (msg ? msg[1] : e.replace(/^WhatsApp no aceptó ningún envío\.\s*/, "")).trim();
+  return texto.length > 140 ? texto.slice(0, 139).trimEnd() + "…" : texto;
+}
+
+export type EstadoWhatsappAviso = { tono: "ok" | "error" | "gris"; texto: string };
+
+/** Lo que muestra la campana debajo de cada aviso. null: no se mandó WhatsApp. */
+export function estadoWhatsappAviso(a: {
+  whatsapp_estado?: string | null;
+  whatsapp_error?: string | null;
+  whatsapp_destino?: string | null;
+}): EstadoWhatsappAviso | null {
+  const aQuien = a.whatsapp_destino === DESTINO_LISTA_FIJA ? "a la lista fija" : a.whatsapp_destino ? "a tu teléfono" : "";
+  switch (a.whatsapp_estado) {
+    case "enviado":
+      return { tono: "ok", texto: `WhatsApp enviado ${aQuien}`.trim() };
+    case "error":
+      return { tono: "error", texto: `El WhatsApp ${aQuien ? `${aQuien} ` : ""}no salió: ${motivoWhatsapp(a.whatsapp_error)}` };
+    case "sin_configurar":
+      return { tono: "gris", texto: "WhatsApp sin configurar" };
+    default:
+      return null;
+  }
+}

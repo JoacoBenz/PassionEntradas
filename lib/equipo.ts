@@ -253,3 +253,38 @@ export function parsearAlta(body: unknown): AltaEquipo | { error: string } {
   if (b.rol !== "administrador" && b.rol !== "moderador") return { error: "Rol inválido" };
   return { email, nombre: nombre.slice(0, 80), apellido: txt("apellido").slice(0, 80), rol: b.rol, promover: b.promover === true };
 }
+
+// ---- El vendedor de una operación (decisión 6a) ------------------------------
+
+const normalizar = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * La persona del equipo que es el vendedor de una operación, si el texto de
+ * `vendedor_alias` la nombra SIN dudas: su nombre completo, su nombre de pila,
+ * su email o la parte de antes de la @ (sin mayúsculas ni tildes). Si no
+ * coincide nadie, o coincide más de uno, null: el aviso va a todos los que
+ * correspondan por rol.
+ */
+export function miembroPorAlias(
+  equipo: Pick<MiembroEquipo, "id" | "nombre" | "email" | "activo">[],
+  alias: string | null | undefined
+): string | null {
+  const a = normalizar(alias ?? "");
+  if (!a) return null;
+  const coinciden = equipo.filter((m) => {
+    if (!m.activo) return false;
+    const nombre = normalizar(m.nombre ?? "");
+    const email = normalizar(m.email ?? "");
+    return (
+      (!!nombre && (nombre === a || nombre.split(" ")[0] === a)) ||
+      (!!email && (email === a || email.split("@")[0] === a))
+    );
+  });
+  return coinciden.length === 1 ? coinciden[0].id : null;
+}

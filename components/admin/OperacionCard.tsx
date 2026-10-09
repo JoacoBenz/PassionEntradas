@@ -23,6 +23,7 @@ import {
 } from "@/lib/operaciones";
 import FacturaModal from "./FacturaModal";
 import { fechaDia } from "@/lib/fechas";
+import AvisosAlCliente from "./AvisosAlCliente";
 
 type Props = {
   op: Operacion;
@@ -341,6 +342,9 @@ export default function OperacionCard({
                 </span>
               )}
             </div>
+
+            {/* Lo que se le avisó al cliente y si el email salió. */}
+            {(op.cliente_id || op.cliente_email) && <AvisosAlCliente opId={op.id} version={op.updated_at} />}
 
             {/* Notas internas (solo panel; nunca van al link público) */}
             {(op.notas || (!readOnly && onUpdate)) && (

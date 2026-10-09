@@ -135,3 +135,26 @@ describe("parsearAlta / mensaje", () => {
     expect(msg).toMatch(/Contraseña temporal: p/);
   });
 });
+
+describe("miembroPorAlias (vendedor de la operación)", () => {
+  it("nombre completo, de pila, email o usuario; sin tildes ni mayúsculas", async () => {
+    const { miembroPorAlias } = await import("@/lib/equipo");
+    const eq = [
+      { id: "a", nombre: "Ignacio Pérez", email: "nacho@x.com", activo: true },
+      { id: "b", nombre: "Emilia Gallo", email: "emi@x.com", activo: true },
+      { id: "c", nombre: "Ignacio Ruiz", email: "iruiz@x.com", activo: true },
+      { id: "d", nombre: "Lucho", email: "lucho@x.com", activo: false },
+    ];
+    expect(miembroPorAlias(eq, "Emilia Gallo")).toBe("b");
+    expect(miembroPorAlias(eq, " emilia ")).toBe("b");
+    expect(miembroPorAlias(eq, "ignacio perez")).toBe("a");
+    expect(miembroPorAlias(eq, "nacho")).toBe("a");
+    expect(miembroPorAlias(eq, "NACHO@x.com")).toBe("a");
+    // Dos Ignacio: no se adivina, va a todos.
+    expect(miembroPorAlias(eq, "Ignacio")).toBeNull();
+    // Desactivado o desconocido: nadie.
+    expect(miembroPorAlias(eq, "Lucho")).toBeNull();
+    expect(miembroPorAlias(eq, "vende_lucho")).toBeNull();
+    expect(miembroPorAlias(eq, null)).toBeNull();
+  });
+});
