@@ -132,9 +132,13 @@ export default function AdminDashboard({
   // filtro.
   const [fijas, setFijas] = useState<Set<string>>(new Set());
   const [fijasArriba, setFijasArriba] = useState<Set<string>>(new Set());
+  // Y las que eran prioridad al tocarlas siguen primeras: confirmar una la
+  // sacaba de la prioridad y saltaba al fondo (o a otra página).
+  const [fijasPrioridad, setFijasPrioridad] = useState<Set<string>>(new Set());
   useEffect(() => {
     setFijas(new Set());
     setFijasArriba(new Set());
+    setFijasPrioridad(new Set());
   }, [filtro]);
 
   useEffect(() => {
@@ -217,8 +221,32 @@ export default function AdminDashboard({
 
     // Lo que lleva rato esperando va primero de todo (decisión 7).
     const todas = [...pendientes, ...nuevos, ...resto];
-    return [...todas.filter((f) => prioridades.has(f.id)), ...todas.filter((f) => !prioridades.has(f.id))];
-  }, [ops, consultas, filtro, query, sort, fijas, fijasArriba, ahora, prioridades]);
+    const prio = (f: Fila) => prioridades.has(f.id) || fijasPrioridad.has(f.id);
+    return [...todas.filter(prio), ...todas.filter((f) => !prio(f))];
+  }, [ops, consultas, filtro, query, sort, fijas, fijasArriba, fijasPrioridad, ahora, prioridades]);
+
+  // El aviso rojo cuenta lo que va a mostrar al tocarlo: con el cliente y la
+  // búsqueda de ahora (si no, decía "4 llevan rato" y abría una lista vacía).
+  const nPrioridad = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const coincide = (...campos: (string | null | undefined)[]) =>
+      !q || campos.some((c) => (c ?? "").toLowerCase().includes(q));
+    const f: FiltroPanel = { filtro: "prioridad", ...(filtro.cliente ? { cliente: filtro.cliente } : {}) };
+    return (
+      ops.filter(
+        (o) =>
+          prioridades.has(o.id) &&
+          opCoincide(o, f, ahora) &&
+          coincide(o.evento, o.code, o.comprador_alias, o.vendedor_alias, o.cliente_email)
+      ).length +
+      consultas.filter(
+        (c) =>
+          prioridades.has(c.id) &&
+          consultaCoincide(c, f, ahora) &&
+          coincide(c.evento, c.code, c.comprador_alias, c.cliente_email)
+      ).length
+    );
+  }, [ops, consultas, filtro.cliente, query, ahora, prioridades]);
 
   // Paginado en el cliente: con historial grande, renderizar cientos de
   // cards de una sola vez es lo que pesa (el fetch ya viene topado en 1000).
@@ -285,6 +313,7 @@ export default function AdminDashboard({
 
     setFijas((s) => (s.has(id) ? s : new Set(s).add(id)));
     if (necesitaConfirmar(op)) setFijasArriba((s) => (s.has(id) ? s : new Set(s).add(id)));
+    if (prioridades.has(id)) setFijasPrioridad((s) => (s.has(id) ? s : new Set(s).add(id)));
     if (parche) setOps((prev) => prev.map((o) => (o.id === id ? { ...o, ...parche } : o)));
     else setBusyId(id);
 
@@ -568,14 +597,14 @@ export default function AdminDashboard({
       </div>
 
       {/* Hay cosas esperando de más: a un toque de verlas solas. */}
-      {prioridades.size > 0 && filter !== "prioridad" && (
+      {nPrioridad > 0 && filter !== "prioridad" && (
         <button
           type="button"
           onClick={() => tocarTarjeta("prioridad")}
           className="-mt-3 mb-4 flex w-full items-center gap-2 rounded-xl bg-[#D14D68] px-3.5 py-2 text-left text-xs font-semibold text-white shadow-sm hover:bg-[#bf3f59]"
         >
           <span aria-hidden>●</span>
-          {prioridades.size} {prioridades.size === 1 ? "lleva" : "llevan"} rato esperando
+          {nPrioridad} {nPrioridad === 1 ? "lleva" : "llevan"} rato esperando
           <span className="ml-auto underline">Ver</span>
         </button>
       )}

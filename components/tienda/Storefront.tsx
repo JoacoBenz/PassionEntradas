@@ -46,6 +46,18 @@ function useLang() {
   return [lang, change] as const;
 }
 
+// Cuánto tapa lo que está pegado arriba (header, barra de filtros): lo
+// sticky que ahora mismo está en el borde superior.
+function altoPegadoArriba(): number {
+  let tope = 0;
+  document.querySelectorAll<HTMLElement>(".tienda .masthead--cat, .tienda .masthead--home .toprow, .tienda .bar").forEach((el) => {
+    if (getComputedStyle(el).position !== "sticky") return;
+    const r = el.getBoundingClientRect();
+    if (r.top <= 1 && r.bottom > 0) tope = Math.max(tope, r.bottom);
+  });
+  return tope;
+}
+
 function LangToggle({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => void }) {
   return (
     <div className="lang" role="group" aria-label="Language / Idioma">
@@ -520,7 +532,15 @@ function TicketCardBase({
     const nuevo = foco === hex ? null : hex;
     setFoco(nuevo);
     // Que el mapa se vea: en el celular suele quedar arriba, fuera de pantalla.
-    if (nuevo) mapaRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const mapa = mapaRef.current;
+    if (!nuevo || !mapa) return;
+    // En tablet y escritorio el header y la barra de filtros quedan pegados
+    // arriba: si el mapa está (aunque sea en parte) debajo de ellos, se baja
+    // justo lo necesario para que quede entero a la vista.
+    const tope = altoPegadoArriba();
+    const r = mapa.getBoundingClientRect();
+    if (tope > 0 && r.top < tope + 8) window.scrollBy({ top: r.top - tope - 8, behavior: "smooth" });
+    else mapa.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
   const { title, context } = parseTitle(ev.evento, ev.comp);
   const date = fmtDate(ev.fecha, lang);

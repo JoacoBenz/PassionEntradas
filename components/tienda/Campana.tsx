@@ -86,8 +86,11 @@ export default function Campana({ lang }: { lang: Lang }) {
 
   function abrir() {
     const abrir = !abierta;
-    if (abrir && window.innerWidth < 640 && caja.current) {
-      const r = caja.current.getBoundingClientRect();
+    // A lo ancho de la pantalla en el celular, y también cuando la campana
+    // quedó tan a la izquierda (header partido en dos renglones) que el panel
+    // anclado a ella se saldría por el borde.
+    const r = caja.current?.getBoundingClientRect();
+    if (abrir && r && (window.innerWidth < 640 || r.right < 360 + 16)) {
       setFijo({ position: "fixed", top: r.bottom + 8, left: 16, right: 16, width: "auto" });
     } else {
       setFijo(undefined);
