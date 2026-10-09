@@ -25,6 +25,7 @@ import {
 } from "@/lib/tickets";
 import { LANGS, mesLabelLang, TX, type Lang } from "@/lib/tienda-i18n";
 import { useCart } from "@/components/tienda/Cart";
+import { CapaFoco, useFocoMapa } from "@/components/tienda/MapaFoco";
 import { LegalLinks } from "@/components/tienda/LegalLinks";
 import { empezarNavegacion } from "@/components/NavProgress";
 import type { ResumenHome } from "@/lib/resumen-home";
@@ -98,11 +99,14 @@ function PlanoLightbox({
   alt,
   t,
   onClose,
+  capa = null,
 }: {
   src: string;
   alt: string;
   t: (typeof TX)[Lang];
   onClose: () => void;
+  // Zona marcada en el mapa de la tarjeta (sigue marcada acá).
+  capa?: ImageData | null;
 }) {
   const [nivel, setNivel] = useState(0);
   const zoom = ZOOMS[nivel];
@@ -181,13 +185,15 @@ function PlanoLightbox({
           está acercada. Clic en la imagen = siguiente nivel (y vuelve a 1×
           cuando llegó al último), que es el gesto que se espera en celular. */}
       <div className="plano-scroll" onClick={cerrarSiEsElFondo}>
-        <img
-          src={src}
-          alt={alt}
-          className="plano-img"
-          style={{ width: `${zoom * 100}%` }}
-          onClick={() => setNivel((n) => (n + 1) % ZOOMS.length)}
-        />
+        <span className="plano-capas" style={{ width: `${zoom * 100}%` }}>
+          <img
+            src={src}
+            alt={alt}
+            className="plano-img"
+            onClick={() => setNivel((n) => (n + 1) % ZOOMS.length)}
+          />
+          <CapaFoco capa={capa} className="plano-foco" />
+        </span>
       </div>
     </div>,
     document.body
@@ -325,7 +331,21 @@ function Foot({ lang }: { lang: Lang }) {
 // consulta si no). El cliente junta varias y las envía todas juntas desde la
 // barra del carrito; recién ahí se crean las operaciones y se avisa a los
 // vendedores.
-function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang }) {
+function LadderRow({
+  u,
+  ev,
+  lang,
+  foco = false,
+  onFoco,
+}: {
+  u: Ticket;
+  ev: EventoAgrupado;
+  lang: Lang;
+  // La zona de este sector está marcada en el mapa.
+  foco?: boolean;
+  // Solo si el mapa tiene el color de la zona (ver useFocoMapa).
+  onFoco?: () => void;
+}) {
   const t = TX[lang];
   const cart = useCart();
   const hasPrice = u.precio_final != null && Number(u.precio_final) > 0;
@@ -366,20 +386,40 @@ function LadderRow({ u, ev, lang }: { u: Ticket; ev: EventoAgrupado; lang: Lang 
     <li className={`seat ${bookable ? "" : "seat--req"}`}>
       <span className="seat-name">
         {sector}
-        {zona && (
-          // Sin nombre de zona (el portal mandó un hexa) el chip es solo el
-          // círculo, y más grande: lo que sirve es comparar el color con el
-          // mapa, no leer "#E4572E".
-          <span
-            className={`seat-zona ${zona.texto ? "" : "seat-zona--solo"}`}
-            title={`${t.zonaMapa}: ${zona.texto ?? zona.crudo}`}
-            aria-label={`${t.zonaMapa}: ${zona.texto ?? zona.crudo}`}
+        {zona && onFoco ? (
+          // El mapa tiene este color: el chip marca la zona en el mapa.
+          <button
+            type="button"
+            className={`seat-zona seat-zona--foco ${zona.texto ? "" : "seat-zona--solo"}`}
+            onClick={onFoco}
+            aria-pressed={foco}
+            title={foco ? t.mapaFoco.quitar : t.mapaFoco.ver}
+            aria-label={`${foco ? t.mapaFoco.quitar : t.mapaFoco.ver}: ${zona.texto ?? sector}`}
           >
             {zona.color && (
               <i className="seat-zona-dot" style={{ background: zona.color }} aria-hidden />
             )}
             {zona.texto}
-          </span>
+            <span className="seat-zona-ver" aria-hidden>
+              {foco ? "✕" : "⌖"}
+            </span>
+          </button>
+        ) : (
+          zona && (
+            // Sin nombre de zona (el portal mandó un hexa) el chip es solo el
+            // círculo, y más grande: lo que sirve es comparar el color con el
+            // mapa, no leer "#E4572E".
+            <span
+              className={`seat-zona ${zona.texto ? "" : "seat-zona--solo"}`}
+              title={`${t.zonaMapa}: ${zona.texto ?? zona.crudo}`}
+              aria-label={`${t.zonaMapa}: ${zona.texto ?? zona.crudo}`}
+            >
+              {zona.color && (
+                <i className="seat-zona-dot" style={{ background: zona.color }} aria-hidden />
+              )}
+              {zona.texto}
+            </span>
+          )
         )}
       </span>
       <span className="seat-price">{precio ?? <span className="consult">{t.consultar}</span>}</span>
@@ -465,6 +505,22 @@ function TicketCardBase({
   // Mapa de sectores abierto a pantalla completa.
   const [plano, setPlano] = useState(false);
   const rollRef = useRef<HTMLDivElement>(null);
+  // Zona marcada en el mapa (hexa del sector tocado) y qué zonas se pueden
+  // marcar: el mapa se analiza recién cuando la tarjeta se abre.
+  const [foco, setFoco] = useState<string | null>(null);
+  const mapaRef = useRef<HTMLButtonElement>(null);
+  const focoMapa = useFocoMapa(
+    ev.imagen,
+    ev.ubicaciones.map((u) => u.zona_color ?? ""),
+    abierta
+  );
+  const capa = focoMapa.capa(foco);
+  function tocarZona(hex: string) {
+    const nuevo = foco === hex ? null : hex;
+    setFoco(nuevo);
+    // Que el mapa se vea: en el celular suele quedar arriba, fuera de pantalla.
+    if (nuevo) mapaRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
   const { title, context } = parseTitle(ev.evento, ev.comp);
   const date = fmtDate(ev.fecha, lang);
   const n = ev.ubicaciones.length;
@@ -480,6 +536,7 @@ function TicketCardBase({
   useEffect(() => {
     const roll = rollRef.current;
     if (roll) roll.style.maxHeight = open ? roll.scrollHeight + "px" : "0px";
+    if (!open) setFoco(null);
   }, [open]);
 
   async function share() {
@@ -540,12 +597,14 @@ function TicketCardBase({
             // Enter en teclado. En PC además crece al pasar el mouse (CSS),
             // que para la mayoría de los mapas ya alcanza.
             <button
+              ref={mapaRef}
               type="button"
-              className="mapa-wrap"
+              className={`mapa-wrap ${capa ? "has-foco" : ""}`}
               onClick={() => setPlano(true)}
               aria-label={t.plano.abrir}
               title={t.plano.abrir}
             >
+              <span className="mapa-capas">
               <img
                 src={ev.imagen}
                 alt={`${title} — seating map`}
@@ -559,6 +618,8 @@ function TicketCardBase({
                   if (roll && open) roll.style.maxHeight = roll.scrollHeight + "px";
                 }}
               />
+              <CapaFoco capa={capa} className="mapa-foco" />
+              </span>
               <span className="mapa-lupa" aria-hidden>
                 ⤢
               </span>
@@ -570,12 +631,22 @@ function TicketCardBase({
               alt={`${title} — seating map`}
               t={t}
               onClose={() => setPlano(false)}
+              capa={capa}
             />
           )}
           {abierta && (
             <ul className="ladder">
               {ev.ubicaciones.map((u) => (
-                <LadderRow key={u.id} u={u} ev={ev} lang={lang} />
+                <LadderRow
+                  key={u.id}
+                  u={u}
+                  ev={ev}
+                  lang={lang}
+                  foco={!!foco && foco.toUpperCase() === (u.zona_color ?? "").trim().toUpperCase()}
+                  onFoco={
+                    focoMapa.puede(u.zona_color) ? () => tocarZona((u.zona_color ?? "").trim()) : undefined
+                  }
+                />
               ))}
             </ul>
           )}

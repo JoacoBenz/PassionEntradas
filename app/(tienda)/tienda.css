@@ -279,6 +279,26 @@
   }
 }
 
+/* Zona marcada (lib/mapa-foco.ts): la capa va encima de la imagen con el
+   mismo tamaño y el mismo object-fit, así coincide píxel a píxel. */
+.mapa-capas { position: relative; display: block; }
+.mapa-foco {
+  position: absolute; inset: 1px; width: calc(100% - 2px); height: calc(100% - 2px);
+  object-fit: contain; border-radius: 9px; pointer-events: none;
+  animation: mapa-foco-in .25s ease-out, mapa-foco-pulso 1.6s ease-in-out .25s 3;
+}
+.plano-capas { position: relative; display: block; margin: 0 auto; }
+.plano-capas .plano-img { width: 100%; }
+.plano-foco {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border-radius: 10px; pointer-events: none;
+}
+@keyframes mapa-foco-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mapa-foco-pulso { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) {
+  .mapa-foco { animation: none; }
+}
+
 /* Señal de que se puede agrandar. */
 .mapa-lupa {
   position: absolute; right: 10px; bottom: 10px;
@@ -1319,6 +1339,15 @@
 }
 /* Sin nombre de zona el chip es SOLO el círculo: se agranda todavía más y se
    saca el padding de texto. */
+/* Chip que marca la zona en el mapa: es un botón. */
+.seat-zona--foco {
+  cursor: pointer; background: transparent; font: inherit; font-size: 11px; font-weight: 600;
+  border-color: var(--ink, #171b2b); color: var(--ink, #171b2b);
+}
+.seat-zona--foco:hover { background: rgba(23, 27, 43, .06); }
+.seat-zona--foco[aria-pressed="true"] { background: var(--ink, #171b2b); color: #fff; }
+.seat-zona-ver { font-size: 11px; line-height: 1; margin-left: 2px; }
+.seat-zona--solo.seat-zona--foco { gap: 3px; padding: 3px 6px 3px 3px; }
 .seat-zona--solo {
   padding: 3px;
   gap: 0;
