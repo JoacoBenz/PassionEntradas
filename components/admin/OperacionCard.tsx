@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ConfirmarBoton from "@/components/ConfirmarBoton";
 import {
   HITO_COLOR,
   diasHastaEvento,
@@ -111,7 +112,6 @@ export default function OperacionCard({
   const [open, setOpen] = useState(defaultOpen);
   const [editingNotas, setEditingNotas] = useState(false);
   const [notasDraft, setNotasDraft] = useState(op.notas ?? "");
-  const [confirmandoCancel, setConfirmandoCancel] = useState(false);
   const [facturaAbierta, setFacturaAbierta] = useState(false);
 
   async function copy(text: string, label: string) {
@@ -543,29 +543,22 @@ export default function OperacionCard({
                 </button>
               ) : (
                 !cerrada && (
-                  <button
-                    onClick={() => {
-                      // Dos toques: el primero arma la confirmación (se
-                      // desarma sola a los 4s), el segundo cancela. Evita
-                      // cancelar por un toque accidental en el celular —
-                      // el link público mostraría "Cancelada" al cliente.
-                      if (!confirmandoCancel) {
-                        setConfirmandoCancel(true);
-                        window.setTimeout(() => setConfirmandoCancel(false), 4000);
-                        return;
-                      }
-                      setConfirmandoCancel(false);
-                      onAction?.(op, { action: "cancelar" }, "Operación cancelada");
-                    }}
+                  // Confirmación en el lugar: un toque accidental en el
+                  // celular no puede cancelar (el link público mostraría
+                  // "Cancelada" al cliente).
+                  <ConfirmarBoton
+                    onConfirm={() => onAction?.(op, { action: "cancelar" }, "Operación cancelada")}
                     disabled={busy}
-                    className={`ml-auto rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                      confirmandoCancel
-                        ? "border-estado-cancelada bg-estado-cancelada text-white"
-                        : "border-estado-cancelada text-estado-cancelada hover:bg-estado-cancelada/5"
-                    }`}
+                    className="ml-auto rounded-lg border border-estado-cancelada px-3 py-1.5 text-xs font-semibold text-estado-cancelada transition-colors hover:bg-estado-cancelada/5 disabled:opacity-60"
+                    armadoClassName="ml-auto inline-flex flex-wrap items-center justify-end gap-2"
+                    preguntaClassName="text-xs font-semibold text-ink"
+                    pregunta="¿Cancelar la operación?"
+                    si="Sí, cancelar"
+                    siClassName="rounded-lg bg-estado-cancelada px-3 py-1.5 text-xs font-semibold text-white"
+                    noClassName="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-[#4A4E5E] hover:bg-canvas"
                   >
-                    {confirmandoCancel ? "¿Confirmás cancelar?" : "Cancelar"}
-                  </button>
+                    Cancelar
+                  </ConfirmarBoton>
                 )
               ))}
           </div>

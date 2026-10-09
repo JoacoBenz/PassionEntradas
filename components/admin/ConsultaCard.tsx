@@ -9,6 +9,7 @@
 // la misma lista.
 
 import { useState } from "react";
+import ConfirmarBoton from "@/components/ConfirmarBoton";
 import { formatMonto, quienDe, type Consulta, type Moneda } from "@/lib/operaciones";
 import { parsePrecio } from "@/lib/precios";
 import { estadoCotizacion, tiempoRestante } from "@/lib/cotizaciones";
@@ -50,7 +51,6 @@ export default function ConsultaCard({
   onDescartar,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
   const [confirmandoWa, setConfirmandoWa] = useState(false);
   // Cotizada: se muestra la cotización; "Cambiar" abre el form precargado.
   const est = estadoCotizacion(c);
@@ -285,27 +285,19 @@ export default function ConsultaCard({
             </p>
             <span className="flex flex-wrap items-center gap-2">
               {onDescartar && (
-                <button
-                  onClick={() => {
-                    // Dos toques, igual que cancelar una operación.
-                    if (!confirmandoDescarte) {
-                      setConfirmandoDescarte(true);
-                      window.setTimeout(() => setConfirmandoDescarte(false), 4000);
-                      return;
-                    }
-                    setConfirmandoDescarte(false);
-                    onDescartar(c);
-                  }}
+                <ConfirmarBoton
+                  onConfirm={() => onDescartar(c)}
                   disabled={busy}
-                  className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
-                    confirmandoDescarte
-                      ? "border-estado-cancelada bg-estado-cancelada text-white"
-                      : "border-estado-cancelada text-estado-cancelada hover:bg-estado-cancelada/5"
-                  }`}
+                  className="rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 border-estado-cancelada text-estado-cancelada hover:bg-estado-cancelada/5"
                   title="No hay entrada: se le muestra al cliente como no disponible"
+                  pregunta="¿Descartar la consulta?"
+                  si="Sí, no disponible"
+                  siClassName="rounded-xl bg-estado-cancelada px-3 py-2 text-xs font-semibold text-white"
+                  noClassName="rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-[#4A4E5E] hover:bg-canvas"
+                  preguntaClassName="text-xs font-semibold text-ink"
                 >
-                  {confirmandoDescarte ? "¿Descartar?" : "No disponible"}
-                </button>
+                  No disponible
+                </ConfirmarBoton>
               )}
               {editando && (
                 <button
@@ -331,25 +323,18 @@ export default function ConsultaCard({
           {/* Cotizada: "No disponible" sigue a mano aunque no se edite. */}
           {cotizada && !editando && onDescartar && (
             <div className="mt-3 flex justify-end">
-              <button
-                onClick={() => {
-                  if (!confirmandoDescarte) {
-                    setConfirmandoDescarte(true);
-                    window.setTimeout(() => setConfirmandoDescarte(false), 4000);
-                    return;
-                  }
-                  setConfirmandoDescarte(false);
-                  onDescartar(c);
-                }}
+              <ConfirmarBoton
+                onConfirm={() => onDescartar(c)}
                 disabled={busy}
-                className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
-                  confirmandoDescarte
-                    ? "border-estado-cancelada bg-estado-cancelada text-white"
-                    : "border-estado-cancelada text-estado-cancelada hover:bg-estado-cancelada/5"
-                }`}
+                className="rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 border-estado-cancelada text-estado-cancelada hover:bg-estado-cancelada/5"
+                pregunta="¿Descartar la consulta?"
+                si="Sí, no disponible"
+                siClassName="rounded-xl bg-estado-cancelada px-3 py-2 text-xs font-semibold text-white"
+                noClassName="rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-[#4A4E5E] hover:bg-canvas"
+                preguntaClassName="text-xs font-semibold text-ink"
               >
-                {confirmandoDescarte ? "¿Descartar?" : "No disponible"}
-              </button>
+                No disponible
+              </ConfirmarBoton>
             </div>
           )}
         </div>

@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 import { fmtPrice, type MonedaVenta } from "@/lib/tickets";
 import { TX, type Lang } from "@/lib/tienda-i18n";
+import { resumenCarrito } from "@/lib/carrito";
 
 export type CartItem = {
   key: string; // = ticket_id (una fila del catálogo)
@@ -126,21 +127,19 @@ export function CartBar() {
   const [open, setOpen] = useState(false);
   const [estado, setEstado] = useState<Estado>("idle");
   const [error, setError] = useState("");
+  // "Enviar pedido" no manda nada todavía: abre la revisión (qué es pedido,
+  // qué es consulta, el total y qué pasa después). Recién "Confirmar y
+  // enviar" hace el POST.
+  const [revisando, setRevisando] = useState(false);
 
   // Un total POR MONEDA: pesos y dólares nunca se suman. Cada moneda termina
   // siendo una operación aparte al enviar (ver /api/pedidos).
-  const totales = (["USD", "ARS"] as MonedaVenta[])
-    .map((moneda) => ({
-      moneda,
-      total: items
-        .filter((i) => (i.moneda ?? "USD") === moneda)
-        .reduce((a, i) => a + (i.monto || 0) * i.cantidad, 0),
-    }))
-    .filter((t) => t.total > 0);
+  const { pedidos, consultas, totales } = resumenCarrito(items);
   const totalTexto = totales.map((t) => fmtPrice(t.total, lang, t.moneda)).join(" + ");
 
   function cerrar() {
     setOpen(false);
+    setRevisando(false);
     if (estado === "done" || estado === "err") {
       setEstado("idle");
       setError("");
@@ -174,6 +173,7 @@ export function CartBar() {
         return;
       }
       clear();
+      setRevisando(false);
       setEstado("done");
     } catch {
       setError(c.errRed);
@@ -212,6 +212,89 @@ export function CartBar() {
                   </button>
                 </div>
               </div>
+            ) : revisando ? (
+              <>
+                <div className="cart-h">
+                  <div>
+                    <h2>{c.revTitulo}</h2>
+                    <p>{c.revSub}</p>
+                  </div>
+                  <button type="button" className="cart-x" onClick={cerrar} aria-label={c.cerrar}>
+                    ✕
+                  </button>
+                </div>
+
+                {[
+                  { tipo: "pedido" as const, lineas: pedidos, titulo: c.revPedidos, nota: c.revPedidosNota },
+                  { tipo: "consulta" as const, lineas: consultas, titulo: c.revConsultas, nota: c.revConsultasNota },
+                ]
+                  .filter((g) => g.lineas.length > 0)
+                  .map((g) => (
+                    <section className="cart-rev-grupo" key={g.tipo}>
+                      <h3>
+                        <span className={`cart-it-tag ${g.tipo}`}>{g.titulo}</span>
+                        <span className="cart-rev-nota">{g.nota}</span>
+                      </h3>
+                      <ul className="cart-rev-list">
+                        {g.lineas.map((i) => (
+                          <li key={i.key}>
+                            <span className="cart-rev-desc">
+                              <span className="cart-it-ev">{i.evento}</span>
+                              <span className="cart-it-meta">
+                                {i.sector}
+                                {i.cantidad > 1 ? ` ×${i.cantidad}` : ""}
+                              </span>
+                            </span>
+                            <span className="cart-it-price">
+                              {i.monto > 0
+                                ? fmtPrice(i.monto * i.cantidad, lang, i.moneda ?? "USD")
+                                : c.aConsultar}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  ))}
+
+                {totales.map((t) => (
+                  <div className="cart-total" key={t.moneda}>
+                    <span>{totales.length > 1 ? `${c.total} (${t.moneda})` : c.total}</span>
+                    <span>{fmtPrice(t.total, lang, t.moneda)}</span>
+                  </div>
+                ))}
+                {totales.length > 1 && <p className="cart-nota-monedas">{c.dosMonedas}</p>}
+
+                <div className="cart-rev-sigue">
+                  <strong>{c.revQueSigue}</strong>
+                  <p>{c.revQueSigueP}</p>
+                </div>
+
+                {estado === "err" && <p className="cart-err">{error}</p>}
+
+                <div className="cart-actions">
+                  <button
+                    type="button"
+                    className="cart-keep"
+                    onClick={() => {
+                      setRevisando(false);
+                      if (estado === "err") setEstado("idle");
+                    }}
+                    disabled={estado === "sending"}
+                  >
+                    {c.revVolver}
+                  </button>
+                  {/* Deshabilitado mientras sale: un doble toque no manda dos
+                      veces (y el server igual deduplica el envío). */}
+                  <button
+                    type="button"
+                    className="cart-send"
+                    onClick={enviar}
+                    disabled={estado === "sending" || items.length === 0}
+                  >
+                    {estado === "sending" ? c.enviando : c.revConfirmar}
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 <div className="cart-h">
@@ -298,10 +381,13 @@ export function CartBar() {
                   <button
                     type="button"
                     className="cart-send"
-                    onClick={enviar}
-                    disabled={estado === "sending" || items.length === 0}
+                    onClick={() => {
+                      setRevisando(true);
+                      if (estado === "err") setEstado("idle");
+                    }}
+                    disabled={items.length === 0}
                   >
-                    {estado === "sending" ? c.enviando : c.enviar}
+                    {c.enviar}
                   </button>
                 </div>
               </>

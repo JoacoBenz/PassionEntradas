@@ -34,7 +34,7 @@ type OpMetrica = Pick<
 
 // Día (YYYY-MM-DD) en hora argentina: un pago confirmado a las 22 h de
 // Buenos Aires ya es el día siguiente en UTC, y caía en el rango equivocado.
-function diaAr(iso: string): string {
+export function diaAr(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(
     new Date(iso)
   );

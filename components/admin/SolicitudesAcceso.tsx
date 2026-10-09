@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { SolicitudAcceso } from "@/lib/acceso";
 import { fechaHora } from "@/lib/fechas";
+import ConfirmarBoton from "@/components/ConfirmarBoton";
 
 // Cola de solicitudes de acceso a la tienda. El admin aprueba (crea el usuario
 // cliente y muestra las credenciales UNA vez) o rechaza. Al aprobar se ofrecen
@@ -77,7 +78,6 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
 
   async function decidir(id: string, accion: "aprobar" | "rechazar") {
     if (busy[id]) return;
-    if (accion === "rechazar" && !confirm("¿Rechazar esta solicitud?")) return;
     setBusy((b) => ({ ...b, [id]: true }));
     try {
       const res = await fetch(`/api/acceso/${id}/decidir`, {
@@ -128,8 +128,6 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
   // regenera la contraseña y muestra las credenciales nuevas para reenviar.
   async function reenviar(id: string) {
     if (busy[id]) return;
-    if (!confirm("Reenviar el acceso genera una contraseña nueva (la anterior deja de funcionar). ¿Continuar?"))
-      return;
     setBusy((b) => ({ ...b, [id]: true }));
     try {
       const res = await fetch(`/api/acceso/${id}/reenviar`, { method: "POST" });
@@ -160,11 +158,6 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
   // Revoca / reactiva el acceso de un cliente aprobado.
   async function revocar(id: string, accion: "revocar" | "reactivar") {
     if (busy[id]) return;
-    const msg =
-      accion === "revocar"
-        ? "Revocar el acceso: el cliente deja de poder entrar hasta que lo reactives. ¿Continuar?"
-        : "Reactivar el acceso de este cliente?";
-    if (!confirm(msg)) return;
     setBusy((b) => ({ ...b, [id]: true }));
     try {
       const res = await fetch(`/api/acceso/${id}/revocar`, {
@@ -227,6 +220,14 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
     "rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50";
   const btnWarn =
     "rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50";
+  // "Sí" de las confirmaciones en línea (ConfirmarBoton).
+  const btnSiDanger =
+    "rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700";
+  const btnSiWarn =
+    "rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700";
+  const btnSiBrand =
+    "rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-deep";
+  const preguntaCls = "text-xs font-semibold text-ink";
 
   return (
     <section className="card-shadow overflow-hidden rounded-2xl">
@@ -307,13 +308,18 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
                     >
                       {busy[s.id] ? "…" : "Aprobar y crear acceso"}
                     </button>
-                    <button
-                      onClick={() => decidir(s.id, "rechazar")}
+                    <ConfirmarBoton
+                      onConfirm={() => decidir(s.id, "rechazar")}
                       disabled={busy[s.id]}
                       className={btnDanger}
+                      pregunta="¿Rechazar la solicitud?"
+                      si="Sí, rechazar"
+                      siClassName={btnSiDanger}
+                      noClassName={btnGhost}
+                      preguntaClassName={preguntaCls}
                     >
                       Rechazar
-                    </button>
+                    </ConfirmarBoton>
                   </div>
                 </div>
               ))
@@ -448,32 +454,47 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
                       )}
                       {s.estado === "aprobada" && !revocada && !s.equipo && (
                         <>
-                          <button
-                            onClick={() => reenviar(s.id)}
+                          <ConfirmarBoton
+                            onConfirm={() => reenviar(s.id)}
                             disabled={busy[s.id]}
                             className={btnGhost}
                             title="Genera una contraseña nueva y muestra las credenciales para reenviarlas"
+                            pregunta="La contraseña actual deja de andar. ¿Seguro?"
+                            si="Sí, nueva contraseña"
+                            siClassName={btnSiBrand}
+                            noClassName={btnGhost}
+                            preguntaClassName={preguntaCls}
                           >
                             {busy[s.id] ? "…" : "Reenviar acceso"}
-                          </button>
-                          <button
-                            onClick={() => revocar(s.id, "revocar")}
+                          </ConfirmarBoton>
+                          <ConfirmarBoton
+                            onConfirm={() => revocar(s.id, "revocar")}
                             disabled={busy[s.id]}
                             className={btnWarn}
                             title="El cliente deja de poder entrar hasta que lo reactives"
+                            pregunta="Deja de poder entrar. ¿Seguro?"
+                            si="Sí, revocar"
+                            siClassName={btnSiWarn}
+                            noClassName={btnGhost}
+                            preguntaClassName={preguntaCls}
                           >
                             Revocar
-                          </button>
+                          </ConfirmarBoton>
                         </>
                       )}
                       {revocada && !s.equipo && (
-                        <button
-                          onClick={() => revocar(s.id, "reactivar")}
+                        <ConfirmarBoton
+                          onConfirm={() => revocar(s.id, "reactivar")}
                           disabled={busy[s.id]}
                           className={btnGhost}
+                          pregunta="¿Reactivar el acceso?"
+                          si="Sí, reactivar"
+                          siClassName={btnSiBrand}
+                          noClassName={btnGhost}
+                          preguntaClassName={preguntaCls}
                         >
                           {busy[s.id] ? "…" : "Reactivar"}
-                        </button>
+                        </ConfirmarBoton>
                       )}
                     </div>
                   </div>

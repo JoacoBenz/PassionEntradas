@@ -1192,6 +1192,12 @@
 .mp-link--cancelar { background: transparent; color: #b3263f; border-color: #b3263f; cursor: pointer; }
 .mp-link--cancelar:hover { background: #b3263f; color: #fff; }
 .mp-link--cancelar:disabled { opacity: .6; cursor: wait; }
+/* Confirmación en el lugar (ConfirmarBoton): pregunta + "Sí, …" + "No". */
+.mp-confirma { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mp-confirma-pregunta { font-size: 13px; font-weight: 600; color: var(--ink); }
+.mp-link--cancelar-si { background: #b3263f; border-color: #b3263f; color: #fff; cursor: pointer; }
+.mp-link--cancelar-si:hover { background: #8f1e32; border-color: #8f1e32; color: #fff; }
+.mp-link--no { background: transparent; cursor: pointer; }
 .mp-empty {
   text-align: center; background: var(--field); border: 1.5px dashed var(--ink);
   padding: 40px 24px; box-shadow: 4px 4px 0 var(--ink);
@@ -1374,6 +1380,17 @@
    son pedidos separados. */
 .cart-total + .cart-total { border-top: 0; padding-top: 2px; margin-top: 0; }
 .cart-nota-monedas { font-size: 12px; color: var(--mute, #6a6e7e); margin: 4px 0 0; line-height: 1.4; }
+/* Paso de revisión antes de "Confirmar y enviar". */
+.cart-rev-grupo { margin: 14px 0 0; }
+.cart-rev-grupo h3 { margin: 0 0 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 600; }
+.cart-rev-nota { color: var(--mute); font-weight: 400; font-size: 12px; }
+.cart-rev-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cart-rev-list li { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+  padding-bottom: 8px; border-bottom: 1px dashed var(--line, #d6d3c8); }
+.cart-rev-desc { display: flex; flex-direction: column; min-width: 0; }
+.cart-rev-sigue { margin: 14px 0 0; padding: 10px 12px; border: 1.5px solid var(--ink); background: var(--field); font-size: 13px; line-height: 1.5; }
+.cart-rev-sigue p { margin: 4px 0 0; color: var(--mute); }
+.cart-keep:disabled { opacity: .5; cursor: default; }
 
 /* Esqueleto de carga (components/Esqueletos.tsx). */
 .sk-tienda { display: flex; flex-direction: column; gap: 14px; padding: 22px 0 40px; }

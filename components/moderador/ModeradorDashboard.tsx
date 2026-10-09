@@ -15,6 +15,7 @@ type Props = {
   metrics: Metrics;
   baseUrl: string;
   prefill?: { evento?: string; ticketId?: string };
+  enlacesPanel?: boolean;
 };
 
 // Módulo del moderador: carga la entrada a vender con los datos de
@@ -25,6 +26,7 @@ export default function ModeradorDashboard({
   metrics,
   baseUrl,
   prefill,
+  enlacesPanel = false,
 }: Props) {
   const [ops, setOps] = useState<Operacion[]>(initial);
   // Lista viva: AutoRefresh vuelve a pedir la página cada tanto y `initial`
@@ -127,7 +129,7 @@ export default function ModeradorDashboard({
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
       {/* Resumen */}
-      <MetricsBoard metrics={metrics} />
+      <MetricsBoard metrics={metrics} enlacesPanel={enlacesPanel} />
 
       {/* Módulo de carga: el foco de esta página, a lo ancho y arriba de todo. */}
       <section className="mt-6">

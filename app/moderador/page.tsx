@@ -104,6 +104,8 @@ export default async function ModeradorPage({
         consultas={consultas}
         metrics={metrics}
         baseUrl={getBaseUrl()}
+        // Las tarjetas de plata abren el Panel filtrado: solo el admin entra ahí.
+        enlacesPanel={esAdmin}
         prefill={
           searchParams?.evento || searchParams?.ticket
             ? { evento: searchParams.evento, ticketId: searchParams.ticket }

@@ -5,6 +5,14 @@ import { fusionarRefresco, parcheOptimista, previoDe } from "@/lib/estado-local"
 import { useRouter } from "next/navigation";
 import { estadoCotizacion } from "@/lib/cotizaciones";
 import {
+  consultaCoincide,
+  etiquetaFiltro,
+  opCoincide,
+  PESTANAS,
+  type Filtro,
+  type FiltroPanel,
+} from "@/lib/panel-filtros";
+import {
   diasHastaEvento,
   estadoDe,
   necesitaConfirmar,
@@ -31,46 +39,14 @@ type Props = {
   // lugar, y una consulta es trabajo pendiente igual que una operación.
   consultas?: Consulta[];
   baseUrl: string;
+  // Filtro con el que abre (?filtro=… desde las tarjetas de Métricas).
+  filtroInicial?: FiltroPanel;
 };
 
 // Fila de la lista: o una operación, o una consulta sin cotizar.
 type Fila =
   | { kind: "op"; id: string; created_at: string; op: Operacion }
   | { kind: "consulta"; id: string; created_at: string; consulta: Consulta };
-
-type Filter = "todas" | "nuevos" | "en_curso" | "para_cerrar" | "cerradas" | "canceladas";
-
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "todas", label: "Todas" },
-  // Pedidos de la tienda que esperan "Confirmar pedido".
-  { key: "nuevos", label: "Nuevos" },
-  { key: "en_curso", label: "En curso" },
-  { key: "para_cerrar", label: "Para entregar" },
-  { key: "cerradas", label: "Entregadas" },
-  { key: "canceladas", label: "Canceladas" },
-];
-
-function matches(op: Operacion, filter: Filter): boolean {
-  const estado = estadoDe(op);
-  switch (filter) {
-    case "todas":
-      return true;
-    case "nuevos":
-      return necesitaConfirmar(op);
-    case "en_curso":
-      return (
-        estado !== "cerrada" &&
-        estado !== "cancelada" &&
-        estado !== "lista_para_cerrar"
-      );
-    case "para_cerrar":
-      return estado === "lista_para_cerrar";
-    case "cerradas":
-      return estado === "cerrada";
-    case "canceladas":
-      return estado === "cancelada";
-  }
-}
 
 // Módulo del administrador: chequea la lista y actualiza estados.
 // La carga de operaciones nuevas vive en el módulo /moderador.
@@ -79,6 +55,7 @@ export default function AdminDashboard({
   items = [],
   consultas: consultasIniciales = [],
   baseUrl,
+  filtroInicial = { filtro: "todas" },
 }: Props) {
   // Índice operación -> líneas, armado una vez por render en vez de filtrar
   // el array completo dentro de cada tarjeta.
@@ -95,7 +72,10 @@ export default function AdminDashboard({
   const [ops, setOps] = useState<Operacion[]>(initial);
   const [consultas, setConsultas] = useState<Consulta[]>(consultasIniciales);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("todas");
+  const [filtro, setFiltro] = useState<FiltroPanel>(filtroInicial);
+  const filter = filtro.filtro;
+  const setFilter = (f: Filtro) => setFiltro({ filtro: f });
+  const listaRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"recientes" | "urgentes">("recientes");
   const [page, setPage] = useState(1);
@@ -105,7 +85,7 @@ export default function AdminDashboard({
   // Cambiar filtro, búsqueda u orden vuelve a la primera página.
   useEffect(() => {
     setPage(1);
-  }, [filter, query, sort]);
+  }, [filtro, query, sort]);
 
   // Clicks de estado (ver lib/estado-local.ts): fila por operación, cuántos
   // hay en vuelo, y el updated_at de la última respuesta de cada una.
@@ -140,7 +120,7 @@ export default function AdminDashboard({
   useEffect(() => {
     setFijas(new Set());
     setFijasArriba(new Set());
-  }, [filter]);
+  }, [filtro]);
 
   useEffect(() => {
     setConsultas(consultasIniciales);
@@ -168,7 +148,7 @@ export default function AdminDashboard({
     let filas: Fila[] = ops
       .filter(
         (o) =>
-          (matches(o, filter) || fijas.has(o.id)) &&
+          (opCoincide(o, filtro) || fijas.has(o.id)) &&
           coincide(o.evento, o.code, o.comprador_alias, o.vendedor_alias, o.cliente_email)
       )
       .map((op) => ({ kind: "op" as const, id: op.id, created_at: op.created_at, op }));
@@ -190,13 +170,16 @@ export default function AdminDashboard({
     // Las consultas van SIEMPRE arriba: son las únicas filas que esperan algo
     // del admin (chequear stock y cerrar precio). Con el paginado, dejarlas
     // ordenadas por fecha las mandaba a la página 3 y no las veía nadie.
-    // Solo aparecen en los filtros donde "trabajo pendiente" tiene sentido.
-    const muestraConsultas = filter === "todas" || filter === "en_curso";
-    const pendientes: Fila[] = muestraConsultas
-      ? consultas
-          .filter((c) => coincide(c.evento, c.code, c.comprador_alias, c.cliente_email))
-          .map((c) => ({ kind: "consulta" as const, id: c.id, created_at: c.created_at, consulta: c }))
-      : [];
+    // Solo aparecen en los filtros donde "trabajo pendiente" tiene sentido,
+    // y en los dos de consultas (A cotizar / Esperando cliente).
+    const ahora = new Date();
+    const pendientes: Fila[] = consultas
+      .filter(
+        (c) =>
+          consultaCoincide(c, filtro, ahora) &&
+          coincide(c.evento, c.code, c.comprador_alias, c.cliente_email)
+      )
+      .map((c) => ({ kind: "consulta" as const, id: c.id, created_at: c.created_at, consulta: c }));
 
     // Los pedidos nuevos (sin confirmar) también esperan al admin: van arriba,
     // justo después de las consultas.
@@ -205,7 +188,7 @@ export default function AdminDashboard({
     const resto = filas.filter((f) => !arriba(f));
 
     return [...pendientes, ...nuevos, ...resto];
-  }, [ops, consultas, filter, query, sort, fijas, fijasArriba]);
+  }, [ops, consultas, filtro, query, sort, fijas, fijasArriba]);
 
   // Paginado en el cliente: con historial grande, renderizar cientos de
   // cards de una sola vez es lo que pesa (el fetch ya viene topado en 1000).
@@ -213,6 +196,21 @@ export default function AdminDashboard({
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const pagina = Math.min(page, totalPages);
   const enPagina = visible.slice((pagina - 1) * PAGE_SIZE, pagina * PAGE_SIZE);
+
+  // Tarjeta del resumen: filtra la lista y la trae a la vista. Tocar la
+  // activa la saca.
+  function tocarTarjeta(f: Filtro) {
+    setFiltro(filter === f ? { filtro: "todas" } : { filtro: f });
+    if (filter !== f) listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // Al abrir con un filtro de la URL, la lista ya arranca a la vista.
+  useEffect(() => {
+    if (filtroInicial.filtro !== "todas") listaRef.current?.scrollIntoView({ block: "start" });
+    // Solo al montar: después manda el estado local.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const chip = etiquetaFiltro(filtro);
 
   function irAPagina(n: number) {
     setPage(Math.min(Math.max(1, n), totalPages));
@@ -426,14 +424,15 @@ export default function AdminDashboard({
         <div className="grid grid-cols-2 divide-x divide-dashed divide-line sm:grid-cols-5">
           {/* "A cotizar" son las consultas: entradas que el cliente pidió y
               todavía hay que chequear si están y a cuánto. */}
-          <Stat label="A cotizar" value={stats.aCotizar} accent="#B07A14" />
+          {/* Cada tarjeta filtra la lista (tocarla de nuevo la limpia). */}
+          <Stat label="A cotizar" value={stats.aCotizar} accent="#B07A14" activa={filter === "a_cotizar"} onClick={() => tocarTarjeta("a_cotizar")} />
           {/* Cotizaciones mandadas que el cliente todavía no respondió. */}
-          <Stat label="Esperando cliente" value={stats.esperando} accent="#D14D68" />
-          <Stat label="En curso" value={stats.enCurso} accent="#1F33E0" />
-          <Stat label="Para entregar" value={stats.paraCerrar} accent="#0D9377" />
+          <Stat label="Esperando cliente" value={stats.esperando} accent="#D14D68" activa={filter === "esperando"} onClick={() => tocarTarjeta("esperando")} />
+          <Stat label="En curso" value={stats.enCurso} accent="#1F33E0" activa={filter === "en_curso"} onClick={() => tocarTarjeta("en_curso")} />
+          <Stat label="Para entregar" value={stats.paraCerrar} accent="#0D9377" activa={filter === "para_cerrar"} onClick={() => tocarTarjeta("para_cerrar")} />
           {/* Quinta celda: en celular ocupa la fila entera (2 columnas). */}
           <div className="col-span-2 border-t border-dashed border-line sm:col-span-1 sm:border-t-0">
-            <Stat label="Entregadas" value={stats.cerradas} accent="#6C5BF2" />
+            <Stat label="Entregadas" value={stats.cerradas} accent="#6C5BF2" activa={filter === "cerradas"} onClick={() => tocarTarjeta("cerradas")} />
           </div>
         </div>
       </section>
@@ -475,11 +474,12 @@ export default function AdminDashboard({
           lo reparten en partes iguales — nada de barra corta ni scroll
           horizontal con tabs cortados. */}
       <div
+        ref={listaRef}
         role="tablist"
         aria-label="Filtrar operaciones"
-        className="mb-5 grid w-full grid-cols-3 gap-1 rounded-xl border border-line bg-white p-1 shadow-sm sm:flex"
+        className="mb-5 scroll-mt-4 grid w-full grid-cols-3 gap-1 rounded-xl border border-line bg-white p-1 shadow-sm sm:flex"
       >
-        {FILTERS.map((f) => {
+        {PESTANAS.map((f) => {
           const active = filter === f.key;
           return (
             <button
@@ -508,6 +508,21 @@ export default function AdminDashboard({
           );
         })}
       </div>
+
+      {/* Filtro que vino de una tarjeta y no es pestaña: se ve y se saca. */}
+      {chip && (
+        <div className="-mt-3 mb-4 flex">
+          <button
+            type="button"
+            onClick={() => setFilter("todas")}
+            className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-xs font-semibold text-white"
+            aria-label={`Quitar filtro: ${chip}`}
+          >
+            {chip}
+            <span aria-hidden>✕</span>
+          </button>
+        </div>
+      )}
 
       {/* Leyenda del semáforo: los tres estados que se accionan. El gris no
           está porque no es un estado, es "todavía no pasó nada". */}
@@ -539,7 +554,9 @@ export default function AdminDashboard({
           <div className="rounded-2xl border border-dashed border-[#C5C9D6] bg-white/50 px-4 py-10 text-center text-sm text-muted">
             {ops.length === 0 && consultas.length === 0
               ? "Todavía no hay operaciones. Se cargan desde el módulo de carga."
-              : "No hay operaciones con este filtro."}
+              : chip
+                ? "Nada con este filtro por ahora."
+                : "No hay operaciones con este filtro."}
           </div>
         ) : (
           enPagina.map((fila) =>
@@ -604,16 +621,29 @@ function Stat({
   label,
   value,
   accent,
+  activa,
+  onClick,
 }: {
   label: string;
   value: number;
   accent: string;
+  activa: boolean;
+  onClick: () => void;
 }) {
   return (
     // Estilo del mock aprobado: label en mono chiquito y número gordo a la
     // izquierda. flex-col + justify-between mantiene los números alineados
     // aunque un label envuelva a dos líneas en móvil.
-    <div className="flex h-full flex-col justify-between gap-1 px-4 py-3.5 text-left">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={activa}
+      title={activa ? "Quitar filtro" : `Ver solo: ${label}`}
+      className={`flex h-full w-full flex-col justify-between gap-1 px-4 py-3.5 text-left transition-colors hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand ${
+        activa ? "bg-canvas shadow-[inset_0_-3px_0_currentColor]" : ""
+      }`}
+      style={activa ? { color: accent } : undefined}
+    >
       <p className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
         {label}
       </p>
@@ -623,6 +653,6 @@ function Stat({
       >
         {String(value).padStart(2, "0")}
       </p>
-    </div>
+    </button>
   );
 }

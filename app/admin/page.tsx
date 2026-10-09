@@ -8,6 +8,7 @@ import AutoRefresh from "@/components/AutoRefresh";
 import BottomNav from "@/components/BottomNav";
 import type { Consulta, Operacion, OperacionItem } from "@/lib/operaciones";
 import { usuarioVerificado } from "@/lib/usuario-verificado";
+import { filtroDeParams } from "@/lib/panel-filtros";
 import {
   isMock,
   MOCK_USER,
@@ -30,7 +31,12 @@ function getBaseUrl(): string {
 }
 
 // Módulo del administrador: chequea y actualiza los estados.
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  // ?filtro=… viene de las tarjetas de plata de Métricas.
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   let email: string | null | undefined;
   let ops: Operacion[];
   let items: OperacionItem[] = [];
@@ -107,6 +113,7 @@ export default async function AdminPage() {
         items={items}
         consultas={consultas}
         baseUrl={getBaseUrl()}
+        filtroInicial={filtroDeParams(searchParams)}
       />
       <BottomNav />
     </main>
