@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol, puedeVerTienda, nombreDe } from "@/lib/auth";
 import { formatMonto, generateCode, type TipoOperacion } from "@/lib/operaciones";
-import { notificarVendedores } from "@/lib/whatsapp";
+import { notificarVendedores, type WhatsappResult } from "@/lib/whatsapp";
+import { avisarEquipo } from "@/lib/avisos-equipo";
 import { notificarVendedoresEmail } from "@/lib/email";
 import {
   isMock,
@@ -459,17 +460,56 @@ export async function POST(request: Request) {
         (consultasCreadas.length > 0 ? " + a cotizar" : "")
       : "a cotizar";
 
-  const [wa, mail] = await Promise.all([
-    notificarVendedores({
-      tipo: TIPO_ENVIO_LABEL[tipoEnvio],
-      cliente: quien,
-      entradas: totalEntradas,
-      detalle: detalleDeLineas(lineasPedido, lineasConsulta),
-      total: totalCorto,
-      texto: mensaje,
-    }),
-    notificarVendedoresEmail(asunto, mensaje),
-  ]);
+  const avisoPedido = {
+    tipo: TIPO_ENVIO_LABEL[tipoEnvio],
+    cliente: quien,
+    entradas: totalEntradas,
+    detalle: detalleDeLineas(lineasPedido, lineasConsulta),
+    total: totalCorto,
+    texto: mensaje,
+  };
+  const enviarWa = (para?: string[]) => notificarVendedores(avisoPedido, para);
+  const admin = isMock() ? null : createAdminSupabase();
+  const datos = { cliente: ctx.comprador, detalle: avisoPedido.detalle, total: totalCorto };
+
+  // Campana del equipo + WhatsApp (ver lib/avisos-equipo). Un pedido lo
+  // acciona el admin; una consulta la puede cotizar también el moderador. En
+  // un envío mixto el admin recibe UN aviso (el del pedido, con todo) y el
+  // moderador el de la consulta.
+  const avisos: Promise<{ whatsapp: WhatsappResult | null }>[] = [];
+  if (operaciones.length > 0) {
+    avisos.push(
+      avisarEquipo(
+        admin,
+        { tipo: "nuevo_pedido", ref: envioId, datos, url: "/admin?filtro=nuevos", operacion_id: operaciones[0].id, roles: ["administrador"] },
+        enviarWa
+      )
+    );
+  }
+  if (consultasCreadas.length > 0) {
+    avisos.push(
+      avisarEquipo(
+        admin,
+        {
+          tipo: "nueva_consulta",
+          ref: envioId,
+          datos,
+          url: "/admin?filtro=a_cotizar",
+          consulta_id: consultasCreadas[0].id,
+          roles: operaciones.length > 0 ? ["moderador"] : ["administrador", "moderador"],
+        },
+        // En un envío mixto la lista fija (sin `para`) ya recibió el aviso
+        // del pedido: acá solo van los moderadores que lo activaron.
+        operaciones.length > 0
+          ? (para) => (para ? enviarWa(para) : Promise.resolve({ ok: false, noConfigurado: true, error: "Ya avisado." }))
+          : enviarWa
+      )
+    );
+  }
+  const [resultados, mail] = await Promise.all([Promise.all(avisos), notificarVendedoresEmail(asunto, mensaje)]);
+  const wa: WhatsappResult =
+    resultados.map((r) => r.whatsapp).find((r): r is WhatsappResult => r !== null) ??
+    { ok: false, error: "No había a quién avisar por WhatsApp.", noConfigurado: true };
 
   return NextResponse.json(
     {

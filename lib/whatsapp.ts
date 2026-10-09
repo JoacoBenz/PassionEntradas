@@ -73,6 +73,20 @@ export function limpiarParametro(valor: string, max = 300): string {
 // WHATSAPP_TEMPLATE_NUMERICO=1 y se mandan por posición.
 export const PARAMS_PEDIDO = ["pedido", "cliente", "entrada", "detalle", "total"] as const;
 export const PARAMS_ACCESO = ["nombre", "email", "telefono", "legajo"] as const;
+// Plantilla genérica `aviso_operacion` (cliente aceptó/canceló, recordatorios):
+// una línea de qué pasó y una con el detalle o el link.
+export const PARAMS_AVISO = ["aviso", "detalle"] as const;
+
+export function plantillaAvisoConfigurada(): boolean {
+  return Boolean(process.env.WHATSAPP_TEMPLATE_AVISO);
+}
+
+/** Aviso genérico al equipo: qué pasó y el detalle, en una línea cada uno. */
+export type AvisoGenerico = { aviso: string; detalle: string; texto: string };
+
+export function parametrosAviso(a: AvisoGenerico): string[] {
+  return [limpiarParametro(a.aviso, 200), limpiarParametro(a.detalle, 400)];
+}
 
 export type ParametroPlantilla =
   | { type: "text"; text: string }
@@ -114,11 +128,12 @@ export function parametrosAcceso(aviso: AvisoAcceso): string[] {
 }
 
 export function whatsappConfigurado(): boolean {
-  return Boolean(
-    process.env.WHATSAPP_TOKEN &&
-      process.env.WHATSAPP_PHONE_ID &&
-      process.env.WHATSAPP_VENDEDORES
-  );
+  return apiWhatsappConfigurada() && Boolean(process.env.WHATSAPP_VENDEDORES);
+}
+
+/** El número de WhatsApp Business está conectado (token + phone id). */
+export function apiWhatsappConfigurada(): boolean {
+  return Boolean(process.env.WHATSAPP_TOKEN && process.env.WHATSAPP_PHONE_ID);
 }
 
 // Destinatarios (vendedores) parseados del env. Vacío si no está configurado.
@@ -175,21 +190,25 @@ export type WhatsappResult =
 // (el pedido, o la solicitud, ya quedaron registrados antes de llamar acá).
 //
 // Si hay plantilla configurada se manda como plantilla; si no, texto libre.
+//
+// `para`: a quién (los del equipo con el aviso activado). Sin `para`, a la
+// lista fija de WHATSAPP_VENDEDORES, como siempre.
 async function enviar(
   plantilla: string | undefined,
   idioma: string,
   nombres: readonly string[],
   valores: string[],
-  texto: string
+  texto: string,
+  para?: string[]
 ): Promise<WhatsappResult> {
-  if (!whatsappConfigurado()) {
+  if (para ? !apiWhatsappConfigurada() : !whatsappConfigurado()) {
     return {
       ok: false,
       noConfigurado: true,
       error: "El aviso por WhatsApp no está configurado (falta conectar el número de WhatsApp Business).",
     };
   }
-  const destinos = vendedores();
+  const destinos = para ? para.map((n) => n.replace(/[^\d]/g, "")).filter(Boolean) : vendedores();
   if (destinos.length === 0) {
     console.error("[whatsapp] WHATSAPP_VENDEDORES está vacío o mal formado, no hay a quién avisar");
     return { ok: false, error: "No hay vendedores cargados en WHATSAPP_VENDEDORES." };
@@ -293,23 +312,41 @@ export function idiomaAcceso(): string {
 }
 
 /** Entró un pedido o una consulta desde la tienda. */
-export function notificarVendedores(aviso: AvisoPedido): Promise<WhatsappResult> {
+export function notificarVendedores(aviso: AvisoPedido, para?: string[]): Promise<WhatsappResult> {
   return enviar(
     process.env.WHATSAPP_TEMPLATE,
     idiomaPedido(),
     PARAMS_PEDIDO,
     parametrosPlantilla(aviso),
-    aviso.texto
+    aviso.texto,
+    para
   );
 }
 
 /** Alguien pidió acceso desde la landing y hay que aprobarlo o rechazarlo. */
-export function notificarSolicitudAcceso(aviso: AvisoAcceso): Promise<WhatsappResult> {
+export function notificarSolicitudAcceso(aviso: AvisoAcceso, para?: string[]): Promise<WhatsappResult> {
   return enviar(
     process.env.WHATSAPP_TEMPLATE_ACCESO,
     idiomaAcceso(),
     PARAMS_ACCESO,
     parametrosAcceso(aviso),
-    aviso.texto
+    aviso.texto,
+    para
+  );
+}
+
+/**
+ * Aviso genérico (`aviso_operacion`): el cliente aceptó o canceló, o un
+ * recordatorio. Hasta que la plantilla esté aprobada (WHATSAPP_TEMPLATE_AVISO)
+ * sale como texto libre, que Meta solo entrega dentro de la ventana de 24 h.
+ */
+export function notificarAviso(aviso: AvisoGenerico, para?: string[]): Promise<WhatsappResult> {
+  return enviar(
+    process.env.WHATSAPP_TEMPLATE_AVISO,
+    process.env.WHATSAPP_TEMPLATE_AVISO_LANG || idiomaPedido(),
+    PARAMS_AVISO,
+    parametrosAviso(aviso),
+    aviso.texto,
+    para
   );
 }

@@ -4,6 +4,7 @@ import { validarSolicitud } from "@/lib/acceso";
 import { isMock, mockCrearSolicitud } from "@/lib/mock-db";
 import { notificarSolicitudAcceso } from "@/lib/whatsapp";
 import { notificarVendedoresEmail } from "@/lib/email";
+import { avisarEquipo } from "@/lib/avisos-equipo";
 
 // POST /api/acceso/solicitar — PÚBLICO. Un visitante de la landing pide
 // acceso a la tienda. Se inserta con service role (la tabla es RLS deny-all).
@@ -42,10 +43,16 @@ export async function POST(request: Request) {
       `Legajo/CUIT: ${legajo}` +
       (mensaje ? `\nMensaje: ${mensaje}` : "") +
       `\n\nAprobala desde el panel.`;
-    const [wa, mail] = await Promise.all([
-      notificarSolicitudAcceso({ nombre, email, telefono, legajo, texto }),
+    const [res, mail] = await Promise.all([
+      // Campana de los admins + WhatsApp (lib/avisos-equipo).
+      avisarEquipo(
+        isMock() ? null : createAdminSupabase(),
+        { tipo: "nuevo_acceso", ref: crypto.randomUUID(), datos: { nombre, email }, url: "/admin/solicitudes" },
+        (para) => notificarSolicitudAcceso({ nombre, email, telefono, legajo, texto }, para)
+      ),
       notificarVendedoresEmail(`Nueva solicitud de acceso — ${nombre}`, texto),
     ]).catch(() => [] as const);
+    const wa = res?.whatsapp;
     // Antes se descartaba el resultado entero: si fallaba, no quedaba
     // ningún rastro. El log de whatsapp.ts ya cubre el motivo detallado; acá
     // alcanza con dejar una línea que diga que el aviso de ESTA solicitud

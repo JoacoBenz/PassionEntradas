@@ -851,7 +851,8 @@ export function mockCambioEquipo(
   if (error) return { ok: false, status: 409, error };
   const u = d.usuarios.find((x) => x.id === id)!;
   u.app_metadata = { ...u.app_metadata, ...metadataDeCambio(cambio) };
-  mockRegistrar(registroDeCambio(objetivo, cambio, por));
+  const registro = registroDeCambio(objetivo, cambio, por);
+  if (registro) mockRegistrar(registro);
   return { ok: true };
 }
 

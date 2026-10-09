@@ -1,6 +1,7 @@
 import Link from "next/link";
 import LogoutButton from "@/components/admin/LogoutButton";
 import TopNav from "@/components/TopNav";
+import CampanaEquipo from "@/components/admin/CampanaEquipo";
 
 type Props = {
   subtitle: string;
@@ -73,6 +74,8 @@ export default function AppHeader({ subtitle, email, nav = false }: Props) {
           >
             Tienda ↗
           </a>
+          {/* Avisos del equipo (pedidos nuevos, recordatorios…). */}
+          <CampanaEquipo />
           <Link
             href="/admin/cuenta"
             title="Mi cuenta"

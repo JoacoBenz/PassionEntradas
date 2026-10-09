@@ -40,7 +40,7 @@ describe("equipo", () => {
 });
 
 const m = (id: string, rol: "administrador" | "moderador", activo = true): MiembroEquipo => ({
-  id, email: `${id}@x.com`, nombre: id, rol, activo, telefono: null, ultimoIngreso: null,
+  id, email: `${id}@x.com`, nombre: id, rol, activo, telefono: null, ultimoIngreso: null, avisosWhatsapp: false,
 });
 
 describe("desactivado", () => {
@@ -87,6 +87,19 @@ describe("validarCambioEquipo", () => {
   it("subir a un moderador o reactivar está bien", () => {
     expect(validarCambioEquipo("yo", equipo[2], { accion: "rol", rol: "administrador" }, equipo)).toBeNull();
     expect(validarCambioEquipo("yo", m("x", "moderador", false), { accion: "reactivar" }, equipo)).toBeNull();
+  });
+});
+
+describe("aviso por WhatsApp", () => {
+  it("se activa solo con teléfono, y no se registra como cambio de acceso", () => {
+    const sin = m("mod", "moderador");
+    const con = { ...sin, telefono: "+54 9 11 5555 0000" };
+    expect(parsearCambio({ accion: "whatsapp", activo: true })).toEqual({ accion: "whatsapp", activo: true });
+    expect(validarCambioEquipo("yo", sin, { accion: "whatsapp", activo: true }, [sin])).toMatch(/teléfono/);
+    expect(validarCambioEquipo("yo", con, { accion: "whatsapp", activo: true }, [con])).toBeNull();
+    expect(validarCambioEquipo("mod", sin, { accion: "whatsapp", activo: false }, [sin])).toBeNull();
+    expect(metadataDeCambio({ accion: "whatsapp", activo: true })).toEqual({ avisos_whatsapp: true });
+    expect(registroDeCambio(con, { accion: "whatsapp", activo: true }, "Ana")).toBeNull();
   });
 });
 

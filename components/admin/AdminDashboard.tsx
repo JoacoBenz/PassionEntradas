@@ -12,6 +12,7 @@ import {
   type Filtro,
   type FiltroPanel,
 } from "@/lib/panel-filtros";
+import { etiquetaPrioridad, pendienteDeConsulta, pendienteDeOp } from "@/lib/recordatorios";
 import {
   diasHastaEvento,
   estadoDe,
@@ -85,6 +86,14 @@ export default function AdminDashboard({
   const { toasts, push } = useToast();
   const router = useRouter();
 
+  // Reloj del Panel: la prioridad (lleva rato esperando) cambia sola con el
+  // tiempo, sin que cambien los datos.
+  const [ahora, setAhora] = useState(() => new Date());
+  useEffect(() => {
+    const t = window.setInterval(() => setAhora(new Date()), 60_000);
+    return () => window.clearInterval(t);
+  }, []);
+
   // Cambiar filtro, búsqueda u orden vuelve a la primera página.
   useEffect(() => {
     setPage(1);
@@ -143,6 +152,20 @@ export default function AdminDashboard({
     return { enCurso, paraCerrar, cerradas, aCotizar, esperando, nuevos };
   }, [ops, consultas]);
 
+  // id -> texto del badge rojo ("Sin confirmar hace 3 h").
+  const prioridades = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const o of ops) {
+      const p = pendienteDeOp(o, ahora);
+      if (p) m.set(o.id, etiquetaPrioridad(p, ahora));
+    }
+    for (const c of consultas) {
+      const p = pendienteDeConsulta(c, ahora);
+      if (p) m.set(c.id, etiquetaPrioridad(p, ahora));
+    }
+    return m;
+  }, [ops, consultas, ahora]);
+
   const visible = useMemo<Fila[]>(() => {
     const q = query.trim().toLowerCase();
     const coincide = (...campos: (string | null | undefined)[]) =>
@@ -151,7 +174,7 @@ export default function AdminDashboard({
     let filas: Fila[] = ops
       .filter(
         (o) =>
-          (opCoincide(o, filtro) || fijas.has(o.id)) &&
+          (opCoincide(o, filtro, ahora) || fijas.has(o.id)) &&
           coincide(o.evento, o.code, o.comprador_alias, o.vendedor_alias, o.cliente_email)
       )
       .map((op) => ({ kind: "op" as const, id: op.id, created_at: op.created_at, op }));
@@ -175,7 +198,6 @@ export default function AdminDashboard({
     // ordenadas por fecha las mandaba a la página 3 y no las veía nadie.
     // Solo aparecen en los filtros donde "trabajo pendiente" tiene sentido,
     // y en los dos de consultas (A cotizar / Esperando cliente).
-    const ahora = new Date();
     const pendientes: Fila[] = consultas
       .filter(
         (c) =>
@@ -190,8 +212,10 @@ export default function AdminDashboard({
     const nuevos = filas.filter(arriba);
     const resto = filas.filter((f) => !arriba(f));
 
-    return [...pendientes, ...nuevos, ...resto];
-  }, [ops, consultas, filtro, query, sort, fijas, fijasArriba]);
+    // Lo que lleva rato esperando va primero de todo (decisión 7).
+    const todas = [...pendientes, ...nuevos, ...resto];
+    return [...todas.filter((f) => prioridades.has(f.id)), ...todas.filter((f) => !prioridades.has(f.id))];
+  }, [ops, consultas, filtro, query, sort, fijas, fijasArriba, ahora, prioridades]);
 
   // Paginado en el cliente: con historial grande, renderizar cientos de
   // cards de una sola vez es lo que pesa (el fetch ya viene topado en 1000).
@@ -512,6 +536,19 @@ export default function AdminDashboard({
         })}
       </div>
 
+      {/* Hay cosas esperando de más: a un toque de verlas solas. */}
+      {prioridades.size > 0 && filter !== "prioridad" && (
+        <button
+          type="button"
+          onClick={() => tocarTarjeta("prioridad")}
+          className="-mt-3 mb-4 flex w-full items-center gap-2 rounded-xl bg-[#D14D68] px-3.5 py-2 text-left text-xs font-semibold text-white shadow-sm hover:bg-[#bf3f59]"
+        >
+          <span aria-hidden>●</span>
+          {prioridades.size} {prioridades.size === 1 ? "lleva" : "llevan"} rato esperando
+          <span className="ml-auto underline">Ver</span>
+        </button>
+      )}
+
       {/* Filtro que vino de una tarjeta y no es pestaña: se ve y se saca. */}
       {chip && (
         <div className="-mt-3 mb-4 flex">
@@ -567,6 +604,7 @@ export default function AdminDashboard({
               <ConsultaCard
                 key={fila.id}
                 consulta={fila.consulta}
+                prioridad={prioridades.get(fila.id) ?? null}
                 busy={busyId === fila.id}
                 onCotizar={cotizarConsulta}
                 onAceptarWhatsapp={aceptarPorWhatsapp}
@@ -577,6 +615,7 @@ export default function AdminDashboard({
               <OperacionCard
                 key={fila.id}
                 op={fila.op}
+                prioridad={prioridades.get(fila.id) ?? null}
                 items={itemsPorOp.get(fila.id) ?? []}
                 baseUrl={baseUrl}
                 busy={busyId === fila.id}

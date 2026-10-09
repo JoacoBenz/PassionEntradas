@@ -1,4 +1,5 @@
 import { estadoCotizacion } from "./cotizaciones";
+import { pendienteDeConsulta, pendienteDeOp } from "./recordatorios";
 import { diaAr } from "./metrics";
 import { estadoDe, necesitaConfirmar, type Consulta, type Moneda, type Operacion } from "./operaciones";
 
@@ -17,7 +18,10 @@ export type Filtro =
   | "esperando"
   // Mismas reglas que las métricas de plata (ver computeMetrics).
   | "cobradas"
-  | "sin_cobrar";
+  | "sin_cobrar"
+  // Lo que lleva rato esperando (lib/recordatorios): el link de los
+  // recordatorios por WhatsApp abre el Panel acá.
+  | "prioridad";
 
 export const PESTANAS: { key: Filtro; label: string }[] = [
   { key: "todas", label: "Todas" },
@@ -30,6 +34,7 @@ export const PESTANAS: { key: Filtro; label: string }[] = [
 ];
 
 const ETIQUETA_TARJETA: Partial<Record<Filtro, string>> = {
+  prioridad: "Con prioridad",
   a_cotizar: "A cotizar",
   esperando: "Esperando cliente",
   cobradas: "Con pago confirmado",
@@ -51,6 +56,7 @@ const FILTROS = new Set<Filtro>([
   "esperando",
   "cobradas",
   "sin_cobrar",
+  "prioridad",
 ]);
 const DIA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -102,6 +108,11 @@ export function etiquetaFiltro(f: FiltroPanel): string | null {
 
 type OpFiltrable = Pick<
   Operacion,
+  | "id"
+  | "code"
+  | "evento"
+  | "fecha_evento"
+  | "created_at"
   | "status"
   | "tipo"
   | "moneda"
@@ -112,7 +123,7 @@ type OpFiltrable = Pick<
   | "cerrada_at"
 >;
 
-export function opCoincide(op: OpFiltrable, f: FiltroPanel): boolean {
+export function opCoincide(op: OpFiltrable, f: FiltroPanel, ahora: Date = new Date()): boolean {
   const estado = estadoDe(op);
   const moneda = op.moneda ?? "USD";
   switch (f.filtro) {
@@ -131,6 +142,8 @@ export function opCoincide(op: OpFiltrable, f: FiltroPanel): boolean {
     case "a_cotizar":
     case "esperando":
       return false;
+    case "prioridad":
+      return pendienteDeOp(op, ahora) !== null;
     case "cobradas": {
       if (op.status === "cancelada" || !op.pago_confirmado_at) return false;
       if (f.moneda && moneda !== f.moneda) return false;
@@ -152,7 +165,7 @@ export function opCoincide(op: OpFiltrable, f: FiltroPanel): boolean {
 }
 
 export function consultaCoincide(
-  c: Pick<Consulta, "estado" | "vence_at">,
+  c: Pick<Consulta, "id" | "code" | "evento" | "estado" | "vence_at" | "created_at">,
   f: FiltroPanel,
   ahora: Date = new Date()
 ): boolean {
@@ -167,6 +180,8 @@ export function consultaCoincide(
       const e = estadoCotizacion(c, ahora);
       return e === "esperando" || e === "vencida";
     }
+    case "prioridad":
+      return pendienteDeConsulta(c, ahora) !== null;
     default:
       return false;
   }

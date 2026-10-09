@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { esStaff, getRol, nombreDe, puedeVerTienda } from "@/lib/auth";
 import { notificarVendedoresEmail } from "@/lib/email";
+import { avisarEquipo } from "@/lib/avisos-equipo";
+import { notificarAviso } from "@/lib/whatsapp";
 import { isMock, MOCK_USER, mockAceptarCotizacion } from "@/lib/mock-db";
 
 // POST /api/consultas/[id]/aceptar — la cotización pasa a ser un pedido.
@@ -84,10 +86,25 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   // Aviso a los vendedores. Best-effort: el pedido ya quedó creado.
   try {
-    await notificarVendedoresEmail(
-      `✅ Cotización aceptada — pedido ${op.op_code}`,
-      `${porWhatsapp ? `${quien} registró que el cliente aceptó por WhatsApp` : `El cliente ${quien} aceptó la cotización en la web`}. Se creó el pedido ${op.op_code}.`
-    );
+    const texto = `${porWhatsapp ? `${quien} registró que el cliente aceptó por WhatsApp` : `El cliente ${quien} aceptó la cotización en la web`}. Se creó el pedido ${op.op_code}.`;
+    await Promise.all([
+      notificarVendedoresEmail(`✅ Cotización aceptada — pedido ${op.op_code}`, texto),
+      avisarEquipo(
+        admin,
+        {
+          tipo: "cotizacion_aceptada",
+          ref: op.op_id,
+          datos: { code: op.op_code, quien, via: porWhatsapp ? "whatsapp" : "web" },
+          url: `/admin?q=${encodeURIComponent(op.op_code)}`,
+          operacion_id: op.op_id,
+        },
+        // Si la registró alguien del equipo (aceptó por WhatsApp), el equipo
+        // ya lo sabe: queda en la campana, sin WhatsApp.
+        porWhatsapp
+          ? null
+          : (para) => notificarAviso({ aviso: `✅ Cotización aceptada · pedido ${op.op_code}`, detalle: `El cliente ${quien} la aceptó en la web`, texto }, para)
+      ),
+    ]);
   } catch (e) {
     console.error("[aceptar] no se pudo avisar a los vendedores:", e);
   }

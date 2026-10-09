@@ -3,6 +3,9 @@ import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server
 import { getRol, puedeVerTienda } from "@/lib/auth";
 import { clientePuedeCancelar } from "@/lib/operaciones";
 import { notificarVendedoresEmail } from "@/lib/email";
+import { avisarEquipo } from "@/lib/avisos-equipo";
+import { notificarAviso } from "@/lib/whatsapp";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   isMock,
   mockClienteCancelarConsulta,
@@ -66,7 +69,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       .eq("id", params.id)
       .eq("cliente_id", user.id)
       .in("estado", ["pendiente", "cotizada"])
-      .select("code, evento, sector")
+      .select("id, code, evento, sector")
       .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!data) {
@@ -80,7 +83,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         ? NextResponse.json({ error: "Esta consulta ya fue resuelta" }, { status: 409 })
         : NextResponse.json({ error: "Consulta no encontrada" }, { status: 404 });
     }
-    await avisar(`Consulta ${data.code}`, data.evento, data.sector, quien);
+    await avisar(admin, { id: data.id, code: data.code, clase: "consulta" }, `Consulta ${data.code}`, data.evento, data.sector, quien);
     return NextResponse.json({ ok: true });
   }
 
@@ -119,19 +122,39 @@ export async function POST(request: Request, { params }: { params: { id: string 
       { status: 409 }
     );
   }
-  await avisar(`Pedido ${op.code}`, op.evento, op.sector, quien);
+  await avisar(admin, { id: op.id, code: op.code, clase: "op" }, `Pedido ${op.code}`, op.evento, op.sector, quien);
   return NextResponse.json({ ok: true });
 }
 
 // Aviso a los vendedores. Best-effort: la cancelación ya quedó registrada y se
 // ve en el panel aunque el email no esté configurado.
-async function avisar(que: string, evento: string, sector: string | null, quien: string) {
+async function avisar(
+  admin: SupabaseClient,
+  ref: { id: string; code: string; clase: "op" | "consulta" },
+  que: string,
+  evento: string,
+  sector: string | null,
+  quien: string
+) {
   const detalle = `${evento}${sector ? ` — ${sector}` : ""}`;
+  const texto = `${que} (${detalle}) fue cancelado por el cliente ${quien} desde Mis pedidos.`;
   try {
-    await notificarVendedoresEmail(
-      `❌ ${que} cancelado por el cliente`,
-      `${que} (${detalle}) fue cancelado por el cliente ${quien} desde Mis pedidos.`
-    );
+    await Promise.all([
+      notificarVendedoresEmail(`❌ ${que} cancelado por el cliente`, texto),
+      // Campana + WhatsApp del equipo (lib/avisos-equipo).
+      avisarEquipo(
+        admin,
+        {
+          tipo: "cancelado_cliente",
+          ref: ref.id,
+          datos: { code: ref.code, evento: detalle, quien },
+          url: `/admin?q=${encodeURIComponent(ref.code)}`,
+          operacion_id: ref.clase === "op" ? ref.id : null,
+          consulta_id: ref.clase === "consulta" ? ref.id : null,
+        },
+        (para) => notificarAviso({ aviso: `❌ ${que} cancelado por el cliente`, detalle, texto }, para)
+      ),
+    ]);
   } catch (e) {
     console.error("[cancelar] no se pudo avisar a los vendedores:", e);
   }

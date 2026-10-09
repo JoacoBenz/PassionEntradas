@@ -71,7 +71,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: `No se pudo aplicar el cambio: ${authErr.message}` }, { status: 500 });
   }
 
-  const { error: logErr } = await admin.from("equipo_cambios").insert(registroDeCambio(objetivo, cambio, por));
+  const registro = registroDeCambio(objetivo, cambio, por);
+  const { error: logErr } = registro
+    ? await admin.from("equipo_cambios").insert(registro)
+    : { error: null };
   return NextResponse.json({
     ok: true,
     aviso: logErr ? "El cambio se hizo pero no quedó en el registro." : undefined,

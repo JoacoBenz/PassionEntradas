@@ -89,6 +89,8 @@ export type MiembroEquipo = {
   activo: boolean;
   telefono: string | null;
   ultimoIngreso: string | null;
+  // Recibe los avisos por WhatsApp (al teléfono de "Mi cuenta").
+  avisosWhatsapp: boolean;
 };
 
 // Lo que se usa de un usuario de Auth (o del espejo del modo demo).
@@ -114,6 +116,7 @@ export function miembroDe(user: UsuarioAuth): MiembroEquipo | null {
     activo: !desactivado(user),
     telefono: texto("telefono") || null,
     ultimoIngreso: user.last_sign_in_at ?? null,
+    avisosWhatsapp: (user.app_metadata as Record<string, unknown> | undefined)?.avisos_whatsapp === true,
   };
 }
 
@@ -132,7 +135,8 @@ export function listarMiembros(users: UsuarioAuth[]): MiembroEquipo[] {
 export type CambioEquipo =
   | { accion: "rol"; rol: RolEquipo }
   | { accion: "desactivar" }
-  | { accion: "reactivar" };
+  | { accion: "reactivar" }
+  | { accion: "whatsapp"; activo: boolean };
 
 export function parsearCambio(body: unknown): CambioEquipo | null {
   const b = (body ?? {}) as Record<string, unknown>;
@@ -140,6 +144,7 @@ export function parsearCambio(body: unknown): CambioEquipo | null {
   if (b.accion === "rol" && (b.rol === "administrador" || b.rol === "moderador")) {
     return { accion: "rol", rol: b.rol };
   }
+  if (b.accion === "whatsapp" && typeof b.activo === "boolean") return { accion: "whatsapp", activo: b.activo };
   return null;
 }
 
@@ -168,6 +173,11 @@ export function validarCambioEquipo(
   if (cambio.accion === "rol" && cambio.rol === objetivo.rol) {
     return `Ya es ${NOMBRE_ROL[cambio.rol]}.`;
   }
+  if (cambio.accion === "whatsapp") {
+    // Se avisa al teléfono de "Mi cuenta": sin teléfono no hay a dónde.
+    if (cambio.activo && !objetivo.telefono) return "No tiene teléfono cargado en Mi cuenta.";
+    return null;
+  }
   if (cambio.accion === "desactivar" && !objetivo.activo) return "Ya está desactivado.";
   if (cambio.accion === "reactivar" && objetivo.activo) return "Ya está activo.";
   if (quitaAdmin) {
@@ -180,6 +190,7 @@ export function validarCambioEquipo(
 /** Lo que cambia en app_metadata (Supabase hace merge con el resto de las claves). */
 export function metadataDeCambio(cambio: CambioEquipo): Record<string, unknown> {
   if (cambio.accion === "rol") return { role: cambio.rol };
+  if (cambio.accion === "whatsapp") return { avisos_whatsapp: cambio.activo };
   return { desactivado: cambio.accion === "desactivar" };
 }
 
@@ -193,7 +204,10 @@ export type RegistroEquipo = {
   por: string;
 };
 
-export function registroDeCambio(objetivo: MiembroEquipo, cambio: CambioEquipo, por: string): RegistroEquipo {
+// El aviso por WhatsApp es una preferencia, no un cambio de acceso: no se
+// registra (null).
+export function registroDeCambio(objetivo: MiembroEquipo, cambio: CambioEquipo, por: string): RegistroEquipo | null {
+  if (cambio.accion === "whatsapp") return null;
   return {
     user_id: objetivo.id,
     email: objetivo.email,

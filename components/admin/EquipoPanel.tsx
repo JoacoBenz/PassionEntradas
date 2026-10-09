@@ -292,6 +292,13 @@ export default function EquipoPanel({
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
               En el equipo ({miembros.filter((m) => m.activo).length})
             </h3>
+            {!miembros.some((m) => m.activo && m.avisosWhatsapp && m.telefono) && (
+              <p className="rounded-lg bg-canvas px-3 py-2 text-[11px] text-[#4A4E5E]">
+                Nadie tiene los avisos por WhatsApp activados: salen a la lista fija de siempre. Al activarlos acá,
+                le llegan a cada uno a su teléfono (los pedidos y lo que hay que confirmar o entregar, solo a los
+                administradores).
+              </p>
+            )}
             {miembros.map((m) => {
               const yo = m.id === yoId;
               const ultimoAdmin = m.rol === "administrador" && m.activo && adminsActivos <= 1;
@@ -314,6 +321,36 @@ export default function EquipoPanel({
                       <p className="text-[11px] text-muted">
                         {m.ultimoIngreso ? `Último ingreso: ${fechaHora(m.ultimoIngreso)}` : "Todavía no entró"}
                       </p>
+                      {/* Avisos por WhatsApp al teléfono de "Mi cuenta". */}
+                      {m.activo && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+                          <span className="text-muted">WhatsApp:</span>
+                          {m.telefono ? (
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={m.avisosWhatsapp}
+                              disabled={busy !== null}
+                              onClick={() =>
+                                cambiar(
+                                  m,
+                                  { accion: "whatsapp", activo: !m.avisosWhatsapp },
+                                  m.avisosWhatsapp ? "Avisos por WhatsApp desactivados." : `Avisos por WhatsApp a ${m.telefono}.`
+                                )
+                              }
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-semibold transition-colors disabled:opacity-50 ${
+                                m.avisosWhatsapp ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                              }`}
+                              title={m.avisosWhatsapp ? "Tocá para dejar de avisarle por WhatsApp" : "Tocá para avisarle por WhatsApp"}
+                            >
+                              <span className={`h-2 w-2 rounded-full ${m.avisosWhatsapp ? "bg-emerald-600" : "bg-zinc-400"}`} aria-hidden />
+                              {m.avisosWhatsapp ? `Avisos a ${m.telefono}` : `Sin avisos (${m.telefono})`}
+                            </button>
+                          ) : (
+                            <span className="text-muted">sin teléfono — se carga en Mi cuenta</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span

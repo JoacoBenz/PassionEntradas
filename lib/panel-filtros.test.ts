@@ -4,6 +4,7 @@ import type { Operacion } from "./operaciones";
 
 const op = (extra: Partial<Operacion> = {}): Operacion =>
   ({
+    id: "o", code: "BX", evento: "E", fecha_evento: null, created_at: "2026-10-09T00:00:00Z",
     status: "esperando_entrada", tipo: "operacion", moneda: "USD",
     entrada_recibida_at: null, pago_confirmado_at: null, pago_proveedor_at: null, cerrada_at: null,
     confirmada_at: null, ...extra,
@@ -68,9 +69,10 @@ describe("opCoincide", () => {
 });
 
 describe("consultaCoincide", () => {
-  const pendiente = { estado: "pendiente" as const, vence_at: null };
-  const cotizada = { estado: "cotizada" as const, vence_at: "2026-10-10T00:00:00Z" };
-  const vencida = { estado: "cotizada" as const, vence_at: "2026-10-01T00:00:00Z" };
+  const base = { id: "c", code: "BX-C", evento: "E", created_at: "2026-10-09T11:00:00Z" };
+  const pendiente = { ...base, estado: "pendiente" as const, vence_at: null };
+  const cotizada = { ...base, estado: "cotizada" as const, vence_at: "2026-10-10T00:00:00Z" };
+  const vencida = { ...base, estado: "cotizada" as const, vence_at: "2026-10-01T00:00:00Z" };
   it("a cotizar / esperando cliente separan las consultas por estado", () => {
     expect(consultaCoincide(pendiente, { filtro: "a_cotizar" }, AHORA)).toBe(true);
     expect(consultaCoincide(cotizada, { filtro: "a_cotizar" }, AHORA)).toBe(false);
@@ -82,6 +84,19 @@ describe("consultaCoincide", () => {
     expect(consultaCoincide(pendiente, { filtro: "todas" }, AHORA)).toBe(true);
     expect(consultaCoincide(cotizada, { filtro: "en_curso" }, AHORA)).toBe(true);
     expect(consultaCoincide(pendiente, { filtro: "cobradas" }, AHORA)).toBe(false);
+  });
+});
+
+describe("prioridad", () => {
+  it("lo que lleva rato esperando, operaciones y consultas", () => {
+    const AH = new Date("2026-10-09T15:00:00Z");
+    expect(opCoincide(op({ tipo: "pedido", created_at: "2026-10-09T12:00:00Z" }), { filtro: "prioridad" }, AH)).toBe(true);
+    expect(opCoincide(op({ tipo: "pedido", created_at: "2026-10-09T14:00:00Z" }), { filtro: "prioridad" }, AH)).toBe(false);
+    const c = { id: "c", code: "C", evento: "E", estado: "pendiente" as const, vence_at: null };
+    expect(consultaCoincide({ ...c, created_at: "2026-10-09T10:00:00Z" }, { filtro: "prioridad" }, AH)).toBe(true);
+    expect(consultaCoincide({ ...c, created_at: "2026-10-09T14:00:00Z" }, { filtro: "prioridad" }, AH)).toBe(false);
+    expect(filtroDeParams({ filtro: "prioridad" })).toEqual({ filtro: "prioridad" });
+    expect(etiquetaFiltro({ filtro: "prioridad" })).toBe("Con prioridad");
   });
 });
 

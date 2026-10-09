@@ -16,6 +16,8 @@ import { estadoCotizacion, tiempoRestante } from "@/lib/cotizaciones";
 
 type Props = {
   consulta: Consulta;
+  // Lleva rato esperando (lib/recordatorios): va en rojo, con la edad.
+  prioridad?: string | null;
   busy?: boolean;
   // Manda (o cambia) la cotización al cliente. NO crea el pedido: eso pasa
   // cuando el cliente la acepta. Devuelve el error si falló, o null.
@@ -49,6 +51,7 @@ export default function ConsultaCard({
   onAceptarWhatsapp,
   onError,
   onDescartar,
+  prioridad = null,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [confirmandoWa, setConfirmandoWa] = useState(false);
@@ -90,9 +93,17 @@ export default function ConsultaCard({
 
   return (
     <article
-      className="card-shadow overflow-hidden rounded-2xl bg-white ring-1"
-      style={{ ["--tw-ring-color" as string]: `${chip.color}40` }}
+      className={`card-shadow overflow-hidden rounded-2xl bg-white ${prioridad ? "ring-2" : "ring-1"}`}
+      style={{ ["--tw-ring-color" as string]: prioridad ? "#D14D68" : `${chip.color}40` }}
     >
+      {/* Prioridad (lib/recordatorios): lleva rato esperando. */}
+      {prioridad && (
+        <p className="flex items-center gap-1.5 bg-[#D14D68] px-4 py-1 text-[11px] font-bold text-white">
+          <span aria-hidden>●</span>
+          {prioridad}
+        </p>
+      )}
+
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}

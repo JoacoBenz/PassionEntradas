@@ -26,6 +26,8 @@ import { fechaDia } from "@/lib/fechas";
 
 type Props = {
   op: Operacion;
+  // Lleva rato esperando (lib/recordatorios): va en rojo, con la edad.
+  prioridad?: string | null;
   // Líneas de la operación. Un pedido del carrito puede traer varias entradas
   // de sectores o eventos distintos; la cabecera solo muestra el resumen.
   items?: OperacionItem[];
@@ -89,6 +91,7 @@ export default function OperacionCard({
   onAction,
   onUpdate,
   onCopied,
+  prioridad = null,
 }: Props) {
   const link = `${baseUrl}/op/${op.id}`;
   const estado = estadoDe(op);
@@ -127,7 +130,14 @@ export default function OperacionCard({
     "rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-[#4A4E5E] transition-colors hover:border-[#C5C9D6] hover:bg-canvas";
 
   return (
-    <article className="card-shadow overflow-hidden rounded-2xl bg-white">
+    <article className={`card-shadow overflow-hidden rounded-2xl bg-white ${prioridad ? "ring-2 ring-[#D14D68]" : ""}`}>
+      {/* Prioridad (lib/recordatorios): lleva rato esperando. */}
+      {prioridad && (
+        <p className="flex items-center gap-1.5 bg-[#D14D68] px-4 py-1 text-[11px] font-bold text-white">
+          <span aria-hidden>●</span>
+          {prioridad}
+        </p>
+      )}
       {/* Fila colapsada: toda la fila es el toggle */}
       <button
         onClick={() => setOpen(!open)}
