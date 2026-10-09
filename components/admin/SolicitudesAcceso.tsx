@@ -352,8 +352,10 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
                       {copiado === `${id}:user` ? "✓" : "Copiar"}
                     </button>
                   </div>
-                  <div className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2">
-                    <span className="font-mono text-sm break-all">{r.creds.password}</span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2">
+                    {/* La contraseña en UN renglón (partida no se lee ni se copia
+                        bien); si no entra, el botón baja. */}
+                    <span className="whitespace-nowrap font-mono text-sm">{r.creds.password}</span>
                     <button
                       onClick={() => copiar(id, r.creds.password, "pass")}
                       className={btnGhost}
@@ -416,7 +418,7 @@ export default function SolicitudesAcceso({ initial }: { initial: SolicitudAcces
                     className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-canvas px-3 py-2.5"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{s.nombre}</p>
+                      <p className="text-sm font-medium [overflow-wrap:anywhere]">{s.nombre}</p>
                       <p className="break-all text-xs text-muted">{s.email}</p>
                       {/* Auditoría: quién decidió/revocó y cuándo. */}
                       <p className="text-[11px] text-muted">

@@ -270,8 +270,9 @@ export default function EquipoPanel({
                   ? "Las credenciales ya salieron por email. Guardalas igual: no se vuelven a mostrar."
                   : "Guardá o enviá estas credenciales ahora: no se vuelven a mostrar."}
               </p>
-              <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2">
-                <span className="break-all font-mono text-sm">{revelado.password}</span>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2">
+                {/* En UN renglón: partida no se lee ni se copia bien. */}
+                <span className="whitespace-nowrap font-mono text-sm">{revelado.password}</span>
                 <button type="button" onClick={() => copiar(revelado.password, "pass")} className={btnGhost}>
                   {copiado === "pass" ? "✓" : "Copiar"}
                 </button>

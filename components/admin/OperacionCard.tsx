@@ -154,21 +154,35 @@ export default function OperacionCard({
           aria-label={SEMAFORO_LABEL[semaforo]}
         />
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-display text-[15px] font-semibold leading-tight tracking-tight">
+          <span className="block font-display text-[15px] font-semibold leading-tight tracking-tight [overflow-wrap:anywhere]">
             {op.evento}
           </span>
           {/* El cliente va en la fila cerrada: saber con quién se está
               trabajando no tiene que costar un click. */}
           {cliente && (
-            <span className="mt-0.5 block truncate text-[11px] font-medium text-[#4A4E5E]">
+            <span className="mt-0.5 block text-[11px] font-medium text-[#4A4E5E] [overflow-wrap:anywhere]">
               {cliente}
             </span>
           )}
-          <span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-wider text-muted">
+          <span className="mt-0.5 block font-mono text-[10px] uppercase leading-snug tracking-wider text-muted">
             {/* En celular el chip "Nuevo" le comía el nombre del evento: va acá. */}
             {nuevo && <span className="font-bold text-[#D14D68] sm:hidden">● Nuevo · </span>}
-            {op.code} · {SEMAFORO_LABEL[semaforo]}
+            {/* El code no se parte en el guion ("BX-" / "8H5U…"). */}
+            <span className="whitespace-nowrap">{op.code}</span> · {SEMAFORO_LABEL[semaforo]}
             {op.fecha_evento ? ` · ${fechaCorta(op.fecha_evento)}` : ""}
+          </span>
+          {/* En celular el monto va abajo: en la columna de la derecha le
+              dejaba al nombre del evento 90px y partía las palabras. */}
+          <span className="mt-1 flex flex-wrap items-baseline gap-x-1.5 sm:hidden">
+            <span className="whitespace-nowrap font-display text-sm font-bold tabular-nums">
+              {formatMonto(op.monto, op.moneda)}
+            </span>
+            {op.cantidad > 1 && (
+              <span className="font-mono text-[10px] text-muted">
+                ×{op.cantidad} ·{" "}
+                <span className="whitespace-nowrap">{formatMonto(op.monto / op.cantidad, op.moneda)} c/u</span>
+              </span>
+            )}
           </span>
         </span>
         {nuevo && (
@@ -192,16 +206,13 @@ export default function OperacionCard({
             {TIPO_LABEL[op.tipo]}
           </span>
         )}
-        <span className="flex flex-col items-end leading-none">
+        <span className="hidden flex-col items-end leading-none sm:flex">
           <span className="whitespace-nowrap font-display text-sm font-bold tabular-nums">
             {formatMonto(op.monto, op.moneda)}
           </span>
           {op.cantidad > 1 && (
-            // En celular solo "×2": el precio unitario al lado le dejaba al
-            // nombre del evento 55px ("River …"). Está igual en el detalle.
             <span className="mt-0.5 whitespace-nowrap font-mono text-[10px] text-muted">
-              ×{op.cantidad}
-              <span className="hidden sm:inline"> · {formatMonto(op.monto / op.cantidad, op.moneda)} c/u</span>
+              ×{op.cantidad} · {formatMonto(op.monto / op.cantidad, op.moneda)} c/u
             </span>
           )}
         </span>
@@ -274,7 +285,7 @@ export default function OperacionCard({
                   {items.map((i) => (
                     <li key={i.id} className="flex items-start justify-between gap-3 px-3 py-2">
                       <span className="min-w-0">
-                        <span className="block truncate text-xs font-medium">{i.evento}</span>
+                        <span className="block text-xs font-medium [overflow-wrap:anywhere]">{i.evento}</span>
                         <span className="block text-[11px] text-muted">
                           {i.sector ?? "General"}
                           {i.fecha_evento ? ` · ${formatFecha(i.fecha_evento)}` : ""}
@@ -490,7 +501,7 @@ export default function OperacionCard({
                     </span>
                   )}
                   {(op.entrada_recibida_por || op.pago_confirmado_por) && (
-                    <span className="mt-0.5 block truncate text-[11px] font-normal text-white/50">
+                    <span className="mt-0.5 block text-[11px] font-normal text-white/50">
                       {op.entrada_recibida_por &&
                         `Entrada por ${quienDe(op.entrada_recibida_por)}`}
                       {op.entrada_recibida_por && op.pago_confirmado_por && " · "}
@@ -639,7 +650,7 @@ function HitoButton({
       <span className="min-w-0">
         {label}
         {done && por && (
-          <span className="block truncate text-[10px] font-normal text-white/75">
+          <span className="block text-[10px] font-normal leading-tight text-white/75 [overflow-wrap:anywhere]">
             Por {por}
           </span>
         )}

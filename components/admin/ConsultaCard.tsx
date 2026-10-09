@@ -120,24 +120,32 @@ export default function ConsultaCard({
           ?
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-display text-[15px] font-semibold leading-tight tracking-tight">
+          <span className="block font-display text-[15px] font-semibold leading-tight tracking-tight [overflow-wrap:anywhere]">
             {c.evento}
           </span>
           {cliente && (
-            <span className="mt-0.5 block truncate text-[11px] font-medium text-[#4A4E5E]">
+            <span className="mt-0.5 block text-[11px] font-medium text-[#4A4E5E] [overflow-wrap:anywhere]">
               {cliente}
             </span>
           )}
-          <span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-wider text-muted">
-            {c.code} ·{" "}
+          <span className="mt-0.5 block font-mono text-[10px] uppercase leading-snug tracking-wider text-muted">
+            <span className="whitespace-nowrap">{c.code}</span> ·{" "}
             {cotizada
               ? `${formatMonto(montoCot, (c.moneda ?? "USD") as Moneda)} · ${tiempoRestante(c.vence_at)}`
               : "Consulta — chequear stock"}
             {c.fecha_evento ? ` · ${fechaCorta(c.fecha_evento)}` : ""}
           </span>
+          {/* En celular el estado va debajo: al costado le dejaba al nombre
+              del evento una columna de 90px ("Elimina-torias"). */}
+          <span
+            className="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide sm:hidden"
+            style={{ color: chip.color, backgroundColor: `${chip.color}1A` }}
+          >
+            {chip.txt}
+          </span>
         </span>
         <span
-          className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+          className="hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide sm:inline-block"
           style={{ color: chip.color, backgroundColor: `${chip.color}1A` }}
         >
           {chip.txt}
@@ -186,10 +194,11 @@ export default function ConsultaCard({
             >
               <p className="text-sm font-semibold text-ink">
                 Cotización enviada:{" "}
-                <span className="font-display tabular-nums">
+                {/* El monto no se parte ("US$" / "450,00"). */}
+                <span className="whitespace-nowrap font-display tabular-nums">
                   {formatMonto(montoCot, (c.moneda ?? "USD") as Moneda)}
                 </span>
-                <span className="ml-1 text-xs font-normal text-muted">
+                <span className="ml-1 whitespace-nowrap text-xs font-normal text-muted">
                   (comisión {formatMonto(feeCot, (c.moneda ?? "USD") as Moneda)})
                 </span>
               </p>

@@ -163,7 +163,7 @@ export default function ModeradorDashboard({
                 Lista para compartir
               </p>
               <p className="mt-1 font-mono text-sm">{lastCreated.code}</p>
-              <p className="truncate font-display font-semibold">
+              <p className="font-display font-semibold [overflow-wrap:anywhere]">
                 {lastCreated.evento}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">

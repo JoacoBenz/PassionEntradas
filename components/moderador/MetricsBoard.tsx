@@ -36,7 +36,7 @@ function Tile({
         {label}
       </p>
       <p
-        className={`mt-0.5 truncate font-display font-bold tabular-nums tracking-tight ${
+        className={`mt-0.5 font-display font-bold tabular-nums tracking-tight [overflow-wrap:anywhere] ${
           // En 320px dos tarjetas por fila: a 2xl el monto quedaba "US$ 40.…".
           big ? "text-xl min-[380px]:text-2xl" : "text-lg"
         }`}

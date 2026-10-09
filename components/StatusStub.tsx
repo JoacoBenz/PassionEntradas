@@ -133,7 +133,7 @@ export default function StatusStub({
                 {items.map((i, n) => (
                   <li key={n} className="flex items-baseline justify-between gap-3 text-sm">
                     <span className="min-w-0">
-                      <span className="block truncate text-white/85">{i.evento}</span>
+                      <span className="block text-white/85 [overflow-wrap:anywhere]">{i.evento}</span>
                       <span className="block text-xs text-white/45">
                         {i.sector ?? "General"}
                         {i.cantidad > 1 ? ` · ×${i.cantidad}` : ""}
@@ -176,7 +176,8 @@ export default function StatusStub({
 
         {/* Cuerpo blanco */}
         <div className="punch-b bg-white">
-          <div className="space-y-6 px-6 py-7">
+          {/* px-4 en celular: con px-6 los tres pasos no entraban en 320px. */}
+          <div className="space-y-6 px-4 py-7 sm:px-6">
             {/* Los tres pasos del proceso: entrada → pago → entrega */}
             <ProgressSteps estado={estado} />
 

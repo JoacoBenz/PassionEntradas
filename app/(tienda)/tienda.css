@@ -326,7 +326,8 @@
   color: rgba(255, 255, 255, .78);
   font-size: 12px; font-weight: 600;
 }
-.plano-ayuda { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* La ayuda puede ocupar dos renglones: cortada con "…" no se entendía. */
+.plano-ayuda { min-width: 0; line-height: 1.3; }
 .plano-acciones { display: inline-flex; align-items: center; gap: 6px; flex: none; }
 .plano-zoom {
   min-width: 34px; text-align: center; font-variant-numeric: tabular-nums;
@@ -841,8 +842,10 @@
 .lp-tel-cod:focus {
   outline: none; border-color: var(--cobalt); box-shadow: 0 0 0 3px #1f33e022;
 }
+/* Celular: el código ("+54 · Argentina") no entra al lado del número; va
+   arriba, a lo ancho, y el número abajo. */
 @media (max-width: 420px) {
-  .lp-tel { grid-template-columns: minmax(0, 38%) 1fr; }
+  .lp-tel { grid-template-columns: minmax(0, 1fr); }
 }
 
 .lp-submit { margin-top: 4px; width: 100%; }
@@ -987,6 +990,11 @@
 }
 .mapa-zoom button:hover:not(:disabled) { background: var(--ink); color: var(--field); }
 .mapa-zoom button:disabled { opacity: .35; cursor: default; }
+/* Celular: el mapa es bajo y los tres botones apilados se salían por abajo,
+   encima de "7 eventos en 5 ciudades". En fila, arriba a la derecha. */
+@media (max-width: 520px) {
+  .mapa-zoom { grid-auto-flow: column; top: 8px; right: 8px; }
+}
 
 .mapa-meta {
   margin: 12px 0 0; font-family: var(--font-mono), monospace; font-size: 12px;

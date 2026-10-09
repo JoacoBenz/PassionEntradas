@@ -153,7 +153,7 @@ export default function FacturaModal({
           <h2 className="mt-0.5 font-display text-lg font-bold tracking-tight">
             {existente ? "Factura emitida" : "Emitir factura"}
           </h2>
-          <p className="mt-1 truncate text-xs text-white/60">{op.evento}</p>
+          <p className="mt-1 text-xs text-white/60">{op.evento}</p>
         </div>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
