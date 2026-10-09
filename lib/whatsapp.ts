@@ -1,13 +1,13 @@
-// Aviso a los vendedores por WhatsApp Business API (Meta Cloud API), opcional y
-// desacoplado — mismo patrón que lib/email.ts. Se activa SOLO si están las
-// envs WHATSAPP_TOKEN, WHATSAPP_PHONE_ID y WHATSAPP_VENDEDORES; si faltan,
-// `whatsappConfigurado()` devuelve false y el flujo de pedido/consulta sigue
-// funcionando igual (el registro en la app se crea siempre), solo que sin el
-// aviso automático. Cuando se conecte el número de WhatsApp Business, los
-// avisos empiezan a salir sin tocar código.
+// Aviso al equipo por WhatsApp Business API (Meta Cloud API), opcional y
+// desacoplado — mismo patrón que lib/email.ts. Necesita WHATSAPP_TOKEN y
+// WHATSAPP_PHONE_ID; si faltan, el envío devuelve `noConfigurado` y el flujo
+// de pedido/consulta sigue igual (el registro en la app se crea siempre),
+// solo que sin el aviso.
 //
-// WHATSAPP_VENDEDORES: números de los vendedores en formato internacional
-// (sin +), separados por coma. Ej: "5491136148053,5492944806666".
+// A quién lo decide lib/avisos-equipo: el teléfono de cada persona del equipo
+// que activó el aviso (`para`). Mientras nadie lo activó, sin `para`, a la
+// lista fija WHATSAPP_VENDEDORES: números en formato internacional (sin +),
+// separados por coma. Ej: "5491136148053,5492944806666".
 
 // --- plantilla (template) ---------------------------------------------------
 // La Cloud API sólo deja mandar texto libre DENTRO de la ventana de 24 h que se
