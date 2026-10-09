@@ -536,8 +536,29 @@ function TicketCardBase({
 
   useEffect(() => {
     const roll = rollRef.current;
-    if (roll) roll.style.maxHeight = open ? roll.scrollHeight + "px" : "0px";
-    if (!open) setFoco(null);
+    if (!roll) return;
+    if (open) {
+      roll.style.maxHeight = roll.scrollHeight + "px";
+      // Terminada la animación, sin tope: lo que crezca después (el mapa que
+      // carga, los chips que pasan a "Ver en el mapa", el stepper del carrito)
+      // tiene que verse entero. Con el alto fijo, la última fila quedaba
+      // cortada en el celular.
+      const fin = (e: TransitionEvent) => {
+        if (e.target === roll && e.propertyName === "max-height" && roll.style.maxHeight !== "0px") {
+          roll.style.maxHeight = "none";
+        }
+      };
+      roll.addEventListener("transitionend", fin);
+      return () => roll.removeEventListener("transitionend", fin);
+    }
+    // Para animar el cierre desde "none" primero hay que volver a un alto en
+    // px (de "none" a 0 no hay transición).
+    if (roll.style.maxHeight === "none") {
+      roll.style.maxHeight = roll.scrollHeight + "px";
+      void roll.offsetHeight;
+    }
+    roll.style.maxHeight = "0px";
+    setFoco(null);
   }, [open]);
 
   async function share() {
@@ -616,7 +637,7 @@ function TicketCardBase({
                 // crecería recortado. Al cargar, re-medimos.
                 onLoad={() => {
                   const roll = rollRef.current;
-                  if (roll && open) roll.style.maxHeight = roll.scrollHeight + "px";
+                  if (roll && open && roll.style.maxHeight !== "none") roll.style.maxHeight = roll.scrollHeight + "px";
                 }}
               />
               <CapaFoco capa={capa} className="mapa-foco" />

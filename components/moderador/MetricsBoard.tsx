@@ -37,7 +37,8 @@ function Tile({
       </p>
       <p
         className={`mt-0.5 truncate font-display font-bold tabular-nums tracking-tight ${
-          big ? "text-2xl" : "text-lg"
+          // En 320px dos tarjetas por fila: a 2xl el monto quedaba "US$ 40.…".
+          big ? "text-xl min-[380px]:text-2xl" : "text-lg"
         }`}
         style={{ color: accent }}
         title={value}

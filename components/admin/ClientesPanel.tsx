@@ -114,9 +114,9 @@ export default function ClientesPanel({ fichas, esAdmin }: { fichas: FichaClient
                       )}
                     </div>
                   </div>
-                  <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                  <dl className="mt-2 grid grid-cols-3 gap-2 text-xs [&_dt]:[overflow-wrap:anywhere] [&_dd]:[overflow-wrap:anywhere]">
                     <div>
-                      <dt className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted">Operaciones</dt>
+                      <dt className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted">Pedidos</dt>
                       <dd className="font-semibold tabular-nums">{f.operaciones}</dd>
                     </div>
                     <div>

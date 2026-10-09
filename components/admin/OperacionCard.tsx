@@ -197,8 +197,11 @@ export default function OperacionCard({
             {formatMonto(op.monto, op.moneda)}
           </span>
           {op.cantidad > 1 && (
-            <span className="mt-0.5 font-mono text-[10px] text-muted">
-              ×{op.cantidad} · {formatMonto(op.monto / op.cantidad, op.moneda)} c/u
+            // En celular solo "×2": el precio unitario al lado le dejaba al
+            // nombre del evento 55px ("River …"). Está igual en el detalle.
+            <span className="mt-0.5 whitespace-nowrap font-mono text-[10px] text-muted">
+              ×{op.cantidad}
+              <span className="hidden sm:inline"> · {formatMonto(op.monto / op.cantidad, op.moneda)} c/u</span>
             </span>
           )}
         </span>
