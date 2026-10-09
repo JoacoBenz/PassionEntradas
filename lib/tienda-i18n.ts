@@ -179,6 +179,12 @@ const en = {
   zonaMapa: "Map zone",
   // Chip de zona que marca la zona en el mapa (lib/mapa-foco.ts).
   mapaFoco: { ver: "Show on map", quitar: "Clear map highlight" },
+  // Campana de avisos de los pedidos.
+  campana: {
+    titulo: "Notifications",
+    conNuevas: (n: number) => `Notifications: ${n} new`,
+    vacia: "Nothing yet. We'll let you know here when your orders move forward.",
+  },
   mapaPag: {
     verTodas: (n: number) => `Show all ${n} cities`,
     verMenos: "Show fewer",
@@ -594,6 +600,11 @@ const es: typeof en = {
 
   zonaMapa: "Zona del mapa",
   mapaFoco: { ver: "Ver en el mapa", quitar: "Quitar la marca del mapa" },
+  campana: {
+    titulo: "Avisos",
+    conNuevas: (n: number) => `Avisos: ${n} ${n === 1 ? "nuevo" : "nuevos"}`,
+    vacia: "Todavía nada. Acá te avisamos cuando tus pedidos avancen.",
+  },
   mapaPag: {
     verTodas: (n: number) => `Ver las ${n} ciudades`,
     verMenos: "Ver menos",

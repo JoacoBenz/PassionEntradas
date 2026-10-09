@@ -1433,3 +1433,38 @@
 .sk-card { width: 100%; height: 118px; }
 @keyframes sk-pulse { from { opacity: .05; } to { opacity: .12; } }
 @media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+
+/* --- campana de avisos (Campana.tsx) --------------------------------------- */
+.campana { position: relative; display: inline-flex; }
+.campana-btn {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border: 1.5px solid var(--ink); background: var(--field);
+  color: var(--ink); cursor: pointer; transition: .12s;
+}
+.campana-btn:hover { background: var(--ink); color: var(--field); }
+.campana-n {
+  position: absolute; top: -7px; right: -7px; min-width: 18px; height: 18px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #d14d68; color: #fff; border-radius: 999px;
+  font-family: var(--font-mono), monospace; font-size: 10px; font-weight: 700;
+}
+.campana-panel {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 70;
+  width: min(340px, calc(100vw - 32px)); max-height: 70vh; overflow: auto;
+  background: var(--field); border: 1.5px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+  text-align: left;
+}
+.campana-h {
+  margin: 0; padding: 10px 14px; border-bottom: 1px dashed var(--line, #d6d3c8);
+  font-family: var(--font-mono), monospace; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.campana-vacia { margin: 0; padding: 18px 14px; color: var(--mute); font-size: 13px; line-height: 1.5; }
+.campana-lista { list-style: none; margin: 0; padding: 0; }
+.campana-lista li + li { border-top: 1px dashed var(--line, #d6d3c8); }
+.campana-lista a { display: grid; gap: 3px; padding: 10px 14px; color: var(--ink); text-decoration: none; }
+.campana-lista a:hover { background: rgba(23, 27, 43, .05); }
+.campana-lista strong { font-size: 13px; }
+.campana-lista span { font-size: 12.5px; color: var(--mute); line-height: 1.45; }
+.campana-lista time { font-size: 11px; color: var(--mute); font-family: var(--font-mono), monospace; }
+.campana-lista li.is-nueva a { box-shadow: inset 3px 0 0 #d14d68; }

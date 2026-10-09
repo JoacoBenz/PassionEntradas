@@ -26,6 +26,7 @@ import {
 import { LANGS, mesLabelLang, TX, type Lang } from "@/lib/tienda-i18n";
 import { useCart } from "@/components/tienda/Cart";
 import { CapaFoco, useFocoMapa } from "@/components/tienda/MapaFoco";
+import Campana from "@/components/tienda/Campana";
 import { LegalLinks } from "@/components/tienda/LegalLinks";
 import { empezarNavegacion } from "@/components/NavProgress";
 import type { ResumenHome } from "@/lib/resumen-home";
@@ -690,6 +691,7 @@ export function StorefrontHome({ resumen }: { resumen: ResumenHome }) {
           <div className="mast-right">
             <LangToggle lang={lang} onChange={setLang} />
             <MapaNavLink label={t.mapa.nav} />
+            <Campana lang={lang} />
             <Link className="lp-nav-login" href="/mis-pedidos">
               {t.lp.navPedidos}
             </Link>
@@ -1049,6 +1051,7 @@ export function StorefrontCatalog({ catalogo }: { catalogo: CatalogoCompacto }) 
           <div className="mast-right">
             <LangToggle lang={lang} onChange={setLang} />
             <MapaNavLink label={t.mapa.nav} />
+            <Campana lang={lang} />
             <Link className="lp-nav-login" href="/mis-pedidos">
               {t.lp.navPedidos}
             </Link>

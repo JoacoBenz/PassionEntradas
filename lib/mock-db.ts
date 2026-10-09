@@ -29,6 +29,7 @@ import type { SyncRun, TicketFull } from "@/lib/tickets";
 import type { Factura, FacturaDatos } from "@/lib/factura";
 import { generarPassword, type SolicitudAcceso, type SolicitudInput } from "@/lib/acceso";
 import { MOCK_TICKETS } from "@/lib/mock-tickets";
+import type { AvisoGuardado, NuevoAviso } from "@/lib/avisos";
 
 export type MockFactura = Factura & { operacion_id: string };
 
@@ -71,6 +72,8 @@ type MockDB = {
   // Usuarios del equipo (espejo de Auth: app_metadata.role / desactivado).
   usuarios: MockUsuario[];
   equipoCambios: (RegistroEquipo & { id: string; created_at: string })[];
+  // Espejo de la tabla notificaciones.
+  avisos: AvisoGuardado[];
 };
 
 export type MockUsuario = {
@@ -330,6 +333,7 @@ function seed(): MockDB {
       },
     ],
     equipoCambios: [],
+    avisos: [],
     items: [],
     // Consultas del cliente demo: una para cotizar y una ya cotizada que
     // espera su respuesta (se ve en el panel y en Mis pedidos).
@@ -430,6 +434,7 @@ export function mockCreateOp(input: {
   envio_id?: string | null;
   confirmada_at?: string | null;
   confirmada_por?: string | null;
+  idioma?: "es" | "en" | null;
   // Líneas del pedido: se guardan aparte, igual que en la base.
   items?: Omit<OperacionItem, "id" | "operacion_id" | "created_at">[];
 }): Operacion {
@@ -1165,4 +1170,35 @@ export function mockDescartarConsulta(
   c.resuelta_at = new Date().toISOString();
   c.updated_at = c.resuelta_at;
   return { ok: true };
+}
+
+
+// ---- avisos (espejo de notificaciones) --------------------------------------
+/** Guarda el aviso si su clave es nueva. null = ya existía (no se re-avisa). */
+export function mockGuardarAviso(a: NuevoAviso): AvisoGuardado | null {
+  const d = db();
+  if (d.avisos.some((x) => x.clave === a.clave)) return null;
+  const fila: AvisoGuardado = {
+    ...a,
+    id: crypto.randomUUID(),
+    leida_at: null,
+    whatsapp_estado: a.whatsapp_estado ?? "no_aplica",
+    whatsapp_error: null,
+    email_error: null,
+    created_at: new Date().toISOString(),
+  };
+  d.avisos.push(fila);
+  return fila;
+}
+
+export function mockActualizarAviso(id: string, patch: Partial<AvisoGuardado>): void {
+  const a = db().avisos.find((x) => x.id === id);
+  if (a) Object.assign(a, patch);
+}
+
+export function mockListAvisos(filtro: (a: AvisoGuardado) => boolean, limite = 30): AvisoGuardado[] {
+  return db()
+    .avisos.filter(filtro)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, limite);
 }

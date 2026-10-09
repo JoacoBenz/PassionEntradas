@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AutoRefresh from "@/components/AutoRefresh";
 import ConfirmarBoton from "@/components/ConfirmarBoton";
+import Campana from "@/components/tienda/Campana";
 import { LANGS, LOCALE, TX, type Lang } from "@/lib/tienda-i18n";
 import { formatMonto, pasosCliente, type EstadoPublico, type Moneda } from "@/lib/operaciones";
 import { waLink } from "@/lib/tickets";
@@ -196,6 +197,7 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
                 </button>
               ))}
             </div>
+            <Campana lang={lang} />
             <Link className="lp-nav-login" href="/cuenta">
               {t.lp.navCuenta}
             </Link>

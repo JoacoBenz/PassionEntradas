@@ -141,6 +141,8 @@ export async function POST(request: Request) {
   // El carrito manda { items: [...] }; se acepta también un item suelto
   // (compat: { tipo, evento, ... }) envolviéndolo en un array.
   const raw = Array.isArray(body.items) ? body.items : [body];
+  // Idioma de la tienda al pedir: los avisos por email le llegan en ese.
+  const idioma: "es" | "en" = body?.lang === "en" ? "en" : "es";
   if (raw.length === 0) {
     return NextResponse.json({ error: "El pedido está vacío" }, { status: 400 });
   }
@@ -265,6 +267,7 @@ export async function POST(request: Request) {
         cliente_email: ctx.cliente_email,
         sector: resumen.sector,
         envio_id: envioId,
+        idioma,
         items: g.lineas.map((l) => ({
           ticket_id: l.ticket_id,
           evento: l.evento,
@@ -355,6 +358,13 @@ export async function POST(request: Request) {
         );
       }
       operaciones.push(creada);
+
+      // El idioma va aparte y sin chequear: español es el default, y si la
+      // columna todavía no existe (migración 0045 sin aplicar) el pedido no se
+      // puede caer por eso.
+      if (idioma === "en") {
+        await admin.from("operaciones").update({ idioma }).eq("id", creada.id);
+      }
 
       // Las líneas. Si fallan, la operación queda sin detalle: se borra para
       // no dejar una operación a medias en el panel.

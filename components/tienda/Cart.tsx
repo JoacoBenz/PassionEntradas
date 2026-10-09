@@ -157,6 +157,7 @@ export function CartBar() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          lang,
           items: items.map((i) => ({
             tipo: i.tipo,
             ticket_id: i.ticket_id,
