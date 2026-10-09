@@ -137,7 +137,8 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
       const res = await fetch(`/api/consultas/${p.id}/${accion}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ version: p.cotizacion?.version }),
+        // El idioma de la tienda: si acepta, sus avisos por email van en ese.
+        body: JSON.stringify({ version: p.cotizacion?.version, lang }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

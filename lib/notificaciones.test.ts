@@ -16,6 +16,18 @@ describe("avisoDeCambio", () => {
   it("saltear pasos avisa solo el de llegada", () => {
     expect(avisoDeCambio(op(), op({ confirmada_at: "x", entrada_recibida_at: "x" }))).toBe("para_pagar");
   });
+  it("desmarcar o reabrir no avisa (solo cuando el pedido avanza)", () => {
+    const conf = { confirmada_at: "x" };
+    // Para pagar -> Confirmado (se desmarcó la entrada).
+    expect(avisoDeCambio(op({ ...conf, entrada_recibida_at: "x" }), op(conf))).toBeNull();
+    // Entregada -> Para pagar (se desmarcó la entrega).
+    expect(avisoDeCambio(op({ ...conf, entrada_recibida_at: "x", cerrada_at: "x" }), op({ ...conf, entrada_recibida_at: "x" }))).toBeNull();
+    // Una del staff (nace confirmada) a la que se le desmarca la entrada.
+    expect(avisoDeCambio(op({ tipo: "operacion", entrada_recibida_at: "x" }), op({ tipo: "operacion" }))).toBeNull();
+    // Reabrir una cancelada.
+    expect(avisoDeCambio(op({ tipo: "operacion", status: "cancelada" }), op({ tipo: "operacion" }))).toBeNull();
+    expect(avisoDeCambio(op({ ...conf, status: "cancelada" }), op(conf))).toBeNull();
+  });
   it("lo que no es uno de los tres no avisa", () => {
     // Pagado: el cliente ya lo sabe.
     expect(avisoDeCambio(op({ entrada_recibida_at: "x" }), op({ entrada_recibida_at: "x", pago_confirmado_at: "x" }))).toBeNull();

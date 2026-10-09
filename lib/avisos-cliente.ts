@@ -61,6 +61,13 @@ export async function avisarCambioAlCliente(
       const { data } = await admin.from("operaciones").select("idioma").eq("id", despues.id).maybeSingle();
       idioma = (data as { idioma?: string | null } | null)?.idioma ?? null;
     }
+    // Sin idioma en el pedido (cargado por el staff, o anterior a esto): el
+    // que el cliente eligió en su cuenta.
+    if (!idioma && despues.cliente_id && admin && !isMock()) {
+      const { data } = await admin.auth.admin.getUserById(despues.cliente_id);
+      const lang = (data?.user?.user_metadata as Record<string, unknown> | undefined)?.lang;
+      if (lang === "en" || lang === "es") idioma = lang;
+    }
 
     let textoPago: string | null = null;
     if (tipo === "para_pagar") {

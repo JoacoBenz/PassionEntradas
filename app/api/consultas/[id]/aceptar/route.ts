@@ -84,6 +84,20 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const op = data as { op_id: string; op_code: string } | null;
   if (!op) return NextResponse.json({ error: "No se pudo crear el pedido" }, { status: 500 });
 
+  // Idioma del pedido que nace (sus emails van en ese): el de la tienda si
+  // acepta el cliente, si no el que tenía la consulta. Aparte y sin
+  // chequear: el pedido ya está creado y esto no lo puede tirar abajo.
+  try {
+    let idioma: string | null = !porWhatsapp && (body?.lang === "en" || body?.lang === "es") ? body.lang : null;
+    if (!idioma) {
+      const { data: cons } = await admin.from("consultas").select("idioma").eq("id", params.id).maybeSingle();
+      idioma = (cons as { idioma?: string | null } | null)?.idioma ?? null;
+    }
+    if (idioma === "en") await admin.from("operaciones").update({ idioma }).eq("id", op.op_id);
+  } catch {
+    /* sin idioma: los emails van en español */
+  }
+
   // Aviso a los vendedores. Best-effort: el pedido ya quedó creado.
   try {
     const texto = `${porWhatsapp ? `${quien} registró que el cliente aceptó por WhatsApp` : `El cliente ${quien} aceptó la cotización en la web`}. Se creó el pedido ${op.op_code}.`;

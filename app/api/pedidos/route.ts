@@ -18,7 +18,7 @@ import {
   evaluarLimite,
   reconciliarItem,
   partirPorStock,
-  entradasAConsulta,
+  entradasMovidasPorStock,
   agruparPorMoneda,
   resumenOperacion,
   separarPorTipo,
@@ -200,16 +200,19 @@ export async function POST(request: Request) {
   const tasa = refs.size ? await fetchConfigTienda().catch(() => sinConfig) : sinConfig;
 
   const pedidoOriginal = [...parsed];
+  // Para avisarle al cliente que parte de lo que pidió quedó a consultar por
+  // falta de stock (no por otra razón, como no tener precio).
+  let aConsultaPorStock = 0;
   parsed.splice(
     0,
     parsed.length,
     ...pedidoOriginal.flatMap((p) => {
       const ref = p.ticket_id ? refs.get(p.ticket_id) : undefined;
-      return partirPorStock(p, ref).map((parte) => reconciliarItem(parte, ref, tasa));
+      const partes = partirPorStock(p, ref);
+      aConsultaPorStock += entradasMovidasPorStock(p, partes);
+      return partes.map((parte) => reconciliarItem(parte, ref, tasa));
     })
   );
-  // Para avisarle al cliente que parte de lo que pidió quedó a consultar.
-  const aConsultaPorStock = entradasAConsulta(pedidoOriginal, parsed);
 
   // Comisión de la operación = suma de la de cada línea (precio − costo). Sin
   // esto el tablero mostraba "comisión ganada: 0" para TODO lo que entra por la
@@ -414,6 +417,10 @@ export async function POST(request: Request) {
           .single();
         if (!error && data) {
           consultasCreadas.push(data as { id: string; code: string; evento: string });
+          // Igual que en la operación: aparte y sin chequear (ver arriba).
+          if (idioma === "en") {
+            await admin.from("consultas").update({ idioma }).eq("id", (data as { id: string }).id);
+          }
           break;
         }
         if (error && (error as any).code !== "23505") {

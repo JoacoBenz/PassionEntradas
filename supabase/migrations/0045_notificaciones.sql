@@ -49,3 +49,8 @@ revoke all on public.notificaciones from anon, authenticated;
 -- los emails le llegan en ese idioma. Sin dato, español.
 alter table public.operaciones
   add column if not exists idioma text check (idioma in ('es', 'en'));
+
+-- Lo mismo en la consulta: cuando el cliente acepta la cotización, el pedido
+-- que nace hereda el idioma de la consulta.
+alter table public.consultas
+  add column if not exists idioma text check (idioma in ('es', 'en'));

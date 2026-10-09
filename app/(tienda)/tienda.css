@@ -1272,6 +1272,7 @@
 .cart-h h2 { margin: 0; font-size: 20px; font-weight: 700; }
 .cart-h p { margin: 6px 0 0; color: var(--mute); font-size: 13px; line-height: 1.5; max-width: 42ch; }
 .cart-x { background: none; border: none; font-size: 20px; line-height: 1; cursor: pointer; color: var(--ink); }
+.cart-x:disabled { opacity: .35; cursor: default; }
 .cart-list { list-style: none; margin: 14px 0; padding: 0; display: grid; gap: 12px; }
 .cart-it { display: flex; align-items: flex-start; gap: 10px;
   border-bottom: 1px dashed var(--ink); padding-bottom: 12px; }

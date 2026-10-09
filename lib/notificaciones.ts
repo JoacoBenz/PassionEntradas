@@ -16,15 +16,29 @@ const AVISO_DE_ESTADO: Partial<Record<EstadoPublico, TipoAvisoCliente>> = {
 
 type Hitos = Parameters<typeof estadoPublicoDe>[0];
 
+// Orden de los pasos que ve el cliente. Cancelada queda afuera: reabrir no
+// es avanzar.
+const PASO: Partial<Record<EstadoPublico, number>> = {
+  pedido_recibido: 0,
+  pedido_confirmado: 1,
+  listo_para_pagar: 2,
+  pago_recibido: 3,
+  entregada: 4,
+};
+
 /**
- * El aviso que corresponde a un cambio, o null. Si un cambio saltea pasos
- * (de "Recibido" directo a "Para pagar") va solo el del paso al que llegó: el
- * de "Para pagar" ya dice que está confirmado.
+ * El aviso que corresponde a un cambio, o null. Solo cuando el pedido AVANZA:
+ * desmarcar un hito (de "Para pagar" a "Confirmado") o reabrir una cancelada
+ * no avisa nada; si no, al cliente le llegaba "Confirmamos tu pedido" después
+ * de "Ya podés pagar". Si un cambio saltea pasos (de "Recibido" directo a
+ * "Para pagar") va solo el del paso al que llegó: ese ya dice que está
+ * confirmado.
  */
 export function avisoDeCambio(antes: Hitos, despues: Hitos): TipoAvisoCliente | null {
-  const a = estadoPublicoDe(antes);
+  const a = PASO[estadoPublicoDe(antes)];
   const d = estadoPublicoDe(despues);
-  if (a === d) return null;
+  const dn = PASO[d];
+  if (a === undefined || dn === undefined || dn <= a) return null;
   return AVISO_DE_ESTADO[d] ?? null;
 }
 

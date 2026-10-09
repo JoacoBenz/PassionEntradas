@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  entradasAConsulta,
+  entradasMovidasPorStock,
   partirPorStock,
   evaluarLimite,
   precioVenta,
@@ -546,6 +546,17 @@ describe("partirPorStock — más que el stock se parte en pedido + consulta", (
       ["pedido", 4, 778 * 4],
       ["consulta", 1, 0],
     ]);
-    expect(entradasAConsulta([item({ cantidad: 5 })], partes)).toBe(1);
+    expect(entradasMovidasPorStock(item({ cantidad: 5 }), partirPorStock(item({ cantidad: 5 }), PORTAL))).toBe(1);
+  });
+  it("sin precio no se parte: una sola consulta, y no cuenta como falta de stock", () => {
+    const sinPrecio = { ...PROPIA, precio_final: null, stock: 3 };
+    const partes = partirPorStock(item({ cantidad: 5 }), sinPrecio);
+    expect(partes).toHaveLength(1);
+    expect(entradasMovidasPorStock(item({ cantidad: 5 }), partes)).toBe(0);
+    const final = partes.map((p) => reconciliarItem(p, sinPrecio, TASA));
+    expect(final.map((p) => [p.tipo, p.cantidad])).toEqual([["consulta", 5]]);
+  });
+  it("una consulta de entrada nunca cuenta como movida por stock", () => {
+    expect(entradasMovidasPorStock(item({ tipo: "consulta", cantidad: 2 }), [item({ tipo: "consulta", cantidad: 2 })])).toBe(0);
   });
 });

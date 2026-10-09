@@ -10,6 +10,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import Link from "next/link";
@@ -131,6 +132,11 @@ export function CartBar() {
   // qué es consulta, el total y qué pasa después). Recién "Confirmar y
   // enviar" hace el POST.
   const [revisando, setRevisando] = useState(false);
+  // Cuándo se abrió la revisión. "Confirmar y enviar" queda donde estaba
+  // "Enviar pedido" (en el celular es la misma fila de abajo): sin esto, el
+  // segundo toque de un doble toque mandaba el pedido sin que el cliente
+  // llegara a ver la revisión. Mismo margen que ConfirmarBoton.
+  const revisionAbiertaAt = useRef(0);
   // Entradas que no tenían stock y el server pasó a consulta (ver partirPorStock).
   const [aConsulta, setAConsulta] = useState(0);
 
@@ -150,6 +156,7 @@ export function CartBar() {
 
   async function enviar() {
     if (estado === "sending" || items.length === 0) return;
+    if (Date.now() - revisionAbiertaAt.current < 400) return;
     setEstado("sending");
     setError("");
     try {
@@ -192,7 +199,15 @@ export function CartBar() {
     <>
       {count > 0 && !open && (
         <div className="cart-bar">
-          <button type="button" onClick={() => setOpen(true)}>
+          <button
+            type="button"
+            onClick={() => {
+              // Un envío anterior que terminó con el carrito cerrado no puede
+              // tapar el carrito nuevo con su "Pedido enviado".
+              if (estado === "done") setEstado("idle");
+              setOpen(true);
+            }}
+          >
             <span className="cart-count">{count}</span>
             {c.revisar}
             {totales.length > 0 && <span className="cart-bar-total">{totalTexto}</span>}
@@ -224,7 +239,15 @@ export function CartBar() {
                     <h2>{c.revTitulo}</h2>
                     <p>{c.revSub}</p>
                   </div>
-                  <button type="button" className="cart-x" onClick={cerrar} aria-label={c.cerrar}>
+                  <button
+                    type="button"
+                    className="cart-x"
+                    onClick={cerrar}
+                    aria-label={c.cerrar}
+                    // Mientras sale el pedido no se cierra: si no, el aviso de
+                    // "Pedido enviado" (y el de entradas sin stock) no se veía.
+                    disabled={estado === "sending"}
+                  >
                     ✕
                   </button>
                 </div>
@@ -307,7 +330,15 @@ export function CartBar() {
                     <h2>{c.titulo}</h2>
                     <p>{c.sub}</p>
                   </div>
-                  <button type="button" className="cart-x" onClick={cerrar} aria-label={c.cerrar}>
+                  <button
+                    type="button"
+                    className="cart-x"
+                    onClick={cerrar}
+                    aria-label={c.cerrar}
+                    // Mientras sale el pedido no se cierra: si no, el aviso de
+                    // "Pedido enviado" (y el de entradas sin stock) no se veía.
+                    disabled={estado === "sending"}
+                  >
                     ✕
                   </button>
                 </div>
@@ -387,6 +418,7 @@ export function CartBar() {
                     type="button"
                     className="cart-send"
                     onClick={() => {
+                      revisionAbiertaAt.current = Date.now();
                       setRevisando(true);
                       if (estado === "err") setEstado("idle");
                     }}
