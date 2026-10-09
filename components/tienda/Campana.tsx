@@ -24,15 +24,19 @@ export default function Campana({ lang }: { lang: Lang }) {
   const [fijo, setFijo] = useState<React.CSSProperties | undefined>(undefined);
   const caja = useRef<HTMLDivElement>(null);
 
-  const cargar = useCallback(async () => {
+  // Devuelve lo que cargó (null si no pudo).
+  const cargar = useCallback(async (): Promise<Aviso[] | null> => {
     try {
       const res = await fetch("/api/notificaciones?audiencia=cliente", { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok) return null;
       const data = await res.json();
-      setAvisos(Array.isArray(data.avisos) ? data.avisos : []);
+      const lista: Aviso[] = Array.isArray(data.avisos) ? data.avisos : [];
+      setAvisos(lista);
       setNoLeidas(Number(data.noLeidas) || 0);
+      return lista;
     } catch {
       /* sin red: queda lo último que se vio */
+      return null;
     }
   }, []);
 
@@ -66,6 +70,20 @@ export default function Campana({ lang }: { lang: Lang }) {
     };
   }, [abierta]);
 
+  // Al abrir: primero lo último y después se marcan leídos SOLO los que se
+  // muestran (marcar "todos" se llevaba puestos avisos que no llegó a ver).
+  async function marcarLeidos() {
+    const lista = (await cargar()) ?? avisos;
+    const ids = lista.filter((a) => !a.leida).map((a) => a.id);
+    if (ids.length === 0) return;
+    setNoLeidas((n) => Math.max(0, n - ids.length));
+    await fetch("/api/notificaciones?audiencia=cliente", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    }).catch(() => {});
+  }
+
   function abrir() {
     const abrir = !abierta;
     if (abrir && window.innerWidth < 640 && caja.current) {
@@ -75,11 +93,8 @@ export default function Campana({ lang }: { lang: Lang }) {
       setFijo(undefined);
     }
     setAbierta(abrir);
-    if (abrir && noLeidas > 0) {
-      // Se ven como nuevas mientras está abierta; el contador baja ya.
-      setNoLeidas(0);
-      void fetch("/api/notificaciones?audiencia=cliente", { method: "POST" }).catch(() => {});
-    }
+    // Se ven como nuevas mientras está abierta; el contador baja ya.
+    if (abrir) void marcarLeidos();
     if (!abrir) setAvisos((a) => a.map((x) => ({ ...x, leida: true })));
   }
 

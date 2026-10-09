@@ -107,14 +107,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Idioma recordado (mismo criterio que el resto de la tienda).
-function useLang(): Lang {
-  const [lang, setLang] = useState<Lang>("es");
-  useEffect(() => {
+// Idioma recordado (mismo criterio que el resto de la tienda). La barra vive
+// en el layout y no se vuelve a montar: el idioma se relee al abrir el
+// carrito y al enviar, si no un cambio de idioma en la página no le llegaba
+// (y el pedido quedaba con el idioma de la primera visita).
+function leerLang(): Lang {
+  try {
     const s = localStorage.getItem("tm_lang");
-    if (s === "en" || s === "es") setLang(s);
+    if (s === "en" || s === "es") return s;
+  } catch {
+    /* sin storage: español */
+  }
+  return "es";
+}
+
+function useLang(): [Lang, () => Lang] {
+  const [lang, setLang] = useState<Lang>("es");
+  const releer = useCallback(() => {
+    const l = leerLang();
+    setLang(l);
+    return l;
   }, []);
-  return lang;
+  useEffect(() => {
+    releer();
+  }, [releer]);
+  return [lang, releer];
 }
 
 type Estado = "idle" | "sending" | "done" | "err";
@@ -123,7 +140,7 @@ type Estado = "idle" | "sending" | "done" | "err";
 // la tienda; se muestra sola cuando hay entradas en el carrito.
 export function CartBar() {
   const { items, count, setQty, remove, clear } = useCart();
-  const lang = useLang();
+  const [lang, releerLang] = useLang();
   const c = TX[lang].carrito;
   const [open, setOpen] = useState(false);
   const [estado, setEstado] = useState<Estado>("idle");
@@ -164,7 +181,7 @@ export function CartBar() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          lang,
+          lang: releerLang(),
           items: items.map((i) => ({
             tipo: i.tipo,
             ticket_id: i.ticket_id,
@@ -205,6 +222,7 @@ export function CartBar() {
               // Un envío anterior que terminó con el carrito cerrado no puede
               // tapar el carrito nuevo con su "Pedido enviado".
               if (estado === "done") setEstado("idle");
+              releerLang();
               setOpen(true);
             }}
           >

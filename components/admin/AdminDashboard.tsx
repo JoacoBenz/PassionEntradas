@@ -7,6 +7,8 @@ import { estadoCotizacion } from "@/lib/cotizaciones";
 import {
   consultaCoincide,
   etiquetaFiltro,
+  EVENTO_IR_AL_PANEL,
+  filtroDeLink,
   opCoincide,
   PESTANAS,
   type Filtro,
@@ -253,6 +255,19 @@ export default function AdminDashboard({
     listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firmaUrl]);
+  // Un link de la campana a la MISMA URL en la que ya está el Panel (ver
+  // EVENTO_IR_AL_PANEL): se aplica igual.
+  useEffect(() => {
+    const ir = (e: Event) => {
+      const link = filtroDeLink(String((e as CustomEvent).detail ?? ""));
+      if (!link) return;
+      setFiltro(link.filtro);
+      setQuery(link.q);
+      listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    window.addEventListener(EVENTO_IR_AL_PANEL, ir);
+    return () => window.removeEventListener(EVENTO_IR_AL_PANEL, ir);
+  }, []);
   const chip = etiquetaFiltro(filtro);
 
   function irAPagina(n: number) {
@@ -520,7 +535,7 @@ export default function AdminDashboard({
         ref={listaRef}
         role="tablist"
         aria-label="Filtrar operaciones"
-        className="mb-5 scroll-mt-4 grid w-full grid-cols-3 gap-1 rounded-xl border border-line bg-white p-1 shadow-sm sm:flex"
+        className="mb-5 scroll-mt-28 lg:scroll-mt-20 grid w-full grid-cols-3 gap-1 rounded-xl border border-line bg-white p-1 shadow-sm sm:flex"
       >
         {PESTANAS.map((f) => {
           const active = filter === f.key;

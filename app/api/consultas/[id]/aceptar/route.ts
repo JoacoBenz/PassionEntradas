@@ -94,7 +94,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       const { data: cons } = await admin.from("consultas").select("idioma").eq("id", params.id).maybeSingle();
       idioma = (cons as { idioma?: string | null } | null)?.idioma ?? null;
     }
-    if (idioma === "en") await admin.from("operaciones").update({ idioma }).eq("id", op.op_id);
+    if (idioma === "en" || idioma === "es") await admin.from("operaciones").update({ idioma }).eq("id", op.op_id);
   } catch {
     /* sin idioma: los emails van en español */
   }

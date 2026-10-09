@@ -84,8 +84,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Ya es parte del equipo." }, { status: 409 });
     }
     if (!alta.promover) {
+      // Cualquier cuenta que no es del equipo se puede pasar al equipo:
+      // también la de un cliente con el acceso revocado (rol vacío), que si no
+      // quedaba sin forma de sumarse.
+      const revocado = rolGuardado(existente) !== "cliente";
       return NextResponse.json(
-        { error: "Ya tiene cuenta de cliente.", esCliente: rolGuardado(existente) === "cliente" },
+        { error: revocado ? "Ya tiene cuenta (con el acceso revocado)." : "Ya tiene cuenta de cliente.", esCliente: true, revocado },
         { status: 409 }
       );
     }

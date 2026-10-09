@@ -68,6 +68,8 @@ export default function EquipoPanel({
   const [busy, setBusy] = useState<string | null>(null);
   const [form, setForm] = useState({ nombre: "", apellido: "", email: "", rol: "moderador" as RolEquipo });
   const [esCliente, setEsCliente] = useState(false);
+  // La cuenta existe pero con el acceso revocado (no es cliente activo).
+  const [revocado, setRevocado] = useState(false);
   const [revelado, setRevelado] = useState<Revelado | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
 
@@ -100,6 +102,7 @@ export default function EquipoPanel({
         // Ya es cliente: se ofrece pasarlo al equipo (sin tocar su clave).
         if (data.esCliente) {
           setEsCliente(true);
+          setRevocado(Boolean(data.revocado));
           return;
         }
         avisar("error", typeof data.error === "string" ? data.error : "No se pudo sumar al equipo");
@@ -233,13 +236,14 @@ export default function EquipoPanel({
               {esCliente ? (
                 <>
                   <p className="text-xs text-[#4A4E5E]">
-                    <b>{form.email}</b> ya tiene cuenta de cliente.
+                    <b className="[overflow-wrap:anywhere]">{form.email}</b>{" "}
+                    {revocado ? "ya tiene cuenta, con el acceso revocado." : "ya tiene cuenta de cliente."}
                   </p>
                   <ConfirmarBoton
                     onConfirm={() => sumar(true)}
                     disabled={busy !== null}
                     className={btnPrimary}
-                    pregunta="Deja de ser cliente. ¿Seguro?"
+                    pregunta={revocado ? "Pasa al equipo. ¿Seguro?" : "Deja de ser cliente. ¿Seguro?"}
                     si={`Sí, pasar a ${ROL_LABEL[form.rol].toLowerCase()}`}
                     siClassName={btnSiBrand}
                     noClassName={btnGhost}
@@ -314,7 +318,7 @@ export default function EquipoPanel({
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold">
+                      <p className="text-sm font-semibold [overflow-wrap:anywhere]">
                         {m.nombre ?? m.email}
                         {yo && <span className="ml-1.5 text-xs font-medium text-muted">(vos)</span>}
                       </p>
@@ -433,7 +437,7 @@ export default function EquipoPanel({
                 {cambios.map((c) => (
                   <li key={c.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-3.5 py-2 text-xs">
                     <span>
-                      <b className="font-semibold">{c.email ?? "—"}</b> {textoCambio(c)}
+                      <b className="font-semibold [overflow-wrap:anywhere]">{c.email ?? "—"}</b> {textoCambio(c)}
                     </span>
                     <span className="text-muted">
                       {c.por} · {fechaHora(c.created_at)}

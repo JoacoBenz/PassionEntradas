@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { avisarEquipo, correrRecordatorios, destinatariosDe, mensajeRecordatorio } from "./avisos-equipo";
 import type { MiembroEquipo } from "./equipo";
-import { mockListAvisos, mockListUsuarios } from "./mock-db";
+import { mockListAvisos, mockListConsultas, mockListUsuarios } from "./mock-db";
 import { DESTINO_LISTA_FIJA } from "./recordatorios";
 
 const miembro = (id: string, rol: MiembroEquipo["rol"], nombre: string, extra: Partial<MiembroEquipo> = {}): MiembroEquipo => ({
@@ -145,5 +145,40 @@ describe("correrRecordatorios", () => {
     }
     const otra = await correrRecordatorios(null, ahora, "https://x");
     expect(otra.avisosNuevos).toBe(0);
+  });
+
+  it("alguien nuevo en el equipo: le llega a su campana, pero la lista fija no recibe otra vez lo mismo", async () => {
+    const ahora = new Date(Date.now() + 3 * 3_600_000);
+    await correrRecordatorios(null, ahora, "https://x");
+    mockListUsuarios().push({
+      id: "99999999-9999-4999-8999-999999999999",
+      email: "nuevo@example.com",
+      app_metadata: { role: "administrador" },
+      user_metadata: { nombre: "Nuevo" },
+      last_sign_in_at: null,
+    } as never);
+    const r = await correrRecordatorios(null, ahora, "https://x");
+    expect(r.avisosNuevos).toBeGreaterThan(0);
+    expect(r.whatsapps).toBe(0);
+    const suyas = mockListAvisos((a) => a.destinatario_id === "99999999-9999-4999-8999-999999999999", 100);
+    expect(suyas.length).toBe(r.avisosNuevos);
+    expect(suyas.every((f) => f.whatsapp_estado === "no_aplica")).toBe(true);
+  });
+
+  it("una cotización que se vuelve a cotizar avisa de nuevo cuando está por vencer", async () => {
+    const ahora = new Date();
+    const c = mockListConsultas().find((x) => x.estado === "cotizada")!;
+    c.vence_at = new Date(ahora.getTime() + 3 * 3_600_000).toISOString();
+    await correrRecordatorios(null, ahora, "https://x");
+    const vence = () => mockListAvisos((a) => a.tipo === "recordatorio_vence" && a.consulta_id === c.id, 100).length;
+    const primera = vence();
+    expect(primera).toBeGreaterThan(0);
+    // Misma cotización, otra pasada: nada nuevo.
+    await correrRecordatorios(null, ahora, "https://x");
+    expect(vence()).toBe(primera);
+    // Cotizada otra vez, con otro vencimiento: aviso nuevo.
+    c.vence_at = new Date(ahora.getTime() + 5 * 3_600_000).toISOString();
+    await correrRecordatorios(null, ahora, "https://x");
+    expect(vence()).toBe(primera * 2);
   });
 });

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { fechaHora } from "@/lib/fechas";
 import { textoAvisoEquipo, type DatosAvisoEquipo, type EstadoWhatsappAviso } from "@/lib/recordatorios";
+import { EVENTO_IR_AL_PANEL } from "@/lib/panel-filtros";
 
 type Aviso = {
   id: string;
@@ -39,15 +40,19 @@ export default function CampanaEquipo() {
   const [fijo, setFijo] = useState<React.CSSProperties | undefined>(undefined);
   const caja = useRef<HTMLDivElement>(null);
 
-  const cargar = useCallback(async () => {
+  // Devuelve lo que cargó (null si no pudo).
+  const cargar = useCallback(async (): Promise<Aviso[] | null> => {
     try {
       const res = await fetch(API, { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok) return null;
       const data = await res.json();
-      setAvisos(Array.isArray(data.avisos) ? data.avisos : []);
+      const lista: Aviso[] = Array.isArray(data.avisos) ? data.avisos : [];
+      setAvisos(lista);
       setNoLeidas(Number(data.noLeidas) || 0);
+      return lista;
     } catch {
       /* sin red: queda lo último */
+      return null;
     }
   }, []);
 
@@ -78,6 +83,21 @@ export default function CampanaEquipo() {
     };
   }, [abierta]);
 
+  // Al abrir: primero lo último (lo que entró desde la última consulta) y
+  // después se marcan leídos SOLO los que se están mostrando. Marcar "todos"
+  // en el server se llevaba puestos avisos que nadie llegó a ver.
+  async function marcarLeidos() {
+    const lista = (await cargar()) ?? avisos;
+    const ids = lista.filter((a) => !a.leida).map((a) => a.id);
+    if (ids.length === 0) return;
+    setNoLeidas((n) => Math.max(0, n - ids.length));
+    await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    }).catch(() => {});
+  }
+
   function alternar() {
     const abrir = !abierta;
     if (abrir && window.innerWidth < 640 && caja.current) {
@@ -87,10 +107,7 @@ export default function CampanaEquipo() {
       setFijo(undefined);
     }
     setAbierta(abrir);
-    if (abrir && noLeidas > 0) {
-      setNoLeidas(0);
-      void fetch(API, { method: "POST" }).catch(() => {});
-    }
+    if (abrir) void marcarLeidos();
     if (!abrir) setAvisos((a) => a.map((x) => ({ ...x, leida: true })));
   }
 
@@ -143,7 +160,14 @@ export default function CampanaEquipo() {
                   <li key={a.id}>
                     <Link
                       href={a.url ?? "/admin"}
-                      onClick={() => setAbierta(false)}
+                      onClick={() => {
+                        setAbierta(false);
+                        // Ya en el Panel: que aplique el filtro aunque la URL
+                        // sea la misma (ver EVENTO_IR_AL_PANEL).
+                        if (window.location.pathname === "/admin") {
+                          window.dispatchEvent(new CustomEvent(EVENTO_IR_AL_PANEL, { detail: a.url ?? "/admin" }));
+                        }
+                      }}
                       className={`grid gap-0.5 px-4 py-2.5 hover:bg-canvas ${a.leida ? "" : "shadow-[inset_3px_0_0_#D14D68]"}`}
                     >
                       <span className={`text-[13px] font-semibold ${recordatorio ? "text-[#B5304B]" : "text-ink"}`}>{txt.titulo}</span>

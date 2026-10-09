@@ -227,12 +227,14 @@ export async function correrRecordatorios(
   const filas: { m: MiembroEquipo; p: Pendiente; aviso: NuevoAviso }[] = [];
   for (const p of ps) {
     const tipo = `recordatorio_${p.tipo}` as TipoAvisoEquipo;
+    // Una cotización que se vuelve a cotizar vence de nuevo: su aviso es otro.
+    const ref = p.tipo === "vence" ? `${p.ref}:${p.desde}` : p.ref;
     for (const m of destinatariosDe(equipo, tipo, undefined, p.clase === "op" ? vendedorDe.get(p.ref) : null)) {
       filas.push({
         m,
         p,
         aviso: {
-          clave: claveAvisoEquipo(m.id, tipo, p.ref),
+          clave: claveAvisoEquipo(m.id, tipo, ref),
           audiencia: "equipo",
           destinatario_id: m.id,
           destinatario_email: m.email,
@@ -251,9 +253,15 @@ export async function correrRecordatorios(
   const guardados = new Map((await guardarAvisos(admin, filas.map((f) => f.aviso))).map((g) => [g.clave, g]));
 
   // Nadie activó el aviso en Equipo todavía: un solo mensaje a la lista fija
-  // con todo lo nuevo, y su resultado en cada fila.
+  // con todo lo nuevo, y su resultado en cada fila. Lo que ya tenía fila de
+  // otra persona ya le llegó a la lista: si cambia el equipo (alguien nuevo,
+  // un vendedor que deja de coincidir) se agrega a su campana, sin repetir
+  // el WhatsApp.
+  const claveDe = (p: Pendiente) => `${p.tipo}:${p.ref}:${p.desde}`;
+  const yaAvisados = new Set(filas.filter((f) => !guardados.has(f.aviso.clave)).map((f) => claveDe(f.p)));
   const paraLista = new Map<string, Pendiente>();
   const filasLista: string[] = [];
+  const filasSinEnvio: string[] = [];
   for (const m of equipo) {
     const nuevos: { p: Pendiente; fila: AvisoGuardado }[] = filas
       .filter((f) => f.m.id === m.id && guardados.has(f.aviso.clave))
@@ -262,7 +270,11 @@ export async function correrRecordatorios(
     if (nuevos.length === 0) continue;
     if (!alguienActivo) {
       for (const { p, fila } of nuevos) {
-        paraLista.set(`${p.tipo}:${p.ref}`, p);
+        if (yaAvisados.has(claveDe(p))) {
+          filasSinEnvio.push(fila.id);
+          continue;
+        }
+        paraLista.set(claveDe(p), p);
         filasLista.push(fila.id);
       }
       continue;
@@ -277,6 +289,7 @@ export async function correrRecordatorios(
     if (r.ok) whatsapps++;
     await actualizarAvisos(admin, filasLista, patchDeWhatsapp(r, DESTINO_LISTA_FIJA));
   }
+  await actualizarAvisos(admin, filasSinEnvio, { whatsapp_estado: "no_aplica" });
   return { pendientes: ps.length, avisosNuevos, whatsapps };
 }
 

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { consultaCoincide, etiquetaFiltro, filtroDeParams, opCoincide, urlPanel } from "./panel-filtros";
+import {
+  consultaCoincide,
+  filtroDeLink,
+  filtroDeParams,
+  etiquetaFiltro,
+  opCoincide,
+  urlPanel,
+} from "./panel-filtros";
 import type { Operacion } from "./operaciones";
 
 const op = (extra: Partial<Operacion> = {}): Operacion =>
@@ -138,5 +145,18 @@ describe("etiquetaFiltro", () => {
     expect(etiquetaFiltro({ filtro: "cobradas", moneda: "USD", desde: "2026-10-01", hasta: "2026-10-09" })).toBe(
       "Con pago confirmado · USD · 01/10 → 09/10"
     );
+  });
+});
+
+describe("filtroDeLink (links de la campana estando en el Panel)", () => {
+  it("lee el filtro y la búsqueda del link", () => {
+    expect(filtroDeLink("/admin?q=BX-AB12CD34")).toEqual({ filtro: { filtro: "todas" }, q: "BX-AB12CD34" });
+    expect(filtroDeLink("/admin?filtro=nuevos")).toEqual({ filtro: { filtro: "nuevos" }, q: "" });
+    expect(filtroDeLink("/admin")).toEqual({ filtro: { filtro: "todas" }, q: "" });
+  });
+  it("lo que no es el Panel no es un filtro", () => {
+    expect(filtroDeLink("/admin/solicitudes")).toBeNull();
+    expect(filtroDeLink("/admin/clientes?x=1")).toBeNull();
+    expect(filtroDeLink("/moderador")).toBeNull();
   });
 });

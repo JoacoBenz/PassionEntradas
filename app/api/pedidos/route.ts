@@ -143,8 +143,11 @@ export async function POST(request: Request) {
   // El carrito manda { items: [...] }; se acepta también un item suelto
   // (compat: { tipo, evento, ... }) envolviéndolo en un array.
   const raw = Array.isArray(body.items) ? body.items : [body];
-  // Idioma de la tienda al pedir: los avisos por email le llegan en ese.
-  const idioma: "es" | "en" = body?.lang === "en" ? "en" : "es";
+  // Idioma de la tienda al pedir: los avisos por email le llegan en ese. Se
+  // guarda siempre que la tienda lo mande (también "es"): sin idioma, los
+  // emails usan el de la cuenta, que puede ser otro.
+  const idiomaElegido: "es" | "en" | null = body?.lang === "en" || body?.lang === "es" ? body.lang : null;
+  const idioma: "es" | "en" = idiomaElegido ?? "es";
   if (raw.length === 0) {
     return NextResponse.json({ error: "El pedido está vacío" }, { status: 400 });
   }
@@ -364,11 +367,10 @@ export async function POST(request: Request) {
       }
       operaciones.push(creada);
 
-      // El idioma va aparte y sin chequear: español es el default, y si la
-      // columna todavía no existe (migración 0045 sin aplicar) el pedido no se
-      // puede caer por eso.
-      if (idioma === "en") {
-        await admin.from("operaciones").update({ idioma }).eq("id", creada.id);
+      // El idioma va aparte y sin chequear: si la columna todavía no existe
+      // (migración 0045 sin aplicar) el pedido no se puede caer por eso.
+      if (idiomaElegido) {
+        await admin.from("operaciones").update({ idioma: idiomaElegido }).eq("id", creada.id);
       }
 
       // Las líneas. Si fallan, la operación queda sin detalle: se borra para
@@ -419,8 +421,8 @@ export async function POST(request: Request) {
         if (!error && data) {
           consultasCreadas.push(data as { id: string; code: string; evento: string });
           // Igual que en la operación: aparte y sin chequear (ver arriba).
-          if (idioma === "en") {
-            await admin.from("consultas").update({ idioma }).eq("id", (data as { id: string }).id);
+          if (idiomaElegido) {
+            await admin.from("consultas").update({ idioma: idiomaElegido }).eq("id", (data as { id: string }).id);
           }
           break;
         }

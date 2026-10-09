@@ -66,6 +66,22 @@ const FILTROS = new Set<Filtro>([
 ]);
 const DIA = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Un link al Panel desde la campana, estando ya en el Panel: si la URL es la
+ * misma que la actual, Next no cambia nada y el filtro no se volvía a
+ * aplicar. La campana avisa con este evento (detail = el link) y el Panel lo
+ * aplica igual.
+ */
+export const EVENTO_IR_AL_PANEL = "panel:ir";
+
+/** El filtro y la búsqueda de un link del Panel ("/admin?filtro=…&q=…"). */
+export function filtroDeLink(url: string): { filtro: FiltroPanel; q: string } | null {
+  const i = url.indexOf("?");
+  if (!url.startsWith("/admin") || (i !== -1 && url.slice(0, i) !== "/admin") || (i === -1 && url !== "/admin")) return null;
+  const params = Object.fromEntries(new URLSearchParams(i === -1 ? "" : url.slice(i + 1)));
+  return { filtro: filtroDeParams(params), q: (params.q ?? "").slice(0, 120) };
+}
+
 /** Lee el filtro de la URL (?filtro=&moneda=&desde=&hasta=). Lo inválido se ignora. */
 export function filtroDeParams(p: Record<string, string | string[] | undefined> | undefined): FiltroPanel {
   const uno = (k: string) => {
