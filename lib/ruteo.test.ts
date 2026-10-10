@@ -84,10 +84,17 @@ describe("moderador", () => {
     expect(ir("/admin", "moderador")).toEqual({ accion: "redirigir", a: "/moderador" });
     expect(ir("/admin/entradas", "moderador")).toEqual({ accion: "redirigir", a: "/moderador" });
     expect(ir("/admin/solicitudes", "moderador")).toEqual({ accion: "redirigir", a: "/moderador" });
+    expect(ir("/admin/equipo", "moderador")).toEqual({ accion: "redirigir", a: "/moderador" });
+    expect(ir("/admin/clientes/x", "moderador")).toEqual({ accion: "redirigir", a: "/moderador" });
   });
 
   it("salvo su propia cuenta, para cambiar la contraseña", () => {
     expect(ir("/admin/cuenta", "moderador")).toEqual({ accion: "seguir" });
+  });
+
+  it("y la lista de Clientes", () => {
+    expect(ir("/admin/clientes", "moderador")).toEqual({ accion: "seguir" });
+    expect(ir("/admin/clientes", "cliente")).toEqual({ accion: "redirigir", a: "/entradas" });
   });
 
   it("puede ver la tienda (carga pedidos desde ahí)", () => {

@@ -373,7 +373,9 @@ export default function MargenesPanel() {
                   aria-label="Evento para la nueva regla"
                   value={nuevaCat}
                   onChange={(e) => setNuevaCat(e.target.value)}
-                  className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-white px-2.5 text-sm outline-none focus:border-brand"
+                  // En celular, a lo ancho en su propio renglón: al lado del %
+                  // y del botón quedaba "Elegir eve…".
+                  className="h-10 w-full min-w-0 rounded-lg border border-line bg-white px-2.5 text-sm outline-none focus:border-brand sm:w-auto sm:flex-1"
                 >
                   <option value="">Elegir evento…</option>
                   {sinRegla.map((c) => (

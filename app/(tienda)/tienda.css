@@ -279,6 +279,26 @@
   }
 }
 
+/* Zona marcada (lib/mapa-foco.ts): la capa va encima de la imagen con el
+   mismo tamaño y el mismo object-fit, así coincide píxel a píxel. */
+.mapa-capas { position: relative; display: block; }
+.mapa-foco {
+  position: absolute; inset: 1px; width: calc(100% - 2px); height: calc(100% - 2px);
+  object-fit: contain; border-radius: 9px; pointer-events: none;
+  animation: mapa-foco-in .25s ease-out, mapa-foco-pulso 1.6s ease-in-out .25s 3;
+}
+.plano-capas { position: relative; display: block; margin: 0 auto; }
+.plano-capas .plano-img { width: 100%; }
+.plano-foco {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border-radius: 10px; pointer-events: none;
+}
+@keyframes mapa-foco-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mapa-foco-pulso { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) {
+  .mapa-foco { animation: none; }
+}
+
 /* Señal de que se puede agrandar. */
 .mapa-lupa {
   position: absolute; right: 10px; bottom: 10px;
@@ -306,7 +326,8 @@
   color: rgba(255, 255, 255, .78);
   font-size: 12px; font-weight: 600;
 }
-.plano-ayuda { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* La ayuda puede ocupar dos renglones: cortada con "…" no se entendía. */
+.plano-ayuda { min-width: 0; line-height: 1.3; }
 .plano-acciones { display: inline-flex; align-items: center; gap: 6px; flex: none; }
 .plano-zoom {
   min-width: 34px; text-align: center; font-variant-numeric: tabular-nums;
@@ -821,8 +842,10 @@
 .lp-tel-cod:focus {
   outline: none; border-color: var(--cobalt); box-shadow: 0 0 0 3px #1f33e022;
 }
+/* Celular: el código ("+54 · Argentina") no entra al lado del número; va
+   arriba, a lo ancho, y el número abajo. */
 @media (max-width: 420px) {
-  .lp-tel { grid-template-columns: minmax(0, 38%) 1fr; }
+  .lp-tel { grid-template-columns: minmax(0, 1fr); }
 }
 
 .lp-submit { margin-top: 4px; width: 100%; }
@@ -967,6 +990,11 @@
 }
 .mapa-zoom button:hover:not(:disabled) { background: var(--ink); color: var(--field); }
 .mapa-zoom button:disabled { opacity: .35; cursor: default; }
+/* Celular: el mapa es bajo y los tres botones apilados se salían por abajo,
+   encima de "7 eventos en 5 ciudades". En fila, arriba a la derecha. */
+@media (max-width: 520px) {
+  .mapa-zoom { grid-auto-flow: column; top: 8px; right: 8px; }
+}
 
 .mapa-meta {
   margin: 12px 0 0; font-family: var(--font-mono), monospace; font-size: 12px;
@@ -1200,6 +1228,12 @@
 .mp-link--cancelar { background: transparent; color: #b3263f; border-color: #b3263f; cursor: pointer; }
 .mp-link--cancelar:hover { background: #b3263f; color: #fff; }
 .mp-link--cancelar:disabled { opacity: .6; cursor: wait; }
+/* Confirmación en el lugar (ConfirmarBoton): pregunta + "Sí, …" + "No". */
+.mp-confirma { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mp-confirma-pregunta { font-size: 13px; font-weight: 600; color: var(--ink); }
+.mp-link--cancelar-si { background: #b3263f; border-color: #b3263f; color: #fff; cursor: pointer; }
+.mp-link--cancelar-si:hover { background: #8f1e32; border-color: #8f1e32; color: #fff; }
+.mp-link--no { background: transparent; cursor: pointer; }
 .mp-empty {
   text-align: center; background: var(--field); border: 1.5px dashed var(--ink);
   padding: 40px 24px; box-shadow: 4px 4px 0 var(--ink);
@@ -1238,6 +1272,7 @@
 .cart-h h2 { margin: 0; font-size: 20px; font-weight: 700; }
 .cart-h p { margin: 6px 0 0; color: var(--mute); font-size: 13px; line-height: 1.5; max-width: 42ch; }
 .cart-x { background: none; border: none; font-size: 20px; line-height: 1; cursor: pointer; color: var(--ink); }
+.cart-x:disabled { opacity: .35; cursor: default; }
 .cart-list { list-style: none; margin: 14px 0; padding: 0; display: grid; gap: 12px; }
 .cart-it { display: flex; align-items: flex-start; gap: 10px;
   border-bottom: 1px dashed var(--ink); padding-bottom: 12px; }
@@ -1292,6 +1327,7 @@
 .cart-ok { text-align: center; padding: 16px 8px; }
 .cart-ok h2 { margin: 0 0 8px; font-size: 22px; font-weight: 700; }
 .cart-ok p { margin: 0 auto 18px; max-width: 40ch; color: var(--mute); font-size: 14px; line-height: 1.55; }
+.cart-ok .cart-ok-nota { padding: 10px 12px; border: 1.5px solid var(--ink); background: var(--field); color: var(--ink); font-size: 13px; }
 /* Los dos botones apilados y con aire. El primario tiene una sombra dura de
    4px que se le metía encima al de abajo: con 12px de separación quedaban
    pegados. El gap contempla la sombra. */
@@ -1330,6 +1366,15 @@
 }
 /* Sin nombre de zona el chip es SOLO el círculo: se agranda todavía más y se
    saca el padding de texto. */
+/* Chip que marca la zona en el mapa: es un botón. */
+.seat-zona--foco {
+  cursor: pointer; background: transparent; font: inherit; font-size: 11px; font-weight: 600;
+  border-color: var(--ink, #171b2b); color: var(--ink, #171b2b);
+}
+.seat-zona--foco:hover { background: rgba(23, 27, 43, .06); }
+.seat-zona--foco[aria-pressed="true"] { background: var(--ink, #171b2b); color: #fff; }
+.seat-zona-ver { font-size: 11px; line-height: 1; margin-left: 2px; }
+.seat-zona--solo.seat-zona--foco { gap: 3px; padding: 3px 6px 3px 3px; }
 .seat-zona--solo {
   padding: 3px;
   gap: 0;
@@ -1349,7 +1394,8 @@
   .back,
   .lp-nav-login,
   .lang-btn,
-  .mapa-nav {
+  .mapa-nav,
+  .campana-btn {
     min-height: 40px;
     display: inline-flex;
     align-items: center;
@@ -1392,6 +1438,17 @@
    son pedidos separados. */
 .cart-total + .cart-total { border-top: 0; padding-top: 2px; margin-top: 0; }
 .cart-nota-monedas { font-size: 12px; color: var(--mute, #6a6e7e); margin: 4px 0 0; line-height: 1.4; }
+/* Paso de revisión antes de "Confirmar y enviar". */
+.cart-rev-grupo { margin: 14px 0 0; }
+.cart-rev-grupo h3 { margin: 0 0 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 600; }
+.cart-rev-nota { color: var(--mute); font-weight: 400; font-size: 12px; }
+.cart-rev-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cart-rev-list li { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+  padding-bottom: 8px; border-bottom: 1px dashed var(--line, #d6d3c8); }
+.cart-rev-desc { display: flex; flex-direction: column; min-width: 0; }
+.cart-rev-sigue { margin: 14px 0 0; padding: 10px 12px; border: 1.5px solid var(--ink); background: var(--field); font-size: 13px; line-height: 1.5; }
+.cart-rev-sigue p { margin: 4px 0 0; color: var(--mute); }
+.cart-keep:disabled { opacity: .5; cursor: default; }
 
 /* Esqueleto de carga (components/Esqueletos.tsx). */
 .sk-tienda { display: flex; flex-direction: column; gap: 14px; padding: 22px 0 40px; }
@@ -1404,3 +1461,38 @@
 .sk-card { width: 100%; height: 118px; }
 @keyframes sk-pulse { from { opacity: .05; } to { opacity: .12; } }
 @media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+
+/* --- campana de avisos (Campana.tsx) --------------------------------------- */
+.campana { position: relative; display: inline-flex; }
+.campana-btn {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border: 1.5px solid var(--ink); background: var(--field);
+  color: var(--ink); cursor: pointer; transition: .12s;
+}
+.campana-btn:hover { background: var(--ink); color: var(--field); }
+.campana-n {
+  position: absolute; top: -7px; right: -7px; min-width: 18px; height: 18px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #d14d68; color: #fff; border-radius: 999px;
+  font-family: var(--font-mono), monospace; font-size: 10px; font-weight: 700;
+}
+.campana-panel {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 70;
+  width: min(340px, calc(100vw - 32px)); max-height: 70vh; overflow: auto;
+  background: var(--field); border: 1.5px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+  text-align: left;
+}
+.campana-h {
+  margin: 0; padding: 10px 14px; border-bottom: 1px dashed var(--line, #d6d3c8);
+  font-family: var(--font-mono), monospace; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.campana-vacia { margin: 0; padding: 18px 14px; color: var(--mute); font-size: 13px; line-height: 1.5; }
+.campana-lista { list-style: none; margin: 0; padding: 0; }
+.campana-lista li + li { border-top: 1px dashed var(--line, #d6d3c8); }
+.campana-lista a { display: grid; gap: 3px; padding: 10px 14px; color: var(--ink); text-decoration: none; }
+.campana-lista a:hover { background: rgba(23, 27, 43, .05); }
+.campana-lista strong { font-size: 13px; }
+.campana-lista span { font-size: 12.5px; color: var(--mute); line-height: 1.45; }
+.campana-lista time { font-size: 11px; color: var(--mute); font-family: var(--font-mono), monospace; }
+.campana-lista li.is-nueva a { box-shadow: inset 3px 0 0 #d14d68; }

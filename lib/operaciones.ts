@@ -100,6 +100,8 @@ export type Operacion = {
   cancelada_por?: string | null;
   created_at: string;
   updated_at: string;
+  // Idioma en que el cliente hizo el pedido (sus emails van en ese idioma).
+  idioma?: "es" | "en" | null;
 };
 
 // Etiquetas del origen para el panel.

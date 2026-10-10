@@ -5,6 +5,17 @@ import { fusionarRefresco, parcheOptimista, previoDe } from "@/lib/estado-local"
 import { useRouter } from "next/navigation";
 import { estadoCotizacion } from "@/lib/cotizaciones";
 import {
+  consultaCoincide,
+  etiquetaFiltro,
+  EVENTO_IR_AL_PANEL,
+  filtroDeLink,
+  opCoincide,
+  PESTANAS,
+  type Filtro,
+  type FiltroPanel,
+} from "@/lib/panel-filtros";
+import { etiquetaPrioridad, pendienteDeConsulta, pendienteDeOp } from "@/lib/recordatorios";
+import {
   diasHastaEvento,
   estadoDe,
   necesitaConfirmar,
@@ -31,46 +42,16 @@ type Props = {
   // lugar, y una consulta es trabajo pendiente igual que una operación.
   consultas?: Consulta[];
   baseUrl: string;
+  // Filtro con el que abre (?filtro=… desde las tarjetas de Métricas).
+  filtroInicial?: FiltroPanel;
+  // Búsqueda con la que abre (?q=… desde "Ver sus pedidos" en Clientes).
+  busquedaInicial?: string;
 };
 
 // Fila de la lista: o una operación, o una consulta sin cotizar.
 type Fila =
   | { kind: "op"; id: string; created_at: string; op: Operacion }
   | { kind: "consulta"; id: string; created_at: string; consulta: Consulta };
-
-type Filter = "todas" | "nuevos" | "en_curso" | "para_cerrar" | "cerradas" | "canceladas";
-
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "todas", label: "Todas" },
-  // Pedidos de la tienda que esperan "Confirmar pedido".
-  { key: "nuevos", label: "Nuevos" },
-  { key: "en_curso", label: "En curso" },
-  { key: "para_cerrar", label: "Para entregar" },
-  { key: "cerradas", label: "Entregadas" },
-  { key: "canceladas", label: "Canceladas" },
-];
-
-function matches(op: Operacion, filter: Filter): boolean {
-  const estado = estadoDe(op);
-  switch (filter) {
-    case "todas":
-      return true;
-    case "nuevos":
-      return necesitaConfirmar(op);
-    case "en_curso":
-      return (
-        estado !== "cerrada" &&
-        estado !== "cancelada" &&
-        estado !== "lista_para_cerrar"
-      );
-    case "para_cerrar":
-      return estado === "lista_para_cerrar";
-    case "cerradas":
-      return estado === "cerrada";
-    case "canceladas":
-      return estado === "cancelada";
-  }
-}
 
 // Módulo del administrador: chequea la lista y actualiza estados.
 // La carga de operaciones nuevas vive en el módulo /moderador.
@@ -79,6 +60,8 @@ export default function AdminDashboard({
   items = [],
   consultas: consultasIniciales = [],
   baseUrl,
+  filtroInicial = { filtro: "todas" },
+  busquedaInicial = "",
 }: Props) {
   // Índice operación -> líneas, armado una vez por render en vez de filtrar
   // el array completo dentro de cada tarjeta.
@@ -95,17 +78,29 @@ export default function AdminDashboard({
   const [ops, setOps] = useState<Operacion[]>(initial);
   const [consultas, setConsultas] = useState<Consulta[]>(consultasIniciales);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("todas");
-  const [query, setQuery] = useState("");
+  const [filtro, setFiltro] = useState<FiltroPanel>(filtroInicial);
+  const filter = filtro.filtro;
+  // Cambiar de pestaña o de tarjeta conserva el cliente elegido (si hay).
+  const setFilter = (f: Filtro) => setFiltro((prev) => ({ filtro: f, ...(prev.cliente ? { cliente: prev.cliente } : {}) }));
+  const listaRef = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState(busquedaInicial);
   const [sort, setSort] = useState<"recientes" | "urgentes">("recientes");
   const [page, setPage] = useState(1);
   const { toasts, push } = useToast();
   const router = useRouter();
 
+  // Reloj del Panel: la prioridad (lleva rato esperando) cambia sola con el
+  // tiempo, sin que cambien los datos.
+  const [ahora, setAhora] = useState(() => new Date());
+  useEffect(() => {
+    const t = window.setInterval(() => setAhora(new Date()), 60_000);
+    return () => window.clearInterval(t);
+  }, []);
+
   // Cambiar filtro, búsqueda u orden vuelve a la primera página.
   useEffect(() => {
     setPage(1);
-  }, [filter, query, sort]);
+  }, [filtro, query, sort]);
 
   // Clicks de estado (ver lib/estado-local.ts): fila por operación, cuántos
   // hay en vuelo, y el updated_at de la última respuesta de cada una.
@@ -137,10 +132,14 @@ export default function AdminDashboard({
   // filtro.
   const [fijas, setFijas] = useState<Set<string>>(new Set());
   const [fijasArriba, setFijasArriba] = useState<Set<string>>(new Set());
+  // Y las que eran prioridad al tocarlas siguen primeras: confirmar una la
+  // sacaba de la prioridad y saltaba al fondo (o a otra página).
+  const [fijasPrioridad, setFijasPrioridad] = useState<Set<string>>(new Set());
   useEffect(() => {
     setFijas(new Set());
     setFijasArriba(new Set());
-  }, [filter]);
+    setFijasPrioridad(new Set());
+  }, [filtro]);
 
   useEffect(() => {
     setConsultas(consultasIniciales);
@@ -160,6 +159,20 @@ export default function AdminDashboard({
     return { enCurso, paraCerrar, cerradas, aCotizar, esperando, nuevos };
   }, [ops, consultas]);
 
+  // id -> texto del badge rojo ("Sin confirmar hace 3 h").
+  const prioridades = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const o of ops) {
+      const p = pendienteDeOp(o, ahora);
+      if (p) m.set(o.id, etiquetaPrioridad(p, ahora));
+    }
+    for (const c of consultas) {
+      const p = pendienteDeConsulta(c, ahora);
+      if (p) m.set(c.id, etiquetaPrioridad(p, ahora));
+    }
+    return m;
+  }, [ops, consultas, ahora]);
+
   const visible = useMemo<Fila[]>(() => {
     const q = query.trim().toLowerCase();
     const coincide = (...campos: (string | null | undefined)[]) =>
@@ -168,7 +181,7 @@ export default function AdminDashboard({
     let filas: Fila[] = ops
       .filter(
         (o) =>
-          (matches(o, filter) || fijas.has(o.id)) &&
+          (opCoincide(o, filtro, ahora) || fijas.has(o.id)) &&
           coincide(o.evento, o.code, o.comprador_alias, o.vendedor_alias, o.cliente_email)
       )
       .map((op) => ({ kind: "op" as const, id: op.id, created_at: op.created_at, op }));
@@ -190,13 +203,15 @@ export default function AdminDashboard({
     // Las consultas van SIEMPRE arriba: son las únicas filas que esperan algo
     // del admin (chequear stock y cerrar precio). Con el paginado, dejarlas
     // ordenadas por fecha las mandaba a la página 3 y no las veía nadie.
-    // Solo aparecen en los filtros donde "trabajo pendiente" tiene sentido.
-    const muestraConsultas = filter === "todas" || filter === "en_curso";
-    const pendientes: Fila[] = muestraConsultas
-      ? consultas
-          .filter((c) => coincide(c.evento, c.code, c.comprador_alias, c.cliente_email))
-          .map((c) => ({ kind: "consulta" as const, id: c.id, created_at: c.created_at, consulta: c }))
-      : [];
+    // Solo aparecen en los filtros donde "trabajo pendiente" tiene sentido,
+    // y en los dos de consultas (A cotizar / Esperando cliente).
+    const pendientes: Fila[] = consultas
+      .filter(
+        (c) =>
+          consultaCoincide(c, filtro, ahora) &&
+          coincide(c.evento, c.code, c.comprador_alias, c.cliente_email)
+      )
+      .map((c) => ({ kind: "consulta" as const, id: c.id, created_at: c.created_at, consulta: c }));
 
     // Los pedidos nuevos (sin confirmar) también esperan al admin: van arriba,
     // justo después de las consultas.
@@ -204,8 +219,34 @@ export default function AdminDashboard({
     const nuevos = filas.filter(arriba);
     const resto = filas.filter((f) => !arriba(f));
 
-    return [...pendientes, ...nuevos, ...resto];
-  }, [ops, consultas, filter, query, sort, fijas, fijasArriba]);
+    // Lo que lleva rato esperando va primero de todo (decisión 7).
+    const todas = [...pendientes, ...nuevos, ...resto];
+    const prio = (f: Fila) => prioridades.has(f.id) || fijasPrioridad.has(f.id);
+    return [...todas.filter(prio), ...todas.filter((f) => !prio(f))];
+  }, [ops, consultas, filtro, query, sort, fijas, fijasArriba, fijasPrioridad, ahora, prioridades]);
+
+  // El aviso rojo cuenta lo que va a mostrar al tocarlo: con el cliente y la
+  // búsqueda de ahora (si no, decía "4 llevan rato" y abría una lista vacía).
+  const nPrioridad = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const coincide = (...campos: (string | null | undefined)[]) =>
+      !q || campos.some((c) => (c ?? "").toLowerCase().includes(q));
+    const f: FiltroPanel = { filtro: "prioridad", ...(filtro.cliente ? { cliente: filtro.cliente } : {}) };
+    return (
+      ops.filter(
+        (o) =>
+          prioridades.has(o.id) &&
+          opCoincide(o, f, ahora) &&
+          coincide(o.evento, o.code, o.comprador_alias, o.vendedor_alias, o.cliente_email)
+      ).length +
+      consultas.filter(
+        (c) =>
+          prioridades.has(c.id) &&
+          consultaCoincide(c, f, ahora) &&
+          coincide(c.evento, c.code, c.comprador_alias, c.cliente_email)
+      ).length
+    );
+  }, [ops, consultas, filtro.cliente, query, ahora, prioridades]);
 
   // Paginado en el cliente: con historial grande, renderizar cientos de
   // cards de una sola vez es lo que pesa (el fetch ya viene topado en 1000).
@@ -213,6 +254,49 @@ export default function AdminDashboard({
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const pagina = Math.min(page, totalPages);
   const enPagina = visible.slice((pagina - 1) * PAGE_SIZE, pagina * PAGE_SIZE);
+
+  // Tarjeta del resumen: filtra la lista y la trae a la vista. Tocar la
+  // activa la saca.
+  function tocarTarjeta(f: Filtro) {
+    setFilter(filter === f ? "todas" : f);
+    if (filter !== f) listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // Al abrir con un filtro de la URL, la lista ya arranca a la vista.
+  useEffect(() => {
+    if (filtroInicial.filtro !== "todas" || filtroInicial.cliente || busquedaInicial)
+      listaRef.current?.scrollIntoView({ block: "start" });
+    // Solo al montar: después manda el estado local.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Si la URL cambia estando ya en el Panel (un aviso de la campana, un link de
+  // Clientes), la página no se vuelve a montar: el filtro y la búsqueda se
+  // aplican acá. Un refresco con la misma URL no pisa lo que se eligió a mano.
+  const firmaUrl = JSON.stringify([filtroInicial, busquedaInicial]);
+  const primeraFirma = useRef(firmaUrl);
+  useEffect(() => {
+    if (firmaUrl === primeraFirma.current) return;
+    primeraFirma.current = firmaUrl;
+    setFiltro(filtroInicial);
+    setQuery(busquedaInicial);
+    listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaUrl]);
+  // Un link de la campana a la MISMA URL en la que ya está el Panel (ver
+  // EVENTO_IR_AL_PANEL): se aplica igual.
+  useEffect(() => {
+    const ir = (e: Event) => {
+      const link = filtroDeLink(String((e as CustomEvent).detail ?? ""));
+      if (!link) return;
+      setFiltro(link.filtro);
+      setQuery(link.q);
+      listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    window.addEventListener(EVENTO_IR_AL_PANEL, ir);
+    return () => window.removeEventListener(EVENTO_IR_AL_PANEL, ir);
+  }, []);
+  const chip = etiquetaFiltro(filtro);
 
   function irAPagina(n: number) {
     setPage(Math.min(Math.max(1, n), totalPages));
@@ -229,6 +313,7 @@ export default function AdminDashboard({
 
     setFijas((s) => (s.has(id) ? s : new Set(s).add(id)));
     if (necesitaConfirmar(op)) setFijasArriba((s) => (s.has(id) ? s : new Set(s).add(id)));
+    if (prioridades.has(id)) setFijasPrioridad((s) => (s.has(id) ? s : new Set(s).add(id)));
     if (parche) setOps((prev) => prev.map((o) => (o.id === id ? { ...o, ...parche } : o)));
     else setBusyId(id);
 
@@ -426,14 +511,15 @@ export default function AdminDashboard({
         <div className="grid grid-cols-2 divide-x divide-dashed divide-line sm:grid-cols-5">
           {/* "A cotizar" son las consultas: entradas que el cliente pidió y
               todavía hay que chequear si están y a cuánto. */}
-          <Stat label="A cotizar" value={stats.aCotizar} accent="#B07A14" />
+          {/* Cada tarjeta filtra la lista (tocarla de nuevo la limpia). */}
+          <Stat label="A cotizar" value={stats.aCotizar} accent="#B07A14" activa={filter === "a_cotizar"} onClick={() => tocarTarjeta("a_cotizar")} />
           {/* Cotizaciones mandadas que el cliente todavía no respondió. */}
-          <Stat label="Esperando cliente" value={stats.esperando} accent="#D14D68" />
-          <Stat label="En curso" value={stats.enCurso} accent="#1F33E0" />
-          <Stat label="Para entregar" value={stats.paraCerrar} accent="#0D9377" />
+          <Stat label="Esperando cliente" value={stats.esperando} accent="#D14D68" activa={filter === "esperando"} onClick={() => tocarTarjeta("esperando")} />
+          <Stat label="En curso" value={stats.enCurso} accent="#1F33E0" activa={filter === "en_curso"} onClick={() => tocarTarjeta("en_curso")} />
+          <Stat label="Para entregar" value={stats.paraCerrar} accent="#0D9377" activa={filter === "para_cerrar"} onClick={() => tocarTarjeta("para_cerrar")} />
           {/* Quinta celda: en celular ocupa la fila entera (2 columnas). */}
           <div className="col-span-2 border-t border-dashed border-line sm:col-span-1 sm:border-t-0">
-            <Stat label="Entregadas" value={stats.cerradas} accent="#6C5BF2" />
+            <Stat label="Entregadas" value={stats.cerradas} accent="#6C5BF2" activa={filter === "cerradas"} onClick={() => tocarTarjeta("cerradas")} />
           </div>
         </div>
       </section>
@@ -475,11 +561,12 @@ export default function AdminDashboard({
           lo reparten en partes iguales — nada de barra corta ni scroll
           horizontal con tabs cortados. */}
       <div
+        ref={listaRef}
         role="tablist"
         aria-label="Filtrar operaciones"
-        className="mb-5 grid w-full grid-cols-3 gap-1 rounded-xl border border-line bg-white p-1 shadow-sm sm:flex"
+        className="mb-5 scroll-mt-28 lg:scroll-mt-20 grid w-full grid-cols-3 gap-1 rounded-xl border border-line bg-white p-1 shadow-sm sm:flex"
       >
-        {FILTERS.map((f) => {
+        {PESTANAS.map((f) => {
           const active = filter === f.key;
           return (
             <button
@@ -508,6 +595,47 @@ export default function AdminDashboard({
           );
         })}
       </div>
+
+      {/* Hay cosas esperando de más: a un toque de verlas solas. */}
+      {nPrioridad > 0 && filter !== "prioridad" && (
+        <button
+          type="button"
+          onClick={() => tocarTarjeta("prioridad")}
+          className="-mt-3 mb-4 flex w-full items-center gap-2 rounded-xl bg-[#D14D68] px-3.5 py-2 text-left text-xs font-semibold text-white shadow-sm hover:bg-[#bf3f59]"
+        >
+          <span aria-hidden>●</span>
+          {nPrioridad} {nPrioridad === 1 ? "lleva" : "llevan"} rato esperando
+          <span className="ml-auto underline">Ver</span>
+        </button>
+      )}
+
+      {/* Filtro que vino de una tarjeta y no es pestaña: se ve y se saca. */}
+      {(chip || filtro.cliente) && (
+        <div className="-mt-3 mb-4 flex flex-wrap gap-2">
+          {filtro.cliente && (
+            <button
+              type="button"
+              onClick={() => setFiltro((prev) => ({ ...prev, cliente: undefined }))}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-cobalt px-3 py-1 text-left text-xs font-semibold text-white"
+              aria-label={`Quitar filtro de cliente: ${filtro.cliente.nombre ?? filtro.cliente.email}`}
+            >
+              <span className="[overflow-wrap:anywhere]">Cliente: {filtro.cliente.nombre ?? filtro.cliente.email}</span>
+              <span aria-hidden>✕</span>
+            </button>
+          )}
+          {chip && (
+            <button
+              type="button"
+              onClick={() => setFilter("todas")}
+              className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-xs font-semibold text-white"
+              aria-label={`Quitar filtro: ${chip}`}
+            >
+              {chip}
+              <span aria-hidden>✕</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Leyenda del semáforo: los tres estados que se accionan. El gris no
           está porque no es un estado, es "todavía no pasó nada". */}
@@ -539,7 +667,9 @@ export default function AdminDashboard({
           <div className="rounded-2xl border border-dashed border-[#C5C9D6] bg-white/50 px-4 py-10 text-center text-sm text-muted">
             {ops.length === 0 && consultas.length === 0
               ? "Todavía no hay operaciones. Se cargan desde el módulo de carga."
-              : "No hay operaciones con este filtro."}
+              : chip
+                ? "Nada con este filtro por ahora."
+                : "No hay operaciones con este filtro."}
           </div>
         ) : (
           enPagina.map((fila) =>
@@ -547,6 +677,7 @@ export default function AdminDashboard({
               <ConsultaCard
                 key={fila.id}
                 consulta={fila.consulta}
+                prioridad={prioridades.get(fila.id) ?? null}
                 busy={busyId === fila.id}
                 onCotizar={cotizarConsulta}
                 onAceptarWhatsapp={aceptarPorWhatsapp}
@@ -557,6 +688,7 @@ export default function AdminDashboard({
               <OperacionCard
                 key={fila.id}
                 op={fila.op}
+                prioridad={prioridades.get(fila.id) ?? null}
                 items={itemsPorOp.get(fila.id) ?? []}
                 baseUrl={baseUrl}
                 busy={busyId === fila.id}
@@ -604,16 +736,29 @@ function Stat({
   label,
   value,
   accent,
+  activa,
+  onClick,
 }: {
   label: string;
   value: number;
   accent: string;
+  activa: boolean;
+  onClick: () => void;
 }) {
   return (
     // Estilo del mock aprobado: label en mono chiquito y número gordo a la
     // izquierda. flex-col + justify-between mantiene los números alineados
     // aunque un label envuelva a dos líneas en móvil.
-    <div className="flex h-full flex-col justify-between gap-1 px-4 py-3.5 text-left">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={activa}
+      title={activa ? "Quitar filtro" : `Ver solo: ${label}`}
+      className={`flex h-full w-full flex-col justify-between gap-1 px-4 py-3.5 text-left transition-colors hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand ${
+        activa ? "bg-canvas shadow-[inset_0_-3px_0_currentColor]" : ""
+      }`}
+      style={activa ? { color: accent } : undefined}
+    >
       <p className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
         {label}
       </p>
@@ -623,6 +768,6 @@ function Stat({
       >
         {String(value).padStart(2, "0")}
       </p>
-    </div>
+    </button>
   );
 }

@@ -9,6 +9,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AutoRefresh from "@/components/AutoRefresh";
+import ConfirmarBoton from "@/components/ConfirmarBoton";
+import Campana from "@/components/tienda/Campana";
 import { LANGS, LOCALE, TX, type Lang } from "@/lib/tienda-i18n";
 import { formatMonto, pasosCliente, type EstadoPublico, type Moneda } from "@/lib/operaciones";
 import { waLink } from "@/lib/tickets";
@@ -126,18 +128,17 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
   const [cancelando, setCancelando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Aceptar o rechazar la cotización. Aceptar crea el pedido: pide
-  // confirmación, igual que cancelar.
+  // Aceptar o rechazar la cotización. Aceptar crea el pedido: se confirma
+  // en el mismo botón, igual que cancelar.
   async function responder(p: PedidoView, accion: "aceptar" | "rechazar") {
-    const msg = accion === "aceptar" ? mp.confirmarAceptar : mp.confirmarRechazar;
-    if (!window.confirm(msg)) return;
     setCancelando(p.id);
     setError(null);
     try {
       const res = await fetch(`/api/consultas/${p.id}/${accion}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ version: p.cotizacion?.version }),
+        // El idioma de la tienda: si acepta, sus avisos por email van en ese.
+        body: JSON.stringify({ version: p.cotizacion?.version, lang }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -152,7 +153,6 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
   }
 
   async function cancelar(p: PedidoView) {
-    if (!window.confirm(p.tipo === "pedido" ? mp.confirmarCancelarPedido : mp.confirmarCancelarConsulta)) return;
     setCancelando(p.id);
     setError(null);
     try {
@@ -198,6 +198,7 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
                 </button>
               ))}
             </div>
+            <Campana lang={lang} />
             <Link className="lp-nav-login" href="/cuenta">
               {t.lp.navCuenta}
             </Link>
@@ -273,22 +274,34 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
                       {mp.cotizacionTexto} · {tiempoRestante(p.cotizacion.venceAt, new Date(), lang)}
                     </p>
                     <span className="mp-cot-acciones">
-                      <button
-                        type="button"
+                      <ConfirmarBoton
                         className="mp-link mp-link--aceptar"
-                        onClick={() => responder(p, "aceptar")}
+                        onConfirm={() => responder(p, "aceptar")}
                         disabled={cancelando === p.id}
+                        pregunta={mp.confirmarAceptar}
+                        si={mp.siAceptar}
+                        no={mp.no}
+                        armadoClassName="mp-confirma"
+                        preguntaClassName="mp-confirma-pregunta"
+                        siClassName="mp-link mp-link--aceptar"
+                        noClassName="mp-link mp-link--no"
                       >
                         {cancelando === p.id ? mp.enviando : mp.aceptar}
-                      </button>
-                      <button
-                        type="button"
+                      </ConfirmarBoton>
+                      <ConfirmarBoton
                         className="mp-link mp-link--cancelar"
-                        onClick={() => responder(p, "rechazar")}
+                        onConfirm={() => responder(p, "rechazar")}
                         disabled={cancelando === p.id}
+                        pregunta={mp.confirmarRechazar}
+                        si={mp.siRechazar}
+                        no={mp.no}
+                        armadoClassName="mp-confirma"
+                        preguntaClassName="mp-confirma-pregunta"
+                        siClassName="mp-link mp-link--cancelar-si"
+                        noClassName="mp-link mp-link--no"
                       >
                         {mp.rechazar}
-                      </button>
+                      </ConfirmarBoton>
                     </span>
                   </div>
                 )}
@@ -347,18 +360,26 @@ export function MisPedidos({ pedidos }: { pedidos: PedidoView[] }) {
                       </a>
                     )}
                     {p.puedeCancelar && (
-                      <button
-                        type="button"
+                      <ConfirmarBoton
                         className="mp-link mp-link--cancelar"
-                        onClick={() => cancelar(p)}
+                        onConfirm={() => cancelar(p)}
                         disabled={cancelando === p.id}
+                        pregunta={
+                          p.tipo === "pedido" && p.seguible ? mp.confirmarCancelarPedido : mp.confirmarCancelarConsulta
+                        }
+                        si={mp.siCancelar}
+                        no={mp.no}
+                        armadoClassName="mp-confirma"
+                        preguntaClassName="mp-confirma-pregunta"
+                        siClassName="mp-link mp-link--cancelar-si"
+                        noClassName="mp-link mp-link--no"
                       >
                         {cancelando === p.id
                           ? mp.cancelando
                           : p.tipo === "pedido" && p.seguible
                             ? mp.cancelarPedido
                             : mp.cancelarConsulta}
-                      </button>
+                      </ConfirmarBoton>
                     )}
                     {/* Factura: solo si el staff ya la emitió. */}
                     {p.facturaId && (

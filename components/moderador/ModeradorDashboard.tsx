@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { whatsappMessage, type Consulta, type Moneda, type Operacion } from "@/lib/operaciones";
 import ConsultaCard from "@/components/admin/ConsultaCard";
 import NewOperacionForm from "@/components/admin/NewOperacionForm";
@@ -15,6 +16,8 @@ type Props = {
   metrics: Metrics;
   baseUrl: string;
   prefill?: { evento?: string; ticketId?: string };
+  enlacesPanel?: boolean;
+  enlaceClientes?: boolean;
 };
 
 // Módulo del moderador: carga la entrada a vender con los datos de
@@ -25,6 +28,8 @@ export default function ModeradorDashboard({
   metrics,
   baseUrl,
   prefill,
+  enlacesPanel = false,
+  enlaceClientes = false,
 }: Props) {
   const [ops, setOps] = useState<Operacion[]>(initial);
   // Lista viva: AutoRefresh vuelve a pedir la página cada tanto y `initial`
@@ -127,7 +132,14 @@ export default function ModeradorDashboard({
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
       {/* Resumen */}
-      <MetricsBoard metrics={metrics} />
+      {enlaceClientes && (
+        <div className="mb-3 flex justify-end">
+          <Link href="/admin/clientes" className="text-xs font-semibold text-brand hover:underline">
+            Ver clientes →
+          </Link>
+        </div>
+      )}
+      <MetricsBoard metrics={metrics} enlacesPanel={enlacesPanel} />
 
       {/* Módulo de carga: el foco de esta página, a lo ancho y arriba de todo. */}
       <section className="mt-6">
@@ -151,7 +163,7 @@ export default function ModeradorDashboard({
                 Lista para compartir
               </p>
               <p className="mt-1 font-mono text-sm">{lastCreated.code}</p>
-              <p className="truncate font-display font-semibold">
+              <p className="font-display font-semibold [overflow-wrap:anywhere]">
                 {lastCreated.evento}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">

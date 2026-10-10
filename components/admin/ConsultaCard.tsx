@@ -9,12 +9,15 @@
 // la misma lista.
 
 import { useState } from "react";
+import ConfirmarBoton from "@/components/ConfirmarBoton";
 import { formatMonto, quienDe, type Consulta, type Moneda } from "@/lib/operaciones";
 import { parsePrecio } from "@/lib/precios";
 import { estadoCotizacion, tiempoRestante } from "@/lib/cotizaciones";
 
 type Props = {
   consulta: Consulta;
+  // Lleva rato esperando (lib/recordatorios): va en rojo, con la edad.
+  prioridad?: string | null;
   busy?: boolean;
   // Manda (o cambia) la cotización al cliente. NO crea el pedido: eso pasa
   // cuando el cliente la acepta. Devuelve el error si falló, o null.
@@ -48,9 +51,9 @@ export default function ConsultaCard({
   onAceptarWhatsapp,
   onError,
   onDescartar,
+  prioridad = null,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
   const [confirmandoWa, setConfirmandoWa] = useState(false);
   // Cotizada: se muestra la cotización; "Cambiar" abre el form precargado.
   const est = estadoCotizacion(c);
@@ -90,9 +93,17 @@ export default function ConsultaCard({
 
   return (
     <article
-      className="card-shadow overflow-hidden rounded-2xl bg-white ring-1"
-      style={{ ["--tw-ring-color" as string]: `${chip.color}40` }}
+      className={`card-shadow overflow-hidden rounded-2xl bg-white ${prioridad ? "ring-2" : "ring-1"}`}
+      style={{ ["--tw-ring-color" as string]: prioridad ? "#D14D68" : `${chip.color}40` }}
     >
+      {/* Prioridad (lib/recordatorios): lleva rato esperando. */}
+      {prioridad && (
+        <p className="flex items-center gap-1.5 bg-[#D14D68] px-4 py-1 text-[11px] font-bold text-white">
+          <span aria-hidden>●</span>
+          {prioridad}
+        </p>
+      )}
+
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}
@@ -109,24 +120,32 @@ export default function ConsultaCard({
           ?
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-display text-[15px] font-semibold leading-tight tracking-tight">
+          <span className="block font-display text-[15px] font-semibold leading-tight tracking-tight [overflow-wrap:anywhere]">
             {c.evento}
           </span>
           {cliente && (
-            <span className="mt-0.5 block truncate text-[11px] font-medium text-[#4A4E5E]">
+            <span className="mt-0.5 block text-[11px] font-medium text-[#4A4E5E] [overflow-wrap:anywhere]">
               {cliente}
             </span>
           )}
-          <span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-wider text-muted">
-            {c.code} ·{" "}
+          <span className="mt-0.5 block font-mono text-[10px] uppercase leading-snug tracking-wider text-muted">
+            <span className="whitespace-nowrap">{c.code}</span> ·{" "}
             {cotizada
               ? `${formatMonto(montoCot, (c.moneda ?? "USD") as Moneda)} · ${tiempoRestante(c.vence_at)}`
               : "Consulta — chequear stock"}
             {c.fecha_evento ? ` · ${fechaCorta(c.fecha_evento)}` : ""}
           </span>
+          {/* En celular el estado va debajo: al costado le dejaba al nombre
+              del evento una columna de 90px ("Elimina-torias"). */}
+          <span
+            className="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide sm:hidden"
+            style={{ color: chip.color, backgroundColor: `${chip.color}1A` }}
+          >
+            {chip.txt}
+          </span>
         </span>
         <span
-          className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+          className="hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide sm:inline-block"
           style={{ color: chip.color, backgroundColor: `${chip.color}1A` }}
         >
           {chip.txt}
@@ -175,10 +194,11 @@ export default function ConsultaCard({
             >
               <p className="text-sm font-semibold text-ink">
                 Cotización enviada:{" "}
-                <span className="font-display tabular-nums">
+                {/* El monto no se parte ("US$" / "450,00"). */}
+                <span className="whitespace-nowrap font-display tabular-nums">
                   {formatMonto(montoCot, (c.moneda ?? "USD") as Moneda)}
                 </span>
-                <span className="ml-1 text-xs font-normal text-muted">
+                <span className="ml-1 whitespace-nowrap text-xs font-normal text-muted">
                   (comisión {formatMonto(feeCot, (c.moneda ?? "USD") as Moneda)})
                 </span>
               </p>
@@ -285,27 +305,19 @@ export default function ConsultaCard({
             </p>
             <span className="flex flex-wrap items-center gap-2">
               {onDescartar && (
-                <button
-                  onClick={() => {
-                    // Dos toques, igual que cancelar una operación.
-                    if (!confirmandoDescarte) {
-                      setConfirmandoDescarte(true);
-                      window.setTimeout(() => setConfirmandoDescarte(false), 4000);
-                      return;
-                    }
-                    setConfirmandoDescarte(false);
-                    onDescartar(c);
-                  }}
+                <ConfirmarBoton
+                  onConfirm={() => onDescartar(c)}
                   disabled={busy}
-                  className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
-                    confirmandoDescarte
-                      ? "border-estado-cancelada bg-estado-cancelada text-white"
-                      : "border-estado-cancelada text-estado-cancelada hover:bg-estado-cancelada/5"
-                  }`}
+                  className="rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 border-estado-cancelada text-estado-cancelada hover:bg-estado-cancelada/5"
                   title="No hay entrada: se le muestra al cliente como no disponible"
+                  pregunta="¿Descartar la consulta?"
+                  si="Sí, no disponible"
+                  siClassName="rounded-xl bg-estado-cancelada px-3 py-2 text-xs font-semibold text-white"
+                  noClassName="rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-[#4A4E5E] hover:bg-canvas"
+                  preguntaClassName="text-xs font-semibold text-ink"
                 >
-                  {confirmandoDescarte ? "¿Descartar?" : "No disponible"}
-                </button>
+                  No disponible
+                </ConfirmarBoton>
               )}
               {editando && (
                 <button
@@ -331,25 +343,18 @@ export default function ConsultaCard({
           {/* Cotizada: "No disponible" sigue a mano aunque no se edite. */}
           {cotizada && !editando && onDescartar && (
             <div className="mt-3 flex justify-end">
-              <button
-                onClick={() => {
-                  if (!confirmandoDescarte) {
-                    setConfirmandoDescarte(true);
-                    window.setTimeout(() => setConfirmandoDescarte(false), 4000);
-                    return;
-                  }
-                  setConfirmandoDescarte(false);
-                  onDescartar(c);
-                }}
+              <ConfirmarBoton
+                onConfirm={() => onDescartar(c)}
                 disabled={busy}
-                className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
-                  confirmandoDescarte
-                    ? "border-estado-cancelada bg-estado-cancelada text-white"
-                    : "border-estado-cancelada text-estado-cancelada hover:bg-estado-cancelada/5"
-                }`}
+                className="rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 border-estado-cancelada text-estado-cancelada hover:bg-estado-cancelada/5"
+                pregunta="¿Descartar la consulta?"
+                si="Sí, no disponible"
+                siClassName="rounded-xl bg-estado-cancelada px-3 py-2 text-xs font-semibold text-white"
+                noClassName="rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-[#4A4E5E] hover:bg-canvas"
+                preguntaClassName="text-xs font-semibold text-ink"
               >
-                {confirmandoDescarte ? "¿Descartar?" : "No disponible"}
-              </button>
+                No disponible
+              </ConfirmarBoton>
             </div>
           )}
         </div>

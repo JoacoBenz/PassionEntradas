@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   armarParametros,
+  detalleConLink,
   idiomaAcceso,
   idiomaPedido,
   limpiarParametro,
   parametrosAcceso,
+  parametrosAviso,
   parametrosPlantilla,
   PARAMS_ACCESO,
   PARAMS_PEDIDO,
+  textoConLink,
 } from "./whatsapp";
 
 // Meta rechaza el envío ENTERO si un parámetro trae un salto de línea, un tab
@@ -188,5 +191,47 @@ describe("idioma de cada plantilla", () => {
     process.env.WHATSAPP_TEMPLATE_LANG = "es";
     expect(idiomaAcceso()).toBe("es");
     limpiar();
+  });
+});
+
+// El link al pedido va dentro del parámetro "detalle" (las plantillas ya
+// aprobadas no tienen otro lugar). Un link cortado no abre: se corta el
+// detalle, nunca el link.
+describe("detalleConLink", () => {
+  const link = "https://passionentradas.com/admin?q=BX-AB12CD34";
+
+  it("pone el link al final del detalle", () => {
+    expect(detalleConLink("2× River vs Boca", link)).toBe(`2× River vs Boca · ${link}`);
+  });
+
+  it("sin link, el detalle solo", () => {
+    expect(detalleConLink("2× River vs Boca", undefined)).toBe("2× River vs Boca");
+  });
+
+  it("si no entra, corta el detalle y deja el link entero", () => {
+    const largo = "Platea ".repeat(100);
+    const r = detalleConLink(largo, link, 120);
+    expect(r.length).toBeLessThanOrEqual(120);
+    expect(r.endsWith(link)).toBe(true);
+    expect(r).toContain("… · ");
+  });
+
+  it("sin saltos de línea en ningún lado", () => {
+    expect(detalleConLink("a\nb", link)).not.toMatch(/\n/);
+  });
+
+  it("va en la plantilla de pedidos y en la de avisos", () => {
+    const p = parametrosPlantilla({ tipo: "pedido", cliente: "Ana", entradas: 2, detalle: "2× River", total: "$ 10", texto: "x", link });
+    expect(p[3]).toBe(`2× River · ${link}`);
+    const a = parametrosAviso({ aviso: "Cancelado", detalle: "River", texto: "x", link });
+    expect(a[1]).toBe(`River · ${link}`);
+  });
+});
+
+describe("textoConLink", () => {
+  it("agrega el link al texto libre una sola vez", () => {
+    expect(textoConLink("Hola", "https://x/admin")).toBe("Hola\n\nhttps://x/admin");
+    expect(textoConLink("Hola https://x/admin", "https://x/admin")).toBe("Hola https://x/admin");
+    expect(textoConLink("Hola", undefined)).toBe("Hola");
   });
 });

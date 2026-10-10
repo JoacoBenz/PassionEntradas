@@ -9,10 +9,13 @@ const d = (days: number) => {
 };
 
 // Mapa de sectores de muestra (SVG inline: funciona sin red en el demo).
+// Mapa demo con zonas pintadas de colores planos, como los del portal: las
+// entradas de este evento traen el hexa de su zona y la tienda la marca en el
+// mapa (lib/mapa-foco.ts).
 const MOCK_MAPA =
   "data:image/svg+xml," +
   encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 240'><rect width='400' height='240' fill='#eceae3'/><ellipse cx='200' cy='120' rx='170' ry='95' fill='none' stroke='#16150f' stroke-width='3'/><rect x='120' y='75' width='160' height='90' fill='#0D9377' opacity='0.7'/><text x='200' y='125' font-family='sans-serif' font-size='16' text-anchor='middle' fill='#fff'>CAMPO</text><text x='200' y='40' font-family='sans-serif' font-size='12' text-anchor='middle' fill='#16150f'>FONDO NORTE</text><text x='200' y='215' font-family='sans-serif' font-size='12' text-anchor='middle' fill='#16150f'>FONDO SUR</text><text x='40' y='125' font-family='sans-serif' font-size='12' text-anchor='middle' fill='#16150f' transform='rotate(-90 40 125)'>LATERAL</text></svg>`
+    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 240'><rect width='400' height='240' fill='#ffffff'/><rect x='70' y='20' width='260' height='38' fill='#BF191F'/><rect x='70' y='182' width='260' height='38' fill='#F08A0A'/><rect x='20' y='20' width='42' height='200' fill='#2F7FD1'/><rect x='338' y='20' width='42' height='200' fill='#2F7FD1'/><rect x='120' y='75' width='160' height='90' fill='#3B9C3B'/><text x='200' y='125' font-family='sans-serif' font-size='16' text-anchor='middle' fill='#fff'>CAMPO</text><text x='200' y='44' font-family='sans-serif' font-size='12' text-anchor='middle' fill='#fff'>FONDO NORTE</text><text x='200' y='206' font-family='sans-serif' font-size='12' text-anchor='middle' fill='#fff'>FONDO SUR</text><text x='41' y='125' font-family='sans-serif' font-size='12' text-anchor='middle' fill='#fff' transform='rotate(-90 41 125)'>LATERAL</text></svg>`
   );
 
 export const MOCK_TICKETS: Ticket[] = [
@@ -26,8 +29,10 @@ export const MOCK_TICKETS: Ticket[] = [
   { id: "2001::1", evento: "Formula 1 - Gran Premio de Monza", competicion: "Formula 1", fecha: d(60), ciudad: "Autodromo Nazionale, Monza (ITA)", categoria: "Tribuna Ascari", precio_origen: 312, precio_final: 390, stock: 8, estado: "book", source: "portal" },
   { id: "2001::2", evento: "Formula 1 - Gran Premio de Monza", competicion: "Formula 1", fecha: d(60), ciudad: "Autodromo Nazionale, Monza (ITA)", categoria: "General 3 días", precio_origen: 168, precio_final: 210, stock: 12, estado: "book", source: "portal" },
   // Champions
-  { id: "3001::1", evento: "Real Madrid vs Manchester City", competicion: "UEFA Champions League", fecha: d(9), ciudad: "Santiago Bernabéu, Madrid (ESP)", categoria: "Lateral Alto", zona_color: "verde", precio_origen: 384, precio_final: 480, stock: 1, estado: "book", source: "portal", imagen_url: MOCK_MAPA },
-  { id: "3001::2", evento: "Real Madrid vs Manchester City", competicion: "UEFA Champions League", fecha: d(9), ciudad: "Santiago Bernabéu, Madrid (ESP)", categoria: "Fondo Norte", zona_color: "Tribuna Alta", precio_origen: 236, precio_final: 295, stock: 3, estado: "book", source: "portal" },
+  { id: "3001::1", evento: "Real Madrid vs Manchester City", competicion: "UEFA Champions League", fecha: d(9), ciudad: "Santiago Bernabéu, Madrid (ESP)", categoria: "Lateral Alto", zona_color: "#2F7FD1", precio_origen: 384, precio_final: 480, stock: 1, estado: "book", source: "portal", imagen_url: MOCK_MAPA },
+  { id: "3001::2", evento: "Real Madrid vs Manchester City", competicion: "UEFA Champions League", fecha: d(9), ciudad: "Santiago Bernabéu, Madrid (ESP)", categoria: "Fondo Norte", zona_color: "#BF191F", precio_origen: 236, precio_final: 295, stock: 3, estado: "book", source: "portal" },
+  // Color que NO está en el mapa: queda el chip de siempre, sin marca.
+  { id: "3001::3", evento: "Real Madrid vs Manchester City", competicion: "UEFA Champions League", fecha: d(9), ciudad: "Santiago Bernabéu, Madrid (ESP)", categoria: "Palco VIP", zona_color: "#7A3DB8", precio_origen: 900, precio_final: 1125, stock: 2, estado: "book", source: "portal" },
   // Sin fecha / a consultar
   { id: "4001::REQ", evento: "Final - FIFA World Cup 2026", competicion: "FIFA World Cup 2026", fecha: d(45), ciudad: "MetLife Stadium, New York (USA)", categoria: null, precio_final: null, stock: 0, estado: "on_request", source: "portal" },
   // Manual (propia)

@@ -85,11 +85,6 @@ export function reconciliarItem(p: ItemPedido, t: TicketRef | undefined, tasa: n
     const f = String(t.fecha).slice(0, 10);
     if (/^\d{4}-\d{2}-\d{2}$/.test(f)) out.fecha_evento = f;
   }
-  // La tienda ya topea por stock; un desvío acá significa carrito viejo o
-  // manipulación. stock 0/null = sin dato confiable, se deja lo pedido.
-  if (out.tipo === "pedido" && typeof t.stock === "number" && t.stock > 0) {
-    out.cantidad = Math.min(out.cantidad, t.stock);
-  }
   // Mismo redondeo que muestra la tienda (fmtPrice usa Math.round), para que el
   // monto guardado coincida con el precio que vio el cliente. La consulta queda
   // en 0: es "a confirmar", no una compra.
@@ -99,6 +94,12 @@ export function reconciliarItem(p: ItemPedido, t: TicketRef | undefined, tasa: n
   // a consulta. La tienda ya la mostraba "a consultar"; esto cubre un carrito
   // viejo o manipulado, que si no terminaba en una operación de 0.
   if (out.tipo === "pedido" && precio == null) out.tipo = "consulta";
+  // La tienda ya topea por stock y partirPorStock manda el resto a consulta;
+  // esto es la última red para un pedido que siga siendo pedido. Una consulta
+  // no se topea: se pregunta por todo lo que pidió.
+  if (out.tipo === "pedido" && typeof t.stock === "number" && t.stock > 0) {
+    out.cantidad = Math.min(out.cantidad, t.stock);
+  }
   const unit = out.tipo === "pedido" && precio != null ? Math.round(precio) : 0;
   out.monto = unit * out.cantidad;
 
@@ -112,6 +113,37 @@ export function reconciliarItem(p: ItemPedido, t: TicketRef | undefined, tasa: n
   const costo = out.tipo === "pedido" ? costoVenta(t, tasa) : null;
   out.comision = costo == null ? 0 : Math.max(0, (unit - Math.round(costo)) * out.cantidad);
   return out;
+}
+
+// --- más que el stock -------------------------------------------------------
+// Un pedido que pide más entradas de las que quedan se PARTE: lo disponible
+// sigue como pedido y el resto pasa a consulta (pedís 5, quedan 3 → 3 pedido +
+// 2 consulta). Con stock 0 la línea entera es consulta. La tienda ya topea el
+// carrito por stock, así que esto cubre un carrito viejo o el stock que bajó
+// entre que lo armó y lo mandó. Sin dato de stock (null) no se toca.
+//
+// Va ANTES de reconciliarItem (que pone precio y moneda a cada parte).
+export function partirPorStock(p: ItemPedido, t: TicketRef | undefined): ItemPedido[] {
+  if (p.tipo !== "pedido" || !t || typeof t.stock !== "number") return [p];
+  // Sin precio la línea entera va a consulta igual (reconciliarItem): partirla
+  // dejaba DOS consultas de la misma entrada (x3 y x2) para cotizar dos veces.
+  if (t.precio_final == null || !(Number(t.precio_final) > 0)) return [p];
+  const stock = Math.max(0, Math.trunc(t.stock));
+  if (p.cantidad <= stock) return [p];
+  const consulta: ItemPedido = { ...p, tipo: "consulta", cantidad: p.cantidad - stock, monto: 0 };
+  if (stock === 0) return [{ ...consulta, cantidad: p.cantidad }];
+  const unit = p.cantidad > 0 ? p.monto / p.cantidad : 0;
+  return [{ ...p, cantidad: stock, monto: Math.round(unit * stock) }, consulta];
+}
+
+/**
+ * Cuántas entradas pasaron a consulta POR STOCK: las partes consulta que
+ * partirPorStock sacó de una línea pedido. Solo eso: si una pasa a consulta
+ * por no tener precio, el aviso al cliente ("no tenían stock") mentiría.
+ */
+export function entradasMovidasPorStock(original: ItemPedido, partes: ItemPedido[]): number {
+  if (original.tipo !== "pedido") return 0;
+  return partes.filter((x) => x.tipo === "consulta").reduce((a, x) => a + x.cantidad, 0);
 }
 
 // --- anti-flood --------------------------------------------------------------

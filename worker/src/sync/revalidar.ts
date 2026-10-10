@@ -30,3 +30,30 @@ export async function avisarTienda(deps: { cfg: Config; log: Logger }): Promise<
     return false;
   }
 }
+
+/**
+ * Le pide a la tienda que revise lo que quedó esperando y avise al equipo
+ * (POST /api/recordatorios). Se llama en CADA vuelta del loop, haya o no
+ * sync publicado: los recordatorios no dependen del portal. Fail-soft.
+ */
+export async function pedirRecordatorios(deps: { cfg: Config; log: Logger }): Promise<boolean> {
+  const { cfg, log } = deps;
+  const url = `${cfg.TIENDA_URL.replace(/\/$/, "")}/api/recordatorios`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "x-revalidar-token": cfg.SUPABASE_SERVICE_ROLE_KEY },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (res.ok) {
+      const r = (await res.json().catch(() => ({}))) as { avisosNuevos?: number; whatsapps?: number };
+      if (r.avisosNuevos) log.info({ avisos: r.avisosNuevos, whatsapps: r.whatsapps }, "recordatorios enviados");
+      return true;
+    }
+    log.warn({ status: res.status, url }, "la tienda rechazó los recordatorios (no crítico)");
+    return false;
+  } catch (err) {
+    log.warn({ err, url }, "no se pudo pedir los recordatorios (no crítico)");
+    return false;
+  }
+}

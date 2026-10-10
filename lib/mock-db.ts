@@ -3,7 +3,17 @@
 // resetea al reiniciar el proceso. NO usar en producción.
 
 import { avisoDeSobreventa, movimientoDeStock, type LineaDescontada } from "@/lib/stock";
-import { bloqueoEnAccesos } from "@/lib/equipo";
+import {
+  bloqueoEnAccesos,
+  listarMiembros,
+  mapaEquipo,
+  metadataDeCambio,
+  registroDeCambio,
+  validarCambioEquipo,
+  type CambioEquipo,
+  type RegistroEquipo,
+  type RolEquipo,
+} from "@/lib/equipo";
 import {
   generateCode,
   type Consulta,
@@ -19,12 +29,15 @@ import type { SyncRun, TicketFull } from "@/lib/tickets";
 import type { Factura, FacturaDatos } from "@/lib/factura";
 import { generarPassword, type SolicitudAcceso, type SolicitudInput } from "@/lib/acceso";
 import { MOCK_TICKETS } from "@/lib/mock-tickets";
+import type { AvisoGuardado, NuevoAviso } from "@/lib/avisos";
 
 export type MockFactura = Factura & { operacion_id: string };
 
 export const isMock = () => process.env.MOCK_DATA === "1";
 
 export const MOCK_USER = {
+  // Id del admin demo en la "Auth" de mentira (ver `usuarios`).
+  id: "00000000-0000-4000-8000-000000000001",
   email: "demo@passion.local",
   rol: "administrador" as const,
   // Perfil del cliente demo: el legajo viaja igual que en producción
@@ -56,8 +69,19 @@ type MockDB = {
   textos: Record<string, string>;
   // Plazo para aceptar una cotización (config.cotizacion_vence_horas).
   venceHoras: number;
-  // Rol de equipo por user_id (espejo de app_metadata.role en Auth).
-  equipo: Map<string, "administrador" | "moderador">;
+  // Usuarios del equipo (espejo de Auth: app_metadata.role / desactivado).
+  usuarios: MockUsuario[];
+  equipoCambios: (RegistroEquipo & { id: string; created_at: string })[];
+  // Espejo de la tabla notificaciones.
+  avisos: AvisoGuardado[];
+};
+
+export type MockUsuario = {
+  id: string;
+  email: string;
+  app_metadata: Record<string, unknown>;
+  user_metadata: Record<string, unknown>;
+  last_sign_in_at: string | null;
 };
 
 function iso(minsAgo: number) {
@@ -284,7 +308,32 @@ function seed(): MockDB {
     facturas: [],
     facturaNumero: 0,
     solicitudes,
-    equipo: new Map([["eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "administrador"]]),
+    usuarios: [
+      {
+        id: MOCK_USER.id,
+        email: MOCK_USER.email,
+        app_metadata: { role: "administrador" },
+        user_metadata: { nombre: "Demo", apellido: "Admin" },
+        last_sign_in_at: iso(10),
+      },
+      {
+        // Era cliente (solicitud dddd…) y pasó al equipo.
+        id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        email: "emilia.demo@example.com",
+        app_metadata: { role: "administrador" },
+        user_metadata: { nombre: "Emilia", apellido: "Demo", telefono: "+54 9 351 555 0000" },
+        last_sign_in_at: iso(60 * 26),
+      },
+      {
+        id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        email: "lucho.demo@example.com",
+        app_metadata: { role: "moderador" },
+        user_metadata: { nombre: "Lucho" },
+        last_sign_in_at: null,
+      },
+    ],
+    equipoCambios: [],
+    avisos: [],
     items: [],
     // Consultas del cliente demo: una para cotizar y una ya cotizada que
     // espera su respuesta (se ve en el panel y en Mis pedidos).
@@ -385,6 +434,7 @@ export function mockCreateOp(input: {
   envio_id?: string | null;
   confirmada_at?: string | null;
   confirmada_por?: string | null;
+  idioma?: "es" | "en" | null;
   // Líneas del pedido: se guardan aparte, igual que en la base.
   items?: Omit<OperacionItem, "id" | "operacion_id" | "created_at">[];
 }): Operacion {
@@ -721,7 +771,89 @@ export function mockCrearSolicitud(input: SolicitudInput): { ok: true } | { ok: 
 
 // Lista para el panel: pendientes primero, luego por fecha (más nuevas arriba).
 export function mockEquipo(): Map<string, "administrador" | "moderador"> {
-  return db().equipo;
+  return mapaEquipo(db().usuarios);
+}
+
+// ---- equipo (pantalla Equipo) ----------------------------------------------
+export function mockListUsuarios(): MockUsuario[] {
+  return db().usuarios;
+}
+
+export function mockListCambiosEquipo() {
+  return [...db().equipoCambios].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 30);
+}
+
+function mockRegistrar(r: RegistroEquipo) {
+  db().equipoCambios.push({ ...r, id: crypto.randomUUID(), created_at: new Date().toISOString() });
+}
+
+// Alta en el equipo: usuario nuevo con contraseña temporal, o un cliente que
+// ya tiene cuenta y pasa al equipo (`promover`).
+export function mockAltaEquipo(
+  input: { email: string; nombre: string; apellido: string; rol: RolEquipo; promover: boolean },
+  por: string
+):
+  | { ok: true; id: string; credenciales: { email: string; password: string } | null }
+  | { ok: false; status: number; error: string; esCliente?: boolean } {
+  const d = db();
+  const email = input.email.toLowerCase();
+  const existente =
+    d.usuarios.find((u) => u.email.toLowerCase() === email) ??
+    // Los clientes del demo viven en las solicitudes aprobadas.
+    (() => {
+      const s = d.solicitudes.find((x) => x.email.toLowerCase() === email && x.estado === "aprobada" && x.user_id);
+      if (!s) return undefined;
+      const u: MockUsuario = {
+        id: s.user_id as string,
+        email: s.email,
+        app_metadata: { role: "cliente" },
+        user_metadata: { nombre: s.nombre },
+        last_sign_in_at: null,
+      };
+      return u;
+    })();
+  if (existente) {
+    const rol = existente.app_metadata.role;
+    if (rol === "administrador" || rol === "moderador") {
+      return { ok: false, status: 409, error: "Ya es parte del equipo." };
+    }
+    if (!input.promover) {
+      return { ok: false, status: 409, error: "Ya tiene cuenta de cliente.", esCliente: true };
+    }
+    existente.app_metadata = { ...existente.app_metadata, role: input.rol, desactivado: false };
+    if (!d.usuarios.includes(existente)) d.usuarios.push(existente);
+    mockRegistrar({ user_id: existente.id, email: existente.email, accion: "alta", rol_antes: "cliente", rol_despues: input.rol, por });
+    return { ok: true, id: existente.id, credenciales: null };
+  }
+  const id = crypto.randomUUID();
+  d.usuarios.push({
+    id,
+    email: input.email,
+    app_metadata: { role: input.rol },
+    user_metadata: { nombre: input.nombre, apellido: input.apellido },
+    last_sign_in_at: null,
+  });
+  mockRegistrar({ user_id: id, email: input.email, accion: "alta", rol_antes: null, rol_despues: input.rol, por });
+  return { ok: true, id, credenciales: { email: input.email, password: generarPassword() } };
+}
+
+export function mockCambioEquipo(
+  id: string,
+  cambio: CambioEquipo,
+  actorId: string,
+  por: string
+): { ok: true } | { ok: false; status: number; error: string } {
+  const d = db();
+  const equipo = listarMiembros(d.usuarios);
+  const objetivo = equipo.find((m) => m.id === id);
+  if (!objetivo) return { ok: false, status: 404, error: "No es parte del equipo." };
+  const error = validarCambioEquipo(actorId, objetivo, cambio, equipo);
+  if (error) return { ok: false, status: 409, error };
+  const u = d.usuarios.find((x) => x.id === id)!;
+  u.app_metadata = { ...u.app_metadata, ...metadataDeCambio(cambio) };
+  const registro = registroDeCambio(objetivo, cambio, por);
+  if (registro) mockRegistrar(registro);
+  return { ok: true };
 }
 
 export function mockListSolicitudes(): SolicitudAcceso[] {
@@ -774,7 +906,7 @@ export function mockReenviarSolicitud(
   if (s.estado !== "aprobada") {
     return { ok: false, status: 409, error: "Solo se reenvía el acceso de una solicitud aprobada" };
   }
-  const bloqueo = bloqueoEnAccesos(s.user_id ? db().equipo.get(s.user_id) ?? null : null, "reenviar");
+  const bloqueo = bloqueoEnAccesos(s.user_id ? mockEquipo().get(s.user_id) ?? null : null, "reenviar");
   if (bloqueo) return { ok: false, status: 409, error: bloqueo };
   const password = generarPassword();
   return { ok: true, solicitud: s, credenciales: { email: s.email, password } };
@@ -791,7 +923,7 @@ export function mockRevocarSolicitud(
   if (s.estado !== "aprobada") {
     return { ok: false, status: 409, error: "Solo se revoca el acceso de una solicitud aprobada" };
   }
-  const bloqueo = bloqueoEnAccesos(s.user_id ? db().equipo.get(s.user_id) ?? null : null, accion);
+  const bloqueo = bloqueoEnAccesos(s.user_id ? mockEquipo().get(s.user_id) ?? null : null, accion);
   if (bloqueo) return { ok: false, status: 409, error: bloqueo };
   if (accion === "revocar") {
     if (s.revocada_at) return { ok: false, status: 409, error: "El acceso ya está revocado" };
@@ -1039,4 +1171,36 @@ export function mockDescartarConsulta(
   c.resuelta_at = new Date().toISOString();
   c.updated_at = c.resuelta_at;
   return { ok: true };
+}
+
+
+// ---- avisos (espejo de notificaciones) --------------------------------------
+/** Guarda el aviso si su clave es nueva. null = ya existía (no se re-avisa). */
+export function mockGuardarAviso(a: NuevoAviso): AvisoGuardado | null {
+  const d = db();
+  if (d.avisos.some((x) => x.clave === a.clave)) return null;
+  const fila: AvisoGuardado = {
+    ...a,
+    id: crypto.randomUUID(),
+    leida_at: null,
+    whatsapp_estado: a.whatsapp_estado ?? "no_aplica",
+    whatsapp_error: null,
+    whatsapp_destino: a.whatsapp_destino ?? null,
+    email_error: null,
+    created_at: new Date().toISOString(),
+  };
+  d.avisos.push(fila);
+  return fila;
+}
+
+export function mockActualizarAviso(id: string, patch: Partial<AvisoGuardado>): void {
+  const a = db().avisos.find((x) => x.id === id);
+  if (a) Object.assign(a, patch);
+}
+
+export function mockListAvisos(filtro: (a: AvisoGuardado) => boolean, limite = 30): AvisoGuardado[] {
+  return db()
+    .avisos.filter(filtro)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, limite);
 }

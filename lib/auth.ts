@@ -13,6 +13,16 @@ import type { User } from "@supabase/supabase-js";
 export type Rol = "administrador" | "moderador" | "cliente";
 
 export function getRol(user: User): Rol | null {
+  // Un miembro del equipo DESACTIVADO (pantalla Equipo) conserva su rol
+  // guardado pero no entra a ningún lado: para los permisos es "sin rol", y
+  // el middleware le cierra la sesión.
+  if (desactivado(user)) return null;
+  return rolGuardado(user);
+}
+
+// El rol tal como está guardado, aunque el usuario esté desactivado. Solo
+// para la gestión del equipo (listar, reactivar); para permisos va getRol.
+export function rolGuardado(user: Pick<User, "app_metadata">): Rol | null {
   const role = (user.app_metadata as Record<string, unknown> | undefined)?.[
     "role"
   ];
@@ -20,6 +30,10 @@ export function getRol(user: User): Rol | null {
     return role;
   }
   return null;
+}
+
+export function desactivado(user: Pick<User, "app_metadata">): boolean {
+  return (user.app_metadata as Record<string, unknown> | undefined)?.["desactivado"] === true;
 }
 
 // Staff = roles del panel. null (sin rol) y cliente NO son staff.

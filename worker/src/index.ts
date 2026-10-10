@@ -5,7 +5,7 @@ import { PortalSession } from "./portal/session.js";
 import { createSupabase } from "./db/supabase.js";
 import { TicketRepository } from "./db/repository.js";
 import { runSyncCycle } from "./sync/cycle.js";
-import { avisarTienda } from "./sync/revalidar.js";
+import { avisarTienda, pedirRecordatorios } from "./sync/revalidar.js";
 import { BlockedError, LoginFailedError } from "./errors.js";
 import { computeBackoffMs, sleep } from "./util/time.js";
 
@@ -85,6 +85,9 @@ async function main(): Promise<void> {
       }
     }
     if (shuttingDown) break;
+    // Recordatorios al equipo (pedidos sin confirmar, etc.): en cada vuelta,
+    // aunque el sync haya fallado o el portal esté bloqueado. Fail-soft.
+    await pedirRecordatorios({ cfg, log });
     await sleep(waitMs, abort.signal);
   }
 }

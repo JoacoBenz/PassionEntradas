@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { getRol, puedeVerTienda, nombreDe } from "@/lib/auth";
 import { formatMonto, generateCode, type TipoOperacion } from "@/lib/operaciones";
-import { notificarVendedores } from "@/lib/whatsapp";
+import { notificarVendedores, type WhatsappResult } from "@/lib/whatsapp";
+import { avisarEquipo } from "@/lib/avisos-equipo";
+import { baseUrlDe } from "@/lib/base-url";
 import { notificarVendedoresEmail } from "@/lib/email";
 import {
   isMock,
@@ -16,6 +18,8 @@ import { DEFAULT_EUR_USD, type MonedaVenta } from "@/lib/tickets";
 import {
   evaluarLimite,
   reconciliarItem,
+  partirPorStock,
+  entradasMovidasPorStock,
   agruparPorMoneda,
   resumenOperacion,
   separarPorTipo,
@@ -139,6 +143,11 @@ export async function POST(request: Request) {
   // El carrito manda { items: [...] }; se acepta también un item suelto
   // (compat: { tipo, evento, ... }) envolviéndolo en un array.
   const raw = Array.isArray(body.items) ? body.items : [body];
+  // Idioma de la tienda al pedir: los avisos por email le llegan en ese. Se
+  // guarda siempre que la tienda lo mande (también "es"): sin idioma, los
+  // emails usan el de la cuenta, que puede ser otro.
+  const idiomaElegido: "es" | "en" | null = body?.lang === "en" || body?.lang === "es" ? body.lang : null;
+  const idioma: "es" | "en" = idiomaElegido ?? "es";
   if (raw.length === 0) {
     return NextResponse.json({ error: "El pedido está vacío" }, { status: 400 });
   }
@@ -181,9 +190,9 @@ export async function POST(request: Request) {
 
   // Los items vinculados a una entrada del catálogo se reconcilian contra la
   // fila real: evento, sector, fecha y PRECIO salen de la base, no del cliente.
-  // La cantidad se topea por el stock conocido (la tienda ya lo limita; un
-  // desvío significa carrito viejo o manipulación). Los que no matchean quedan
-  // como vinieron.
+  // Lo que pide más que el stock que queda se parte: lo disponible como
+  // pedido y el resto como consulta (ver partirPorStock). Los que no matchean
+  // quedan como vinieron.
   const refs = await buscarTickets(
     parsed.map((p) => p.ticket_id).filter((id): id is string => !!id)
   );
@@ -194,10 +203,20 @@ export async function POST(request: Request) {
   const sinConfig = { eurUsd: DEFAULT_EUR_USD, arsPorUsd: null };
   const tasa = refs.size ? await fetchConfigTienda().catch(() => sinConfig) : sinConfig;
 
-  for (let i = 0; i < parsed.length; i++) {
-    const p = parsed[i];
-    parsed[i] = reconciliarItem(p, p.ticket_id ? refs.get(p.ticket_id) : undefined, tasa);
-  }
+  const pedidoOriginal = [...parsed];
+  // Para avisarle al cliente que parte de lo que pidió quedó a consultar por
+  // falta de stock (no por otra razón, como no tener precio).
+  let aConsultaPorStock = 0;
+  parsed.splice(
+    0,
+    parsed.length,
+    ...pedidoOriginal.flatMap((p) => {
+      const ref = p.ticket_id ? refs.get(p.ticket_id) : undefined;
+      const partes = partirPorStock(p, ref);
+      aConsultaPorStock += entradasMovidasPorStock(p, partes);
+      return partes.map((parte) => reconciliarItem(parte, ref, tasa));
+    })
+  );
 
   // Comisión de la operación = suma de la de cada línea (precio − costo). Sin
   // esto el tablero mostraba "comisión ganada: 0" para TODO lo que entra por la
@@ -256,6 +275,7 @@ export async function POST(request: Request) {
         cliente_email: ctx.cliente_email,
         sector: resumen.sector,
         envio_id: envioId,
+        idioma,
         items: g.lineas.map((l) => ({
           ticket_id: l.ticket_id,
           evento: l.evento,
@@ -347,6 +367,12 @@ export async function POST(request: Request) {
       }
       operaciones.push(creada);
 
+      // El idioma va aparte y sin chequear: si la columna todavía no existe
+      // (migración 0045 sin aplicar) el pedido no se puede caer por eso.
+      if (idiomaElegido) {
+        await admin.from("operaciones").update({ idioma: idiomaElegido }).eq("id", creada.id);
+      }
+
       // Las líneas. Si fallan, la operación queda sin detalle: se borra para
       // no dejar una operación a medias en el panel.
       const { error: errItems } = await admin.from("operacion_items").insert(
@@ -394,6 +420,10 @@ export async function POST(request: Request) {
           .single();
         if (!error && data) {
           consultasCreadas.push(data as { id: string; code: string; evento: string });
+          // Igual que en la operación: aparte y sin chequear (ver arriba).
+          if (idiomaElegido) {
+            await admin.from("consultas").update({ idioma: idiomaElegido }).eq("id", (data as { id: string }).id);
+          }
           break;
         }
         if (error && (error as any).code !== "23505") {
@@ -440,17 +470,62 @@ export async function POST(request: Request) {
         (consultasCreadas.length > 0 ? " + a cotizar" : "")
       : "a cotizar";
 
-  const [wa, mail] = await Promise.all([
-    notificarVendedores({
-      tipo: TIPO_ENVIO_LABEL[tipoEnvio],
-      cliente: quien,
-      entradas: totalEntradas,
-      detalle: detalleDeLineas(lineasPedido, lineasConsulta),
-      total: totalCorto,
-      texto: mensaje,
-    }),
-    notificarVendedoresEmail(asunto, mensaje),
-  ]);
+  const avisoPedido = {
+    tipo: TIPO_ENVIO_LABEL[tipoEnvio],
+    cliente: quien,
+    entradas: totalEntradas,
+    detalle: detalleDeLineas(lineasPedido, lineasConsulta),
+    total: totalCorto,
+    texto: mensaje,
+  };
+  // Link directo a lo que entró (un solo pedido o una sola consulta: su
+  // código en el buscador del Panel; si son varios, el filtro).
+  const urlPedidos = operaciones.length === 1 ? `/admin?q=${encodeURIComponent(operaciones[0].code)}` : "/admin?filtro=nuevos";
+  const urlConsultas =
+    consultasCreadas.length === 1 ? `/admin?q=${encodeURIComponent(consultasCreadas[0].code)}` : "/admin?filtro=a_cotizar";
+  const base = baseUrlDe(request);
+  const enviarWa = (para: string[] | undefined, url: string) =>
+    notificarVendedores({ ...avisoPedido, link: `${base}${url}` }, para);
+  const admin = isMock() ? null : createAdminSupabase();
+  const datos = { cliente: ctx.comprador, detalle: avisoPedido.detalle, total: totalCorto };
+
+  // Campana del equipo + WhatsApp (ver lib/avisos-equipo). Un pedido lo
+  // acciona el admin; una consulta la puede cotizar también el moderador. En
+  // un envío mixto el admin recibe UN aviso (el del pedido, con todo) y el
+  // moderador el de la consulta.
+  const avisos: Promise<{ whatsapp: WhatsappResult | null }>[] = [];
+  if (operaciones.length > 0) {
+    avisos.push(
+      avisarEquipo(
+        admin,
+        { tipo: "nuevo_pedido", ref: envioId, datos, url: urlPedidos, operacion_id: operaciones[0].id, roles: ["administrador"] },
+        enviarWa
+      )
+    );
+  }
+  if (consultasCreadas.length > 0) {
+    avisos.push(
+      avisarEquipo(
+        admin,
+        {
+          tipo: "nueva_consulta",
+          ref: envioId,
+          datos,
+          url: urlConsultas,
+          consulta_id: consultasCreadas[0].id,
+          roles: operaciones.length > 0 ? ["moderador"] : ["administrador", "moderador"],
+          // En un envío mixto la lista fija ya recibió el aviso del pedido:
+          // acá solo van los moderadores que lo activaron.
+          listaFija: operaciones.length === 0,
+        },
+        enviarWa
+      )
+    );
+  }
+  const [resultados, mail] = await Promise.all([Promise.all(avisos), notificarVendedoresEmail(asunto, mensaje)]);
+  const wa: WhatsappResult =
+    resultados.map((r) => r.whatsapp).find((r): r is WhatsappResult => r !== null) ??
+    { ok: false, error: "No había a quién avisar por WhatsApp.", noConfigurado: true };
 
   return NextResponse.json(
     {
@@ -463,6 +538,8 @@ export async function POST(request: Request) {
       operacion: operaciones[0] ? { id: operaciones[0].id, code: operaciones[0].code } : null,
       operaciones: operaciones.map((o) => ({ id: o.id, code: o.code, moneda: o.moneda })),
       consultas: consultasCreadas.map((c) => ({ id: c.id, code: c.code })),
+      // Entradas pedidas que no tenían stock y quedaron como consulta.
+      aConsultaPorStock,
       // El error se manda al cliente (no solo el booleano) para poder ver el
       // motivo real desde la pestaña Network sin tener que ir a buscar los
       // logs del servidor — Meta no dice mucho más que "rejected" en la UI.

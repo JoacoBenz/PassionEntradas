@@ -9,7 +9,10 @@ import {
   type StatusAction,
 } from "@/lib/operaciones";
 import { getRol, nombreDe } from "@/lib/auth";
-import { isMock, mockApplyAction } from "@/lib/mock-db";
+import { isMock, mockApplyAction, mockListOps } from "@/lib/mock-db";
+import { avisarCambioAlCliente, COLUMNAS_AVISO, type OpParaAviso } from "@/lib/avisos-cliente";
+import { baseUrlDe } from "@/lib/base-url";
+
 
 // PATCH /api/operaciones/[id]/status — aplica una acción sobre la operación.
 // "entrada" y "pago" son hitos independientes que se marcan/desmarcan por
@@ -74,12 +77,15 @@ export async function PATCH(
   }
 
   if (isMock()) {
+    const previa = mockListOps().find((o) => o.id === params.id);
+    const antes = previa ? { ...previa } : null;
     const res = mockApplyAction(params.id, action);
     if (!res.ok) {
       return NextResponse.json({ error: res.error }, { status: res.status });
     }
     // Pago, cancelar o reabrir pueden haber movido el stock de una propia.
     if (movimientoDeStock(action, res.op)) refrescarTienda();
+    if (antes) await avisarCambioAlCliente(null, antes, res.op as OpParaAviso, baseUrlDe(request));
     return NextResponse.json({ ...pickResult(res.op), ...(res.aviso ? { aviso: res.aviso } : {}) });
   }
 
@@ -87,7 +93,8 @@ export async function PATCH(
 
   const { data: current, error: readErr } = await admin
     .from("operaciones")
-    .select("status, tipo, confirmada_at, entrada_recibida_at, pago_confirmado_at, pago_proveedor_at, cerrada_at, ticket_id")
+    // Además de los hitos, lo necesario para avisarle al cliente.
+    .select(`${COLUMNAS_AVISO}, pago_proveedor_at, ticket_id`)
     .eq("id", params.id)
     .maybeSingle();
 
@@ -255,6 +262,15 @@ export async function PATCH(
       refrescarTienda();
     }
   }
+
+  // Confirmado / Para pagar / Entregada: aviso al cliente (campana + email).
+  // Nunca traba la respuesta con un error: se registra y sigue.
+  await avisarCambioAlCliente(
+    admin,
+    current as OpParaAviso,
+    { ...(current as OpParaAviso), ...(data as Partial<OpParaAviso>) },
+    baseUrlDe(request)
+  );
 
   return NextResponse.json({ ...pickResult(data as Operacion), ...(aviso ? { aviso } : {}) });
 }

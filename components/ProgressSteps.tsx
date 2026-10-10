@@ -13,7 +13,7 @@ export default function ProgressSteps({ estado }: { estado: EstadoPublico }) {
   if (!pasos) return null;
 
   return (
-    <ol className="grid grid-cols-3 gap-2">
+    <ol className="grid grid-cols-3 gap-1.5 sm:gap-2">
       {pasos.map((p, i) => {
         const color = COLOR[p.key];
         const hecho = p.estado === "hecho";
@@ -21,7 +21,7 @@ export default function ProgressSteps({ estado }: { estado: EstadoPublico }) {
         return (
           <li
             key={p.key}
-            className="flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3"
+            className="flex min-w-0 flex-col items-center gap-1.5 rounded-xl border px-1 py-3 sm:px-2"
             style={{
               borderColor: hecho || actual ? `${color}55` : "#E2E4EC",
               backgroundColor: hecho ? `${color}0D` : "transparent",
@@ -40,7 +40,9 @@ export default function ProgressSteps({ estado }: { estado: EstadoPublico }) {
               {hecho ? "✓" : i + 1}
             </span>
             <span
-              className="text-center text-[11px] font-semibold uppercase leading-tight tracking-wide"
+              // En 320px "CONFIRMADO" a 11px con tracking no entraba en su cajita
+              // y pisaba el borde: más chico y sin tracking en celular.
+              className="max-w-full text-center text-[10px] font-semibold uppercase leading-tight tracking-normal sm:text-[11px] sm:tracking-wide"
               style={{ color: hecho || actual ? color : "#7B8095" }}
             >
               {p.label}

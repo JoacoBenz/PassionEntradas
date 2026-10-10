@@ -4,7 +4,8 @@
 // dos líneas; las consultas viven ahora dentro del Panel, mezcladas con las
 // operaciones y marcadas con un signo de pregunta.
 
-export type NavItem = { href: string; label: string; icon: React.ReactNode };
+// `rutas`: otras páginas que también marcan la sección como activa.
+export type NavItem = { href: string; label: string; icon: React.ReactNode; rutas?: string[] };
 
 const ICON_CLS = "h-[18px] w-[18px]";
 
@@ -44,6 +45,9 @@ export const NAV_ITEMS: NavItem[] = [
   {
     href: "/admin/solicitudes",
     label: "Accesos",
+    // Solicitudes, Equipo y Clientes son pestañas de la misma sección (una
+    // quinta entrada en la barra la partía en dos líneas).
+    rutas: ["/admin/equipo", "/admin/clientes"],
     icon: (
       <svg className={ICON_CLS} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
@@ -55,6 +59,9 @@ export const NAV_ITEMS: NavItem[] = [
 
 // La ruta más específica gana: /admin/entradas no debe activar también /admin.
 export function activeHref(pathname: string): string | null {
+  const dentro = (r: string) => pathname === r || pathname.startsWith(`${r}/`);
+  const porRuta = NAV_ITEMS.find((i) => i.rutas?.some(dentro));
+  if (porRuta) return porRuta.href;
   return (
     [...NAV_ITEMS]
       .sort((a, b) => b.href.length - a.href.length)

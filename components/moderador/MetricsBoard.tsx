@@ -1,8 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { formatMonto, type Moneda } from "@/lib/operaciones";
 import type { Metrics } from "@/lib/metrics";
+import { urlPanel, type FiltroPanel } from "@/lib/panel-filtros";
 
 // Tablero del negocio en el módulo de carga: cuánta plata se movió (pagos
 // confirmados), cuántas entradas se vendieron, la comisión ganada, y dos
@@ -17,6 +19,7 @@ function Tile({
   accent,
   big = false,
   className = "",
+  href,
 }: {
   label: string;
   value: string;
@@ -24,15 +27,18 @@ function Tile({
   accent: string;
   big?: boolean;
   className?: string;
+  // Con href la tarjeta abre el Panel con las operaciones que suma.
+  href?: string;
 }) {
-  return (
-    <div className={`min-w-0 px-4 py-3.5 ${className}`}>
+  const contenido = (
+    <>
       <p className="text-[10px] font-medium uppercase leading-snug tracking-[0.14em] text-muted">
         {label}
       </p>
       <p
-        className={`mt-0.5 truncate font-display font-bold tabular-nums tracking-tight ${
-          big ? "text-2xl" : "text-lg"
+        className={`mt-0.5 font-display font-bold tabular-nums tracking-tight [overflow-wrap:anywhere] ${
+          // En 320px dos tarjetas por fila: a 2xl el monto quedaba "US$ 40.…".
+          big ? "text-xl min-[380px]:text-2xl" : "text-lg"
         }`}
         style={{ color: accent }}
         title={value}
@@ -40,8 +46,20 @@ function Tile({
         {value}
       </p>
       {detail && <p className="text-[11px] leading-snug text-muted">{detail}</p>}
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link
+        href={href}
+        title={`Ver en el Panel: ${label}`}
+        className={`block min-w-0 px-4 py-3.5 transition-colors hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand ${className}`}
+      >
+        {contenido}
+      </Link>
+    );
+  }
+  return <div className={`min-w-0 px-4 py-3.5 ${className}`}>{contenido}</div>;
 }
 
 // Presets del filtro de período (por fecha de pago confirmado). El rango se
@@ -72,7 +90,13 @@ function rangoDePreset(p: Preset): { desde: string; hasta: string } {
   }
 }
 
-export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics }) {
+export default function MetricsBoard({
+  metrics: inicial,
+  enlacesPanel = false,
+}: {
+  metrics: Metrics;
+  enlacesPanel?: boolean;
+}) {
   const [metricsTodas, setMetrics] = useState<Metrics>(inicial);
   // Pestaña de moneda: cada una se muestra por separado, nunca sumadas.
   const [monedaSel, setMonedaSel] = useState<string | null>(null);
@@ -112,6 +136,18 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
     setHasta(r.hasta);
     void aplicarRango(r.desde, r.hasta);
   }
+
+  // Link al Panel con lo que suma cada tarjeta: misma moneda y, para lo
+  // cobrado, el mismo período del tablero.
+  const moneda = metrics.moneda === "ARS" || metrics.moneda === "USD" ? metrics.moneda : undefined;
+  const enlace = (filtro: FiltroPanel["filtro"]) =>
+    enlacesPanel
+      ? urlPanel({
+          filtro,
+          moneda,
+          ...(filtro === "cobradas" ? { desde: desde || undefined, hasta: hasta || undefined } : {}),
+        })
+      : undefined;
 
   const inputCls =
     "w-full min-w-0 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/15";
@@ -210,6 +246,7 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
             value={fmt(metrics.plataMovida)}
             detail="Total con pago confirmado"
             accent="#0D9377"
+            href={enlace("cobradas")}
             className="col-span-2 border-b border-dashed border-line md:col-span-1 md:border-b-0 md:border-r"
           />
           <Tile
@@ -218,6 +255,7 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
             value={fmt(metrics.comisionGanada)}
             detail="Sobre ventas confirmadas"
             accent="#6C5BF2"
+            href={enlace("cobradas")}
             className="border-r border-dashed border-line"
           />
           <Tile
@@ -226,6 +264,7 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
             value={String(metrics.entradasVendidas).padStart(2, "0")}
             detail="Con pago confirmado"
             accent="#B07A14"
+            href={enlace("cobradas")}
           />
         </div>
         <div className="perf-line-light" />
@@ -240,6 +279,7 @@ export default function MetricsBoard({ metrics: inicial }: { metrics: Metrics })
                 : "operaciones en curso sin cobrar"
             }`}
             accent="#5F6577"
+            href={enlace("sin_cobrar")}
             className="border-r border-dashed border-line"
           />
           <Tile

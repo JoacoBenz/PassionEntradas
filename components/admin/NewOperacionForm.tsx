@@ -76,7 +76,7 @@ function EventoCombo({
         className={inputCls}
         value={value}
         autoComplete="off"
-        placeholder="Buscá en el catálogo o escribí libre"
+        placeholder="Buscá o escribí el evento"
         onChange={(e) => {
           onTexto(e.target.value);
           setAbierto(true);
@@ -397,7 +397,7 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
             />
             {ticketId && (
               <div className="mt-1.5 flex items-center justify-between gap-2 rounded-lg bg-canvas px-2.5 py-1.5">
-                <span className="min-w-0 truncate text-[11px] text-muted">
+                <span className="min-w-0 text-[11px] text-muted">
                   Vinculada al catálogo
                   {vinculo
                     ? `: ${vinculo.categoria ?? "Entrada general"} · ${
@@ -418,8 +418,10 @@ export default function NewOperacionForm({ onCreated, onError, prefill }: Props)
           </div>
 
           {/* flex-col + justify-between: si un label envuelve a dos líneas,
-              los inputs quedan anclados abajo y alineados entre sí. */}
-          <div className="grid grid-cols-2 gap-3">
+              los inputs quedan anclados abajo y alineados entre sí. En
+              celular uno debajo del otro: a media pantalla el desplegable
+              mostraba "Elegí un cli…". */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col justify-between">
               <label htmlFor="comprador" className={labelCls}>
                 Comprador *

@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { esStaff, getRol, nombreDe, puedeVerTienda } from "@/lib/auth";
 import { notificarVendedoresEmail } from "@/lib/email";
+import { avisarEquipo } from "@/lib/avisos-equipo";
+import { baseUrlDe } from "@/lib/base-url";
+import { notificarAviso } from "@/lib/whatsapp";
 import { isMock, MOCK_USER, mockAceptarCotizacion } from "@/lib/mock-db";
 
 // POST /api/consultas/[id]/aceptar — la cotización pasa a ser un pedido.
@@ -82,12 +85,46 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const op = data as { op_id: string; op_code: string } | null;
   if (!op) return NextResponse.json({ error: "No se pudo crear el pedido" }, { status: 500 });
 
-  // Aviso a los vendedores. Best-effort: el pedido ya quedó creado.
+  // Idioma del pedido que nace (sus emails van en ese): el de la tienda si
+  // acepta el cliente, si no el que tenía la consulta. Aparte y sin
+  // chequear: el pedido ya está creado y esto no lo puede tirar abajo.
   try {
-    await notificarVendedoresEmail(
-      `✅ Cotización aceptada — pedido ${op.op_code}`,
-      `${porWhatsapp ? `${quien} registró que el cliente aceptó por WhatsApp` : `El cliente ${quien} aceptó la cotización en la web`}. Se creó el pedido ${op.op_code}.`
-    );
+    let idioma: string | null = !porWhatsapp && (body?.lang === "en" || body?.lang === "es") ? body.lang : null;
+    if (!idioma) {
+      const { data: cons } = await admin.from("consultas").select("idioma").eq("id", params.id).maybeSingle();
+      idioma = (cons as { idioma?: string | null } | null)?.idioma ?? null;
+    }
+    if (idioma === "en" || idioma === "es") await admin.from("operaciones").update({ idioma }).eq("id", op.op_id);
+  } catch {
+    /* sin idioma: los emails van en español */
+  }
+
+  // Aviso a los vendedores. Best-effort: el pedido ya quedó creado.
+  const base = baseUrlDe(request);
+  try {
+    const texto = `${porWhatsapp ? `${quien} registró que el cliente aceptó por WhatsApp` : `El cliente ${quien} aceptó la cotización en la web`}. Se creó el pedido ${op.op_code}.`;
+    await Promise.all([
+      notificarVendedoresEmail(`✅ Cotización aceptada — pedido ${op.op_code}`, texto),
+      avisarEquipo(
+        admin,
+        {
+          tipo: "cotizacion_aceptada",
+          ref: op.op_id,
+          datos: { code: op.op_code, quien, via: porWhatsapp ? "whatsapp" : "web" },
+          url: `/admin?q=${encodeURIComponent(op.op_code)}`,
+          operacion_id: op.op_id,
+        },
+        // Si la registró alguien del equipo (aceptó por WhatsApp), el equipo
+        // ya lo sabe: queda en la campana, sin WhatsApp.
+        porWhatsapp
+          ? null
+          : (para, url) =>
+              notificarAviso(
+                { aviso: `✅ Cotización aceptada · pedido ${op.op_code}`, detalle: `El cliente ${quien} la aceptó en la web`, texto, link: `${base}${url}` },
+                para
+              )
+      ),
+    ]);
   } catch (e) {
     console.error("[aceptar] no se pudo avisar a los vendedores:", e);
   }

@@ -538,7 +538,7 @@ export default function TicketsPanel({
               {editando ? "Editar entrada propia" : "Cargar entrada propia"}
             </h2>
             {editando && (
-              <p className="mt-1 truncate text-xs text-white/60">
+              <p className="mt-1 text-xs text-white/60">
                 {editando.evento} — el link en la tienda no cambia
               </p>
             )}
@@ -587,7 +587,7 @@ export default function TicketsPanel({
                   className={inputCls}
                   value={form.proveedor}
                   onChange={(e) => set("proveedor", e.target.value)}
-                  placeholder="A quién le compramos (opcional)"
+                  placeholder="A quién le compramos"
                 />
               </div>
               <div>
@@ -596,7 +596,7 @@ export default function TicketsPanel({
                   <div className="flex items-center gap-3 rounded-lg border border-line bg-white p-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={mapa} alt="Mapa del estadio" className="h-14 w-20 rounded object-cover" />
-                    <span className="min-w-0 flex-1 truncate text-xs text-muted">
+                    <span className="min-w-0 flex-1 text-xs text-muted">
                       Se muestra en la tienda con zoom
                     </span>
                     <button

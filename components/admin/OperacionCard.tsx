@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ConfirmarBoton from "@/components/ConfirmarBoton";
 import {
   HITO_COLOR,
   diasHastaEvento,
@@ -22,9 +23,12 @@ import {
 } from "@/lib/operaciones";
 import FacturaModal from "./FacturaModal";
 import { fechaDia } from "@/lib/fechas";
+import AvisosAlCliente from "./AvisosAlCliente";
 
 type Props = {
   op: Operacion;
+  // Lleva rato esperando (lib/recordatorios): va en rojo, con la edad.
+  prioridad?: string | null;
   // Líneas de la operación. Un pedido del carrito puede traer varias entradas
   // de sectores o eventos distintos; la cabecera solo muestra el resumen.
   items?: OperacionItem[];
@@ -88,6 +92,7 @@ export default function OperacionCard({
   onAction,
   onUpdate,
   onCopied,
+  prioridad = null,
 }: Props) {
   const link = `${baseUrl}/op/${op.id}`;
   const estado = estadoDe(op);
@@ -111,7 +116,6 @@ export default function OperacionCard({
   const [open, setOpen] = useState(defaultOpen);
   const [editingNotas, setEditingNotas] = useState(false);
   const [notasDraft, setNotasDraft] = useState(op.notas ?? "");
-  const [confirmandoCancel, setConfirmandoCancel] = useState(false);
   const [facturaAbierta, setFacturaAbierta] = useState(false);
 
   async function copy(text: string, label: string) {
@@ -127,7 +131,14 @@ export default function OperacionCard({
     "rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-[#4A4E5E] transition-colors hover:border-[#C5C9D6] hover:bg-canvas";
 
   return (
-    <article className="card-shadow overflow-hidden rounded-2xl bg-white">
+    <article className={`card-shadow overflow-hidden rounded-2xl bg-white ${prioridad ? "ring-2 ring-[#D14D68]" : ""}`}>
+      {/* Prioridad (lib/recordatorios): lleva rato esperando. */}
+      {prioridad && (
+        <p className="flex items-center gap-1.5 bg-[#D14D68] px-4 py-1 text-[11px] font-bold text-white">
+          <span aria-hidden>●</span>
+          {prioridad}
+        </p>
+      )}
       {/* Fila colapsada: toda la fila es el toggle */}
       <button
         onClick={() => setOpen(!open)}
@@ -144,21 +155,35 @@ export default function OperacionCard({
           aria-label={SEMAFORO_LABEL[semaforo]}
         />
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-display text-[15px] font-semibold leading-tight tracking-tight">
+          <span className="block font-display text-[15px] font-semibold leading-tight tracking-tight [overflow-wrap:anywhere]">
             {op.evento}
           </span>
           {/* El cliente va en la fila cerrada: saber con quién se está
               trabajando no tiene que costar un click. */}
           {cliente && (
-            <span className="mt-0.5 block truncate text-[11px] font-medium text-[#4A4E5E]">
+            <span className="mt-0.5 block text-[11px] font-medium text-[#4A4E5E] [overflow-wrap:anywhere]">
               {cliente}
             </span>
           )}
-          <span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-wider text-muted">
+          <span className="mt-0.5 block font-mono text-[10px] uppercase leading-snug tracking-wider text-muted">
             {/* En celular el chip "Nuevo" le comía el nombre del evento: va acá. */}
             {nuevo && <span className="font-bold text-[#D14D68] sm:hidden">● Nuevo · </span>}
-            {op.code} · {SEMAFORO_LABEL[semaforo]}
+            {/* El code no se parte en el guion ("BX-" / "8H5U…"). */}
+            <span className="whitespace-nowrap">{op.code}</span> · {SEMAFORO_LABEL[semaforo]}
             {op.fecha_evento ? ` · ${fechaCorta(op.fecha_evento)}` : ""}
+          </span>
+          {/* En celular el monto va abajo: en la columna de la derecha le
+              dejaba al nombre del evento 90px y partía las palabras. */}
+          <span className="mt-1 flex flex-wrap items-baseline gap-x-1.5 sm:hidden">
+            <span className="whitespace-nowrap font-display text-sm font-bold tabular-nums">
+              {formatMonto(op.monto, op.moneda)}
+            </span>
+            {op.cantidad > 1 && (
+              <span className="font-mono text-[10px] text-muted">
+                ×{op.cantidad} ·{" "}
+                <span className="whitespace-nowrap">{formatMonto(op.monto / op.cantidad, op.moneda)} c/u</span>
+              </span>
+            )}
           </span>
         </span>
         {nuevo && (
@@ -182,12 +207,12 @@ export default function OperacionCard({
             {TIPO_LABEL[op.tipo]}
           </span>
         )}
-        <span className="flex flex-col items-end leading-none">
+        <span className="hidden flex-col items-end leading-none sm:flex">
           <span className="whitespace-nowrap font-display text-sm font-bold tabular-nums">
             {formatMonto(op.monto, op.moneda)}
           </span>
           {op.cantidad > 1 && (
-            <span className="mt-0.5 font-mono text-[10px] text-muted">
+            <span className="mt-0.5 whitespace-nowrap font-mono text-[10px] text-muted">
               ×{op.cantidad} · {formatMonto(op.monto / op.cantidad, op.moneda)} c/u
             </span>
           )}
@@ -261,7 +286,7 @@ export default function OperacionCard({
                   {items.map((i) => (
                     <li key={i.id} className="flex items-start justify-between gap-3 px-3 py-2">
                       <span className="min-w-0">
-                        <span className="block truncate text-xs font-medium">{i.evento}</span>
+                        <span className="block text-xs font-medium [overflow-wrap:anywhere]">{i.evento}</span>
                         <span className="block text-[11px] text-muted">
                           {i.sector ?? "General"}
                           {i.fecha_evento ? ` · ${formatFecha(i.fecha_evento)}` : ""}
@@ -317,6 +342,9 @@ export default function OperacionCard({
                 </span>
               )}
             </div>
+
+            {/* Lo que se le avisó al cliente y si el email salió. */}
+            {(op.cliente_id || op.cliente_email) && <AvisosAlCliente opId={op.id} version={op.updated_at} />}
 
             {/* Notas internas (solo panel; nunca van al link público) */}
             {(op.notas || (!readOnly && onUpdate)) && (
@@ -477,7 +505,7 @@ export default function OperacionCard({
                     </span>
                   )}
                   {(op.entrada_recibida_por || op.pago_confirmado_por) && (
-                    <span className="mt-0.5 block truncate text-[11px] font-normal text-white/50">
+                    <span className="mt-0.5 block text-[11px] font-normal text-white/50">
                       {op.entrada_recibida_por &&
                         `Entrada por ${quienDe(op.entrada_recibida_por)}`}
                       {op.entrada_recibida_por && op.pago_confirmado_por && " · "}
@@ -543,29 +571,22 @@ export default function OperacionCard({
                 </button>
               ) : (
                 !cerrada && (
-                  <button
-                    onClick={() => {
-                      // Dos toques: el primero arma la confirmación (se
-                      // desarma sola a los 4s), el segundo cancela. Evita
-                      // cancelar por un toque accidental en el celular —
-                      // el link público mostraría "Cancelada" al cliente.
-                      if (!confirmandoCancel) {
-                        setConfirmandoCancel(true);
-                        window.setTimeout(() => setConfirmandoCancel(false), 4000);
-                        return;
-                      }
-                      setConfirmandoCancel(false);
-                      onAction?.(op, { action: "cancelar" }, "Operación cancelada");
-                    }}
+                  // Confirmación en el lugar: un toque accidental en el
+                  // celular no puede cancelar (el link público mostraría
+                  // "Cancelada" al cliente).
+                  <ConfirmarBoton
+                    onConfirm={() => onAction?.(op, { action: "cancelar" }, "Operación cancelada")}
                     disabled={busy}
-                    className={`ml-auto rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                      confirmandoCancel
-                        ? "border-estado-cancelada bg-estado-cancelada text-white"
-                        : "border-estado-cancelada text-estado-cancelada hover:bg-estado-cancelada/5"
-                    }`}
+                    className="ml-auto rounded-lg border border-estado-cancelada px-3 py-1.5 text-xs font-semibold text-estado-cancelada transition-colors hover:bg-estado-cancelada/5 disabled:opacity-60"
+                    armadoClassName="ml-auto inline-flex flex-wrap items-center justify-end gap-2"
+                    preguntaClassName="text-xs font-semibold text-ink"
+                    pregunta="¿Cancelar la operación?"
+                    si="Sí, cancelar"
+                    siClassName="rounded-lg bg-estado-cancelada px-3 py-1.5 text-xs font-semibold text-white"
+                    noClassName="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-[#4A4E5E] hover:bg-canvas"
                   >
-                    {confirmandoCancel ? "¿Confirmás cancelar?" : "Cancelar"}
-                  </button>
+                    Cancelar
+                  </ConfirmarBoton>
                 )
               ))}
           </div>
@@ -633,7 +654,7 @@ function HitoButton({
       <span className="min-w-0">
         {label}
         {done && por && (
-          <span className="block truncate text-[10px] font-normal text-white/75">
+          <span className="block text-[10px] font-normal leading-tight text-white/75 [overflow-wrap:anywhere]">
             Por {por}
           </span>
         )}

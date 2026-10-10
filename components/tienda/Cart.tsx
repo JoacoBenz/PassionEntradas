@@ -10,11 +10,13 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import Link from "next/link";
 import { fmtPrice, type MonedaVenta } from "@/lib/tickets";
 import { TX, type Lang } from "@/lib/tienda-i18n";
+import { resumenCarrito } from "@/lib/carrito";
 
 export type CartItem = {
   key: string; // = ticket_id (una fila del catálogo)
@@ -105,14 +107,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Idioma recordado (mismo criterio que el resto de la tienda).
-function useLang(): Lang {
-  const [lang, setLang] = useState<Lang>("es");
-  useEffect(() => {
+// Idioma recordado (mismo criterio que el resto de la tienda). La barra vive
+// en el layout y no se vuelve a montar: el idioma se relee al abrir el
+// carrito y al enviar, si no un cambio de idioma en la página no le llegaba
+// (y el pedido quedaba con el idioma de la primera visita).
+function leerLang(): Lang {
+  try {
     const s = localStorage.getItem("tm_lang");
-    if (s === "en" || s === "es") setLang(s);
+    if (s === "en" || s === "es") return s;
+  } catch {
+    /* sin storage: español */
+  }
+  return "es";
+}
+
+function useLang(): [Lang, () => Lang] {
+  const [lang, setLang] = useState<Lang>("es");
+  const releer = useCallback(() => {
+    const l = leerLang();
+    setLang(l);
+    return l;
   }, []);
-  return lang;
+  useEffect(() => {
+    releer();
+  }, [releer]);
+  return [lang, releer];
 }
 
 type Estado = "idle" | "sending" | "done" | "err";
@@ -121,26 +140,31 @@ type Estado = "idle" | "sending" | "done" | "err";
 // la tienda; se muestra sola cuando hay entradas en el carrito.
 export function CartBar() {
   const { items, count, setQty, remove, clear } = useCart();
-  const lang = useLang();
+  const [lang, releerLang] = useLang();
   const c = TX[lang].carrito;
   const [open, setOpen] = useState(false);
   const [estado, setEstado] = useState<Estado>("idle");
   const [error, setError] = useState("");
+  // "Enviar pedido" no manda nada todavía: abre la revisión (qué es pedido,
+  // qué es consulta, el total y qué pasa después). Recién "Confirmar y
+  // enviar" hace el POST.
+  const [revisando, setRevisando] = useState(false);
+  // Cuándo se abrió la revisión. "Confirmar y enviar" queda donde estaba
+  // "Enviar pedido" (en el celular es la misma fila de abajo): sin esto, el
+  // segundo toque de un doble toque mandaba el pedido sin que el cliente
+  // llegara a ver la revisión. Mismo margen que ConfirmarBoton.
+  const revisionAbiertaAt = useRef(0);
+  // Entradas que no tenían stock y el server pasó a consulta (ver partirPorStock).
+  const [aConsulta, setAConsulta] = useState(0);
 
   // Un total POR MONEDA: pesos y dólares nunca se suman. Cada moneda termina
   // siendo una operación aparte al enviar (ver /api/pedidos).
-  const totales = (["USD", "ARS"] as MonedaVenta[])
-    .map((moneda) => ({
-      moneda,
-      total: items
-        .filter((i) => (i.moneda ?? "USD") === moneda)
-        .reduce((a, i) => a + (i.monto || 0) * i.cantidad, 0),
-    }))
-    .filter((t) => t.total > 0);
+  const { pedidos, consultas, totales } = resumenCarrito(items);
   const totalTexto = totales.map((t) => fmtPrice(t.total, lang, t.moneda)).join(" + ");
 
   function cerrar() {
     setOpen(false);
+    setRevisando(false);
     if (estado === "done" || estado === "err") {
       setEstado("idle");
       setError("");
@@ -149,6 +173,7 @@ export function CartBar() {
 
   async function enviar() {
     if (estado === "sending" || items.length === 0) return;
+    if (Date.now() - revisionAbiertaAt.current < 400) return;
     setEstado("sending");
     setError("");
     try {
@@ -156,6 +181,7 @@ export function CartBar() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          lang: releerLang(),
           items: items.map((i) => ({
             tipo: i.tipo,
             ticket_id: i.ticket_id,
@@ -174,6 +200,8 @@ export function CartBar() {
         return;
       }
       clear();
+      setRevisando(false);
+      setAConsulta(Number(data.aConsultaPorStock) || 0);
       setEstado("done");
     } catch {
       setError(c.errRed);
@@ -188,7 +216,16 @@ export function CartBar() {
     <>
       {count > 0 && !open && (
         <div className="cart-bar">
-          <button type="button" onClick={() => setOpen(true)}>
+          <button
+            type="button"
+            onClick={() => {
+              // Un envío anterior que terminó con el carrito cerrado no puede
+              // tapar el carrito nuevo con su "Pedido enviado".
+              if (estado === "done") setEstado("idle");
+              releerLang();
+              setOpen(true);
+            }}
+          >
             <span className="cart-count">{count}</span>
             {c.revisar}
             {totales.length > 0 && <span className="cart-bar-total">{totalTexto}</span>}
@@ -203,6 +240,7 @@ export function CartBar() {
               <div className="cart-ok">
                 <h2>{c.okTitulo}</h2>
                 <p>{c.okP}</p>
+                {aConsulta > 0 && <p className="cart-ok-nota">{c.okStock(aConsulta)}</p>}
                 <div className="cart-ok-acciones">
                   <Link className="btn-primary" href="/mis-pedidos" onClick={cerrar}>
                     {c.okCta}
@@ -212,6 +250,97 @@ export function CartBar() {
                   </button>
                 </div>
               </div>
+            ) : revisando ? (
+              <>
+                <div className="cart-h">
+                  <div>
+                    <h2>{c.revTitulo}</h2>
+                    <p>{c.revSub}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="cart-x"
+                    onClick={cerrar}
+                    aria-label={c.cerrar}
+                    // Mientras sale el pedido no se cierra: si no, el aviso de
+                    // "Pedido enviado" (y el de entradas sin stock) no se veía.
+                    disabled={estado === "sending"}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {[
+                  { tipo: "pedido" as const, lineas: pedidos, titulo: c.revPedidos, nota: c.revPedidosNota },
+                  { tipo: "consulta" as const, lineas: consultas, titulo: c.revConsultas, nota: c.revConsultasNota },
+                ]
+                  .filter((g) => g.lineas.length > 0)
+                  .map((g) => (
+                    <section className="cart-rev-grupo" key={g.tipo}>
+                      <h3>
+                        <span className={`cart-it-tag ${g.tipo}`}>{g.titulo}</span>
+                        <span className="cart-rev-nota">{g.nota}</span>
+                      </h3>
+                      <ul className="cart-rev-list">
+                        {g.lineas.map((i) => (
+                          <li key={i.key}>
+                            <span className="cart-rev-desc">
+                              <span className="cart-it-ev">{i.evento}</span>
+                              <span className="cart-it-meta">
+                                {i.sector}
+                                {i.cantidad > 1 ? ` ×${i.cantidad}` : ""}
+                              </span>
+                            </span>
+                            <span className="cart-it-price">
+                              {i.monto > 0
+                                ? fmtPrice(i.monto * i.cantidad, lang, i.moneda ?? "USD")
+                                : c.aConsultar}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  ))}
+
+                {totales.map((t) => (
+                  <div className="cart-total" key={t.moneda}>
+                    <span>{totales.length > 1 ? `${c.total} (${t.moneda})` : c.total}</span>
+                    <span>{fmtPrice(t.total, lang, t.moneda)}</span>
+                  </div>
+                ))}
+                {totales.length > 1 && <p className="cart-nota-monedas">{c.dosMonedas}</p>}
+
+                <div className="cart-rev-sigue">
+                  <strong>{c.revQueSigue}</strong>
+                  <p>{c.revQueSigueP}</p>
+                </div>
+
+                {estado === "err" && <p className="cart-err">{error}</p>}
+
+                <div className="cart-actions">
+                  <button
+                    type="button"
+                    className="cart-keep"
+                    onClick={() => {
+                      setRevisando(false);
+                      if (estado === "err") setEstado("idle");
+                    }}
+                    disabled={estado === "sending"}
+                  >
+                    {c.revVolver}
+                  </button>
+                  {/* Deshabilitado mientras sale: un doble toque no manda dos
+                      veces (y el server igual deduplica el envío). */}
+                  <button
+                    type="button"
+                    className="cart-send"
+                    onClick={enviar}
+                    disabled={estado === "sending" || items.length === 0}
+                  >
+                    {estado === "sending" ? c.enviando : c.revConfirmar}
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 <div className="cart-h">
@@ -219,7 +348,15 @@ export function CartBar() {
                     <h2>{c.titulo}</h2>
                     <p>{c.sub}</p>
                   </div>
-                  <button type="button" className="cart-x" onClick={cerrar} aria-label={c.cerrar}>
+                  <button
+                    type="button"
+                    className="cart-x"
+                    onClick={cerrar}
+                    aria-label={c.cerrar}
+                    // Mientras sale el pedido no se cierra: si no, el aviso de
+                    // "Pedido enviado" (y el de entradas sin stock) no se veía.
+                    disabled={estado === "sending"}
+                  >
                     ✕
                   </button>
                 </div>
@@ -298,10 +435,14 @@ export function CartBar() {
                   <button
                     type="button"
                     className="cart-send"
-                    onClick={enviar}
-                    disabled={estado === "sending" || items.length === 0}
+                    onClick={() => {
+                      revisionAbiertaAt.current = Date.now();
+                      setRevisando(true);
+                      if (estado === "err") setEstado("idle");
+                    }}
+                    disabled={items.length === 0}
                   >
-                    {estado === "sending" ? c.enviando : c.enviar}
+                    {c.enviar}
                   </button>
                 </div>
               </>

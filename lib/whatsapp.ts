@@ -1,13 +1,13 @@
-// Aviso a los vendedores por WhatsApp Business API (Meta Cloud API), opcional y
-// desacoplado — mismo patrón que lib/email.ts. Se activa SOLO si están las
-// envs WHATSAPP_TOKEN, WHATSAPP_PHONE_ID y WHATSAPP_VENDEDORES; si faltan,
-// `whatsappConfigurado()` devuelve false y el flujo de pedido/consulta sigue
-// funcionando igual (el registro en la app se crea siempre), solo que sin el
-// aviso automático. Cuando se conecte el número de WhatsApp Business, los
-// avisos empiezan a salir sin tocar código.
+// Aviso al equipo por WhatsApp Business API (Meta Cloud API), opcional y
+// desacoplado — mismo patrón que lib/email.ts. Necesita WHATSAPP_TOKEN y
+// WHATSAPP_PHONE_ID; si faltan, el envío devuelve `noConfigurado` y el flujo
+// de pedido/consulta sigue igual (el registro en la app se crea siempre),
+// solo que sin el aviso.
 //
-// WHATSAPP_VENDEDORES: números de los vendedores en formato internacional
-// (sin +), separados por coma. Ej: "5491136148053,5492944806666".
+// A quién lo decide lib/avisos-equipo: el teléfono de cada persona del equipo
+// que activó el aviso (`para`). Mientras nadie lo activó, sin `para`, a la
+// lista fija WHATSAPP_VENDEDORES: números en formato internacional (sin +),
+// separados por coma. Ej: "5491136148053,5492944806666".
 
 // --- plantilla (template) ---------------------------------------------------
 // La Cloud API sólo deja mandar texto libre DENTRO de la ventana de 24 h que se
@@ -40,6 +40,8 @@ export type AvisoPedido = {
   total: string;
   /** Mensaje completo, multilínea: email y fallback de texto libre. */
   texto: string;
+  /** Link al pedido en el panel: va al final del detalle, entero. */
+  link?: string;
 };
 
 /** Datos de una solicitud de acceso nueva desde la landing. */
@@ -49,6 +51,8 @@ export type AvisoAcceso = {
   telefono: string;
   legajo: string;
   texto: string;
+  /** La plantilla `nuevo_acceso` no tiene dónde: solo va en el texto libre. */
+  link?: string;
 };
 
 // Meta rechaza parámetros con saltos de línea, tabs o espacios repetidos, y
@@ -63,6 +67,23 @@ export function limpiarParametro(valor: string, max = 300): string {
   return plano.slice(0, max - 1).trimEnd() + "…";
 }
 
+/**
+ * El detalle con el link al final, en un parámetro de plantilla. Si no entra,
+ * se corta el detalle y nunca el link: un link cortado no abre nada.
+ */
+export function detalleConLink(detalle: string, link: string | undefined, max = 400): string {
+  const l = limpiarParametro(link ?? "", max);
+  if (!link || l === "—") return limpiarParametro(detalle, max);
+  const lugar = max - l.length - 3;
+  if (lugar < 10) return l;
+  return `${limpiarParametro(detalle, lugar)} · ${l}`;
+}
+
+/** El texto libre con el link al final (si no lo tenía ya). */
+export function textoConLink(texto: string, link: string | undefined): string {
+  return link && !texto.includes(link) ? `${texto}\n\n${link}` : texto;
+}
+
 // Nombres de las variables, EXACTAMENTE como figuran en la plantilla de
 // WhatsApp Manager. Meta pasó a parámetros con nombre: si la plantilla usa
 // {{cliente}}, el envío tiene que mandar `parameter_name: "cliente"` y no la
@@ -73,6 +94,20 @@ export function limpiarParametro(valor: string, max = 300): string {
 // WHATSAPP_TEMPLATE_NUMERICO=1 y se mandan por posición.
 export const PARAMS_PEDIDO = ["pedido", "cliente", "entrada", "detalle", "total"] as const;
 export const PARAMS_ACCESO = ["nombre", "email", "telefono", "legajo"] as const;
+// Plantilla genérica `aviso_operacion` (cliente aceptó/canceló, recordatorios):
+// una línea de qué pasó y una con el detalle o el link.
+export const PARAMS_AVISO = ["aviso", "detalle"] as const;
+
+export function plantillaAvisoConfigurada(): boolean {
+  return Boolean(process.env.WHATSAPP_TEMPLATE_AVISO);
+}
+
+/** Aviso genérico al equipo: qué pasó y el detalle, en una línea cada uno. */
+export type AvisoGenerico = { aviso: string; detalle: string; texto: string; link?: string };
+
+export function parametrosAviso(a: AvisoGenerico): string[] {
+  return [limpiarParametro(a.aviso, 200), detalleConLink(a.detalle, a.link, 400)];
+}
 
 export type ParametroPlantilla =
   | { type: "text"; text: string }
@@ -98,7 +133,7 @@ export function parametrosPlantilla(aviso: AvisoPedido): string[] {
     limpiarParametro(aviso.tipo, 40),
     limpiarParametro(aviso.cliente, 120),
     limpiarParametro(String(aviso.entradas), 10),
-    limpiarParametro(aviso.detalle, 400),
+    detalleConLink(aviso.detalle, aviso.link, 400),
     limpiarParametro(aviso.total, 60),
   ];
 }
@@ -114,11 +149,12 @@ export function parametrosAcceso(aviso: AvisoAcceso): string[] {
 }
 
 export function whatsappConfigurado(): boolean {
-  return Boolean(
-    process.env.WHATSAPP_TOKEN &&
-      process.env.WHATSAPP_PHONE_ID &&
-      process.env.WHATSAPP_VENDEDORES
-  );
+  return apiWhatsappConfigurada() && Boolean(process.env.WHATSAPP_VENDEDORES);
+}
+
+/** El número de WhatsApp Business está conectado (token + phone id). */
+export function apiWhatsappConfigurada(): boolean {
+  return Boolean(process.env.WHATSAPP_TOKEN && process.env.WHATSAPP_PHONE_ID);
 }
 
 // Destinatarios (vendedores) parseados del env. Vacío si no está configurado.
@@ -175,21 +211,25 @@ export type WhatsappResult =
 // (el pedido, o la solicitud, ya quedaron registrados antes de llamar acá).
 //
 // Si hay plantilla configurada se manda como plantilla; si no, texto libre.
+//
+// `para`: a quién (los del equipo con el aviso activado). Sin `para`, a la
+// lista fija de WHATSAPP_VENDEDORES, como siempre.
 async function enviar(
   plantilla: string | undefined,
   idioma: string,
   nombres: readonly string[],
   valores: string[],
-  texto: string
+  texto: string,
+  para?: string[]
 ): Promise<WhatsappResult> {
-  if (!whatsappConfigurado()) {
+  if (para ? !apiWhatsappConfigurada() : !whatsappConfigurado()) {
     return {
       ok: false,
       noConfigurado: true,
       error: "El aviso por WhatsApp no está configurado (falta conectar el número de WhatsApp Business).",
     };
   }
-  const destinos = vendedores();
+  const destinos = para ? para.map((n) => n.replace(/[^\d]/g, "")).filter(Boolean) : vendedores();
   if (destinos.length === 0) {
     console.error("[whatsapp] WHATSAPP_VENDEDORES está vacío o mal formado, no hay a quién avisar");
     return { ok: false, error: "No hay vendedores cargados en WHATSAPP_VENDEDORES." };
@@ -293,23 +333,41 @@ export function idiomaAcceso(): string {
 }
 
 /** Entró un pedido o una consulta desde la tienda. */
-export function notificarVendedores(aviso: AvisoPedido): Promise<WhatsappResult> {
+export function notificarVendedores(aviso: AvisoPedido, para?: string[]): Promise<WhatsappResult> {
   return enviar(
     process.env.WHATSAPP_TEMPLATE,
     idiomaPedido(),
     PARAMS_PEDIDO,
     parametrosPlantilla(aviso),
-    aviso.texto
+    textoConLink(aviso.texto, aviso.link),
+    para
   );
 }
 
 /** Alguien pidió acceso desde la landing y hay que aprobarlo o rechazarlo. */
-export function notificarSolicitudAcceso(aviso: AvisoAcceso): Promise<WhatsappResult> {
+export function notificarSolicitudAcceso(aviso: AvisoAcceso, para?: string[]): Promise<WhatsappResult> {
   return enviar(
     process.env.WHATSAPP_TEMPLATE_ACCESO,
     idiomaAcceso(),
     PARAMS_ACCESO,
     parametrosAcceso(aviso),
-    aviso.texto
+    textoConLink(aviso.texto, aviso.link),
+    para
+  );
+}
+
+/**
+ * Aviso genérico (`aviso_operacion`): el cliente aceptó o canceló, o un
+ * recordatorio. Hasta que la plantilla esté aprobada (WHATSAPP_TEMPLATE_AVISO)
+ * sale como texto libre, que Meta solo entrega dentro de la ventana de 24 h.
+ */
+export function notificarAviso(aviso: AvisoGenerico, para?: string[]): Promise<WhatsappResult> {
+  return enviar(
+    process.env.WHATSAPP_TEMPLATE_AVISO,
+    process.env.WHATSAPP_TEMPLATE_AVISO_LANG || idiomaPedido(),
+    PARAMS_AVISO,
+    parametrosAviso(aviso),
+    textoConLink(aviso.texto, aviso.link),
+    para
   );
 }
