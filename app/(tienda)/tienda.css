@@ -488,7 +488,10 @@
 
 /* ============ topbar ============ */
 .toprow { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
-.mast-right { display: flex; align-items: center; gap: 10px; }
+/* flex-wrap: en un celular angosto los accesos no entran en una fila (idioma,
+   mapa, avisos, Mis pedidos, Mi cuenta, Inicio); sin wrap el último quedaba
+   cortado contra el borde. */
+.mast-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; max-width: 100%; }
 
 /* Toggle de idioma EN/ES (mismo lenguaje visual que el viejo selector). */
 .lang { display: inline-flex; flex-shrink: 0; border: 1px solid var(--ink); }
@@ -1096,12 +1099,16 @@
 
 /* ============ mis pedidos (cliente) ============ */
 .mp-wrap { padding-top: 28px; }
-.mp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+/* minmax(0, 1fr): sin esto la columna del grid crecía al ancho del contenido
+   más largo (un estado como "Cotización lista — te toca responder" no se
+   parte) y la tarjeta entera quedaba más ancha que el celular, cortada. */
+.mp-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .mp-item {
+  min-width: 0;
   background: var(--field); border: 1.5px solid var(--ink);
   box-shadow: 4px 4px 0 var(--ink); padding: 16px 18px;
 }
-.mp-item-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mp-item-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 10px; flex-wrap: wrap; }
 .mp-tipo {
   font-family: var(--font-mono), monospace; font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .08em; padding: 3px 8px; border: 1px solid var(--ink);
@@ -1110,8 +1117,9 @@
 .mp-tipo--consulta { background: transparent; color: var(--ink); }
 .mp-estado {
   font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;
-  padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+  padding: 3px 10px; border-radius: 999px; max-width: 100%;
 }
+.mp-estado::before { flex: none; }
 .mp-estado::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .mp-e-abierta { color: #b07a14; background: #f7efd8; }
 .mp-e-curso { color: var(--cobalt); background: #e6e9fb; }
@@ -1257,6 +1265,16 @@
   padding: 3px 8px; cursor: pointer; transition: .12s;
 }
 .cart-rm:hover { background: var(--flare); border-color: var(--flare); color: #fff; }
+/* Celular angosto: etiqueta, evento, precio y "Quitar" en una fila no entran
+   (en 320px "Quitar" quedaba cortado contra el borde). Arriba la etiqueta y
+   el precio, el evento a lo ancho, y "Quitar" abajo a la derecha. */
+@media (max-width: 420px) {
+  .cart-it { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; }
+  .cart-it-tag { justify-self: start; }
+  .cart-it-price { grid-row: 1; grid-column: 2; justify-self: end; }
+  .cart-it-main { grid-column: 1 / -1; }
+  .cart-rm { grid-column: 2; justify-self: end; }
+}
 .cart-total { display: flex; justify-content: space-between; align-items: baseline;
   font-weight: 700; font-size: 15px; margin: 6px 0 4px; border-top: 2px solid var(--ink); padding-top: 12px; }
 .cart-err { color: var(--flare); font-size: 13px; margin: 10px 0 0; }
