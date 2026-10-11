@@ -22,10 +22,11 @@ type Props = {
 export default function AppHeader({ subtitle, email, nav = false }: Props) {
   return (
     <header className="surface-ink sticky top-0 z-30 pt-[env(safe-area-inset-top)] text-white">
-      {/* flex-wrap: si la marca + acciones no entran (Safari mide las fuentes
-          más anchas que Chromium), la fila de acciones baja completa en vez
-          de cortarse en el borde. */}
-      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3">
+      {/* flex-wrap solo en celular: si la marca + acciones no entran, la fila
+          de acciones baja completa en vez de cortarse en el borde. Desde
+          tablet va todo en UNA fila (con la campana ya no entraba en 5xl y
+          las acciones quedaban abajo de las secciones). */}
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 md:flex-nowrap">
         <div className="flex min-w-0 items-center gap-2.5 md:gap-6">
           <div className="flex items-center gap-2.5">
             {/* Marca TicketMirror (la de la tienda): ▚ flare + MIRROR en cobalto
@@ -58,7 +59,7 @@ export default function AppHeader({ subtitle, email, nav = false }: Props) {
             las dejaba desparejas en móvil). 40px en táctil, 36px en desktop. */}
         <div className="flex items-center gap-2">
           {email && (
-            <span className="hidden font-mono text-xs text-white/50 lg:inline">
+            <span title={email} className="hidden max-w-[22ch] truncate font-mono text-xs text-white/50 xl:inline">
               {email}
             </span>
           )}
