@@ -19,6 +19,7 @@ export default function TopNav() {
             key={item.href}
             href={item.href}
             aria-current={isActive ? "page" : undefined}
+            title={item.label}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
               isActive
                 ? "bg-cobalt text-white"
@@ -26,7 +27,9 @@ export default function TopNav() {
             }`}
           >
             {item.icon}
-            {item.label}
+            {/* En tablet solo el ícono (si no, no entraba en una fila con
+                las acciones); el nombre vuelve desde lg. */}
+            <span className="sr-only lg:not-sr-only">{item.label}</span>
           </Link>
         );
       })}
